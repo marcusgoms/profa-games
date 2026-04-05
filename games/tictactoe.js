@@ -32,6 +32,20 @@
     let score = { X: 0, O: 0, draw: 0 };
     let aiTimer = null;
 
+    let audioCtx = null;
+    function tone(freq, dur, type = 'sine', vol = 0.1) {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = type; o.frequency.value = freq;
+            g.gain.value = vol;
+            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+            o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime + dur);
+        } catch(_) {}
+    }
+
     function render() {
         cells.forEach((c, i) => {
             c.textContent = state[i];
@@ -61,13 +75,18 @@
     }
     function showResult(r) {
         active = false;
+        const gamesPlayed = parseInt(localStorage.getItem('pf_games') || '0', 10) + 1;
+        localStorage.setItem('pf_games', gamesPlayed);
         if (r.combo) {
             flashWin(r.combo);
             score[r.winner]++;
             endGame(`Jogador ${r.winner} venceu!`, 'win');
+            tone(523, 0.12, 'sine', 0.12);
+            setTimeout(() => tone(784, 0.3, 'sine', 0.12), 150);
         } else {
             score.draw++;
             endGame('Empate!', 'draw');
+            tone(300, 0.2, 'sawtooth', 0.06);
         }
         document.getElementById('tt-sx').textContent = score.X;
         document.getElementById('tt-sd').textContent = score.draw;
@@ -109,6 +128,7 @@
     function makeMove(idx) {
         state[idx] = player;
         render();
+        tone(440, 0.08, 'sine', 0.12);
         const r = check();
         if (r) { showResult(r); return; }
         player = player === 'X' ? 'O' : 'X';

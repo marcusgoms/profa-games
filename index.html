@@ -16,17 +16,25 @@
                 <a href="pong.html">Pong</a>
                 <a href="memory.html">Memória</a>
                 <a href="tictactoe.html">Jogo da Velha</a>
+                <a href="about.html">Sobre</a>
             </div>
-            <button id="mobile-menu-btn">&#9776;</button>
+            <button id="mobile-menu-btn" aria-label="Menu">&#9776;</button>
         </div>
     </nav>
 
     <header class="hero">
+        <canvas id="particles"></canvas>
         <div class="hero-content">
             <h1>Bem-vindo ao <span class="logo-text">PROFA GAMES</span></h1>
-            <p>Escolha um jogo e divirta-se!</p>
+            <p>Jogos clássicos, direto no navegador. Sem baixar nada.</p>
         </div>
     </header>
+
+    <div class="stats-bar">
+        <div class="stat"><span class="stat-value" id="stat-snake">0</span><span class="stat-label">Recorde Snake</span></div>
+        <div class="stat"><span class="stat-value" id="stat-pong">0</span><span class="stat-label">Recorde Pong</span></div>
+        <div class="stat"><span class="stat-value" id="stat-games">0</span><span class="stat-label">Partidas jogadas</span></div>
+    </div>
 
     <main class="games-grid-section">
         <h2>Nossos Jogos</h2>
@@ -99,6 +107,10 @@
         </div>
     </footer>
 
+    <button id="back-top" class="back-top" aria-label="Voltar ao topo">&#9650;</button>
+
     <script src="hub.js"></script>
+    <script src="particles.js"></script>
+    <script src="stats.js"></script>
 </body>
 </html>

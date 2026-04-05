@@ -14,6 +14,22 @@
     const COLS = W / CELL, ROWS = H / CELL;
 
     let snake, dir, nextDir, food, score, gameOver, running, snakeTimer;
+    let best = parseInt(localStorage.getItem('pf_snake') || '0', 10);
+
+    /* Sound via Web Audio */
+    let audioCtx = null;
+    function tone(freq, dur, type = 'square', vol = 0.08) {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = type; o.frequency.value = freq;
+            g.gain.value = vol;
+            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+            o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime + dur);
+        } catch(_) {}
+    }
 
     function isMobile() {
         return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -36,7 +52,7 @@
         score = 0;
         gameOver = false;
         running = true;
-        statusEl.textContent = 'Pontuação: 0';
+        statusEl.textContent = `Pontuação: 0 | Recorde: ${best}`;
         controlsEl.classList.toggle('hidden', !isMobile());
         gameLoop();
     }
@@ -60,14 +76,22 @@
             snake.some(s => s.x === head.x && s.y === head.y)) {
             gameOver = true;
             running = false;
-            statusEl.textContent = `Game Over! Pontuação: ${score}`;
+            if (score > best) {
+                best = score;
+                localStorage.setItem('pf_snake', best);
+            }
+            const gamesPlayed = parseInt(localStorage.getItem('pf_games') || '0', 10) + 1;
+            localStorage.setItem('pf_games', gamesPlayed);
+            statusEl.textContent = `Game Over! Pontuação: ${score} | Recorde: ${best}`;
+            tone(150, 0.4, 'sawtooth', 0.12);
             return;
         }
         snake.unshift(head);
         if (head.x === food.x && head.y === food.y) {
             score++;
-            statusEl.textContent = `Pontuação: ${score}`;
+            statusEl.textContent = `Pontuação: ${score} | Recorde: ${best}`;
             food = spawnFood();
+            tone(600, 0.1, 'sine', 0.1);
         } else {
             snake.pop();
         }
@@ -96,15 +120,12 @@
     }
 
     document.addEventListener('keydown', keyHandler);
-
     document.getElementById('ctrl-up').addEventListener('click', () => setDir(0, -1));
     document.getElementById('ctrl-down').addEventListener('click', () => setDir(0, 1));
     document.getElementById('ctrl-left').addEventListener('click', () => setDir(-1, 0));
     document.getElementById('ctrl-right').addEventListener('click', () => setDir(1, 0));
-
     resetBtn.addEventListener('click', startGame);
 
     startGame();
-
     draw();
 })();

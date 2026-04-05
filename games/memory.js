@@ -12,6 +12,21 @@
     if (!movesEl) return;
 
     let pairs = 0, moves = 0, flipped = [], locked = false, flipTimer = null;
+    let best = parseInt(localStorage.getItem('pf_memory') || '0', 10);
+
+    let audioCtx = null;
+    function tone(freq, dur, type = 'triangle', vol = 0.08) {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = type; o.frequency.value = freq;
+            g.gain.value = vol;
+            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+            o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime + dur);
+        } catch(_) {}
+    }
 
     function startGame() {
         board.innerHTML = '';
@@ -19,7 +34,6 @@
         movesEl.textContent = '0';
         pairsEl.textContent = '0';
         statusEl.className = 'game-status';
-        statusEl.innerHTML = `<span style="margin:0 12px">Jogadas: <strong id="mem-moves">0</strong></span><span style="margin:0 12px">Pares: <strong id="mem-pairs">0</strong>/8</span>`;
 
         const cards = [...EMOJIS, ...EMOJIS];
         for (let i = cards.length - 1; i > 0; i--) {
@@ -43,6 +57,7 @@
         card.classList.add('flipped');
         card.textContent = card.dataset.emoji;
         flipped.push(card);
+        tone(660, 0.08, 'sine', 0.1);
 
         if (flipped.length === 2) {
             moves++;
@@ -51,6 +66,7 @@
 
             const [a, b] = flipped;
             if (a.dataset.emoji === b.dataset.emoji) {
+                tone(880, 0.15, 'sine', 0.12);
                 a.classList.add('matched');
                 b.classList.add('matched');
                 pairs++;
@@ -59,10 +75,20 @@
                 locked = false;
 
                 if (pairs === EMOJIS.length) {
+                    if (!best || moves < best) {
+                        best = moves;
+                        localStorage.setItem('pf_memory', best);
+                    }
+                    const gamesPlayed = parseInt(localStorage.getItem('pf_games') || '0', 10) + 1;
+                    localStorage.setItem('pf_games', gamesPlayed);
                     statusEl.className = 'game-status win';
-                    statusEl.textContent = `Parabéns! Você encontrou todos os ${EMOJIS.length} pares em ${moves} jogadas!`;
+                    statusEl.textContent = `Parabéns! Todos os pares em ${moves} jogadas! Recorde: ${best}`;
+                    tone(523, 0.15, 'sine', 0.12);
+                    setTimeout(() => tone(659, 0.15, 'sine', 0.12), 150);
+                    setTimeout(() => tone(784, 0.3, 'sine', 0.12), 300);
                 }
             } else {
+                tone(200, 0.15, 'sawtooth', 0.06);
                 flipTimer = setTimeout(() => {
                     a.classList.remove('flipped');
                     b.classList.remove('flipped');
