@@ -81,6 +81,81 @@ a { text-decoration: none; color: inherit; }
     font-size: 1.3em; color: var(--text-dim);
 }
 
+/* ============ LOL PREVIEW CARD ============ */
+.lol-preview {
+    position: absolute; right: 40px; bottom: 40px; z-index: 2;
+}
+.lol-mini-card {
+    background: rgba(26, 26, 46, 0.9);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px; padding: 18px 20px; min-width: 240px;
+    cursor: pointer; transition: transform 0.25s, box-shadow 0.25s;
+    text-decoration: none; color: inherit; display: block;
+}
+.lol-mini-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0,212,255,0.15);
+}
+.lmc-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.lmc-icon {
+    width: 48px; height: 48px; border-radius: 10px; flex-shrink: 0;
+    border: 2px solid rgba(0,212,255,0.3); overflow: hidden; background: var(--bg-card);
+}
+.lmc-icon img { width: 100%; height: 100%; object-fit: cover; }
+.lmc-name { font-size: 1.1em; font-weight: 700; line-height: 1.1; }
+.lmc-name .lmc-tag { color: var(--text-dim); font-weight: 400; font-size: 0.6em; }
+.lmc-region {
+    font-size: 0.7em; color: var(--primary); font-weight: 600;
+}
+.lmc-rank {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06);
+}
+.lmc-rank .lmc-tier {
+    font-size: 0.95em; font-weight: 800;
+}
+.lmc-rank .lmc-lp {
+    font-size: 0.75em; color: var(--primary);
+}
+.lmc-rank .lmc-wr {
+    font-size: 0.7em; color: var(--text-dim); margin-left: auto;
+}
+.lmc-level {
+    font-size: 0.7em; color: var(--text-dim); margin-top: 6px;
+}
+.lmc-status {
+    display: flex; align-items: center; gap: 5px; margin-top: 8px;
+    font-size: 0.7em; font-weight: 600;
+}
+.lmc-status .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+}
+.lmc-status .dot.green { background: #4caf50; animation: pulse 1.5s infinite; }
+.lmc-status .dot.gold { background: #c89b3c; }
+.lmc-no-rank {
+    font-size: 0.8em; color: var(--text-dim); margin-top: 8px;
+}
+.lmc-loader {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 60px;
+}
+.lmc-loader .spinner {
+    width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.08);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.rank-iron { color: #8a8a8a; } .rank-bronze { color: #cd7f32; }
+.rank-silver { color: #c0c0c0; } .rank-gold { color: #ffd700; }
+.rank-platinum { color: #00c3c3; } .rank-emerald { color: #00c87d; }
+.rank-diamond { color: #6b8cff; } .rank-master { color: #e0448b; }
+.rank-grandmaster { color: #cd163b; } .rank-challenger { color: #e7d952; }
+
 /* ============ STATS BAR ============ */
 .stats-bar {
     display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;
