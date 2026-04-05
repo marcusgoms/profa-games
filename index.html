@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROFA GAMES</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav id="main-nav">
+        <div class="nav-inner">
+            <a href="index.html" class="logo">PROFA <span>GAMES</span></a>
+            <div class="nav-links">
+                <a href="index.html" class="active">Início</a>
+                <a href="snake.html">Snake</a>
+                <a href="pong.html">Pong</a>
+                <a href="memory.html">Memória</a>
+                <a href="tictactoe.html">Jogo da Velha</a>
+            </div>
+            <button id="mobile-menu-btn">&#9776;</button>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content">
+            <h1>Bem-vindo ao <span class="logo-text">PROFA GAMES</span></h1>
+            <p>Escolha um jogo e divirta-se!</p>
+        </div>
+    </header>
+
+    <main class="games-grid-section">
+        <h2>Nossos Jogos</h2>
+        <div class="games-grid">
+            <a href="tictactoe.html" class="game-card">
+                <div class="card-visual tc-preview">
+                    <div class="tc-mini-grid">
+                        <span class="tc-x">✕</span><span></span><span class="tc-o">○</span>
+                        <span></span><span class="tc-x">✕</span><span></span>
+                        <span class="tc-o">○</span><span></span><span class="tc-x">✕</span>
+                    </div>
+                </div>
+                <div class="card-info">
+                    <h3>Jogo da Velha</h3>
+                    <p>Clássico contra IA ou 2 jogadores</p>
+                    <span class="tag">Estratégia</span>
+                </div>
+            </a>
+
+            <a href="memory.html" class="game-card">
+                <div class="card-visual mem-preview">
+                    <div class="mem-mini-grid">
+                        <div class="mini-card flipped">⭐</div>
+                        <div class="mini-card">?</div>
+                        <div class="mini-card">?</div>
+                        <div class="mini-card flipped">🐶</div>
+                    </div>
+                </div>
+                <div class="card-info">
+                    <h3>Jogo da Memória</h3>
+                    <p>Encontre todos os pares de cartas</p>
+                    <span class="tag">Memória</span>
+                </div>
+            </a>
+
+            <a href="snake.html" class="game-card">
+                <div class="card-visual snake-preview">
+                    <div class="snake-icon">
+                        <span class="snake-body">●●●</span>
+                        <span class="snake-food">●</span>
+                    </div>
+                </div>
+                <div class="card-info">
+                    <h3>Snake</h3>
+                    <p>Coma, cresça e não bata!</p>
+                    <span class="tag">Arcade</span>
+                </div>
+            </a>
+
+            <a href="pong.html" class="game-card">
+                <div class="card-visual pong-preview">
+                    <div class="pong-icon">
+                        <div class="paddle p-left"></div>
+                        <div class="pong-ball"></div>
+                        <div class="paddle p-right"></div>
+                    </div>
+                </div>
+                <div class="card-info">
+                    <h3>Pong</h3>
+                    <p>Tabela clássica contra a IA</p>
+                    <span class="tag">Arcade</span>
+                </div>
+            </a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-inner">
+            <p>PROFA GAMES &copy; 2026 — Jogos feitos com HTML, CSS e JavaScript puros.</p>
+        </div>
+    </footer>
+
+    <script src="hub.js"></script>
+</body>
+</html>

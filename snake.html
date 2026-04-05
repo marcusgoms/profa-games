@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROFA GAMES — Snake</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav id="main-nav">
+        <div class="nav-inner">
+            <a href="index.html" class="logo">PROFA <span>GAMES</span></a>
+            <div class="nav-links">
+                <a href="index.html">Início</a>
+                <a href="snake.html" class="active">Snake</a>
+                <a href="pong.html">Pong</a>
+                <a href="memory.html">Memória</a>
+                <a href="tictactoe.html">Jogo da Velha</a>
+            </div>
+            <button id="mobile-menu-btn">&#9776;</button>
+        </div>
+    </nav>
+
+    <main class="game-page">
+        <div class="game-wrapper">
+            <div class="game-status" id="snake-status">Pontuação: 0</div>
+            <canvas id="snake-canvas" width="320" height="320"></canvas>
+            <div class="snake-controls" id="snake-controls">
+                <button class="ctrl-btn" id="ctrl-up">&#9650;</button>
+                <button class="ctrl-btn" id="ctrl-left">&#9664;</button>
+                <button class="ctrl-btn" id="ctrl-down">&#9660;</button>
+                <button class="ctrl-btn" id="ctrl-right">&#9654;</button>
+            </div>
+            <div class="button-row">
+                <button class="btn-primary" id="snake-reset">Reiniciar</button>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-inner"><p>PROFA GAMES &copy; 2026 — Jogos feitos com HTML, CSS e JavaScript puros.</p></div>
+    </footer>
+
+    <script src="hub.js"></script>
+    <script src="games/snake.js"></script>
+</body>
+</html>
