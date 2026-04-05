@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROFA GAMES — Admin LoL</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .admin-page {
+            padding-top: 82px; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .admin-wrapper {
+            max-width: 600px; width: 100%; margin: 40px auto; padding: 36px 28px;
+            background: var(--bg-surface); border-radius: var(--card-radius);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .admin-wrapper h1 { font-size: 1.8em; margin-bottom: 6px; color: var(--primary); }
+        .admin-wrapper > p { color: var(--text-dim); margin-bottom: 28px; font-size: 0.9em; }
+
+        .a-field { margin-bottom: 18px; }
+        .a-field label { display: block; font-size: 0.8em; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .a-field input {
+            width: 100%; padding: 10px 14px; background: var(--bg-card); color: var(--text);
+            border: 2px solid rgba(255,255,255,0.06); border-radius: 8px; font-size: 1em;
+            transition: border-color 0.2s;
+        }
+        .a-field input:focus { outline: none; border-color: var(--primary); }
+        .a-row { display: flex; gap: 12px; }
+        .a-row .a-field { flex: 1; }
+
+        .btn-row { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+        .btn-save {
+            background: var(--primary); color: var(--bg-dark); border: none;
+            padding: 10px 22px; border-radius: 8px; font-size: 0.9em; font-weight: 700; cursor: pointer;
+        }
+        .btn-save:hover { opacity: 0.85; transform: translateY(-1px); }
+        .btn-test {
+            background: var(--accent); color: #fff; border: none;
+            padding: 10px 22px; border-radius: 8px; font-size: 0.9em; font-weight: 600; cursor: pointer;
+        }
+        .btn-test:hover { opacity: 0.85; }
+        .btn-reset {
+            background: var(--bg-card); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 22px; border-radius: 8px; font-size: 0.9em; font-weight: 600; cursor: pointer;
+        }
+        .btn-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+        .msg { padding: 12px 14px; border-radius: 8px; margin-top: 16px; font-size: 0.85em; display: none; }
+        .msg.ok { background: rgba(76,175,80,0.12); color: #4caf50; border: 1px solid rgba(76,175,80,0.25); }
+        .msg.err { background: rgba(239,83,80,0.12); color: #ef5350; border: 1px solid rgba(239,83,80,0.25); }
+
+        .current-saved {
+            margin-top: 28px; padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .current-saved h3 { font-size: 0.95em; color: var(--text); margin-bottom: 10px; }
+        .cur-item { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.85em; }
+        .cur-item .ck { color: var(--text-dim); }
+        .cur-item .cv { color: var(--text); font-weight: 600; }
+    </style>
+</head>
+<body>
+    <nav id="main-nav">
+        <div class="nav-inner">
+            <a href="index.html" class="logo">PROFA <span>GAMES</span></a>
+            <div class="nav-links">
+                <a href="index.html">Início</a>
+                <a href="snake.html">Snake</a>
+                <a href="pong.html">Pong</a>
+                <a href="memory.html">Memória</a>
+                <a href="tictactoe.html">Jogo da Velha</a>
+                <a href="about.html">Sobre</a>
+                <a href="lol.html">LoL</a>
+                <a href="admin.html" class="active">Admin</a>
+            </div>
+            <button id="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="admin-wrapper">
+            <h1>⚙ Admin LoL</h1>
+            <p>Configure o Riot ID do jogador. Salva no localStorage do navegador.</p>
+
+            <div class="a-row">
+                <div class="a-field">
+                    <label for="gf">Game Name</label>
+                    <input type="text" id="gf" placeholder="Ex: Faker" autocomplete="off">
+                </div>
+                <div class="a-field">
+                    <label for="tf">Tag Line</label>
+                    <input type="text" id="tf" placeholder="Ex: 1234" autocomplete="off">
+                </div>
+            </div>
+            <div class="a-row">
+                <div class="a-field">
+                    <label for="rf">Região</label>
+                    <input type="text" id="rf" value="BR1" placeholder="BR1">
+                    <small style="color:var(--text-dim);font-size:0.75em;">BR1, NA1, EUW1, KR, JP1…</small>
+                </div>
+                <div class="a-field">
+                    <label for="kf">API Key (opcional)</label>
+                    <input type="password" id="kf" placeholder="Deixa vazio se não trocar" autocomplete="off">
+                    <small style="color:var(--text-dim);font-size:0.75em;">Se vazio, usa a padrão do lol.html</small>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-save" id="bsave">Salvar</button>
+                <button class="btn-test" id="btest">Testar e Abrir</button>
+                <button class="btn-reset" id="breset">Resetar</button>
+            </div>
+
+            <div class="msg" id="msg"></div>
+
+            <div class="current-saved" id="cur"></div>
+
+            <div style="margin-top:24px;">
+                <a class="back-link" href="lol.html">← Ver página do LoL</a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-inner"><p>PROFA GAMES &copy; 2026</p></div>
+    </footer>
+
+    <script src="hub.js"></script>
+    <script>
+    (() => {
+        'use strict';
+        const DEF = { g: 'PROFANON', t: 'br1', r: 'BR1' };
+        const $ = id => document.getElementById(id);
+        const msg = $('msg');
+
+        function show(t, ok) {
+            msg.textContent = t;
+            msg.className = 'msg ' + (ok ? 'ok' : 'err');
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 5000);
+        }
+
+        function load() {
+            const s = JSON.parse(localStorage.getItem('lol_prof') || 'null');
+            $('gf').value = s?.g || DEF.g;
+            $('tf').value = s?.t || DEF.t;
+            $('rf').value = s?.r || DEF.r;
+            $('cur').innerHTML = `
+                <h3>Salvo agora</h3>
+                <div class="cur-item"><span class="ck">Riot ID</span><span class="cv">${$('gf').value}#${$('tf').value}</span></div>
+                <div class="cur-item"><span class="ck">Região</span><span class="cv">${$('rf').value}</span></div>
+            `;
+        }
+
+        function loadAll() {
+            fetchJSON('https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/PROFANON/br1');
+        }
+
+        $('bsave').onclick = () => {
+            const g = $('gf').value.trim(), t = $('tf').value.trim(), r = $('rf').value.trim();
+            if (!g || !t) { show('Preencha Game Name e Tag.', false); return; }
+            localStorage.setItem('lol_prof', JSON.stringify({ g, t, r }));
+            if ($('kf').value.trim()) localStorage.setItem('lol_key', $('gf').value.trim());
+            show('Salvo! A página LoL leu o novo perfil.', true);
+            load();
+        };
+
+        $('btest').onclick = async () => {
+            const g = $('gf').value.trim(), t = $('tf').value.trim();
+            if (!g || !t) { show('Preencha Game Name e Tag.', false); return; }
+            $('btest').textContent = '...';
+            $('btest').disabled = true;
+            try {
+                const res = await fetch(
+                    `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(g)}/${encodeURIComponent(t)}`,
+                    { headers: { 'X-Riot-Token': $('kf').value.trim() || 'RGAPI-ac93dba2-2144-4534-a0e6-c1b8d864d0ec' } }
+                );
+                if (!res.ok) throw new Error(`API: ${res.status}`);
+                const d = await res.json();
+                localStorage.setItem('lol_prof', JSON.stringify({ g, t, r: $('rf').value.trim() }));
+                show(`Achei: ${d.gameName || g}#${d.tagLine || t}. Abrindo...`, true);
+                setTimeout(() => window.open('lol.html', '_blank'), 600);
+            } catch(e) { show('Erro: ' + e.message, false); }
+            $('btest').textContent = 'Testar e Abrir';
+            $('btest').disabled = false;
+        };
+
+        $('breset').onclick = () => {
+            localStorage.removeItem('lol_prof');
+            localStorage.removeItem('lol_key');
+            $('kf').value = '';
+            $('rf').value = DEF.r;
+            show('Resetado.', true);
+            load();
+        };
+
+        load();
+    })();
+    </script>
+</body>
+</html>
