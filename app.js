@@ -577,9 +577,13 @@
     }
 
     // Background refresh: fetches fresh data, merges with existing matches, saves to Firebase
+    // Stagger refreshes to avoid rate limiting (each player waits i*3s)
+    let _refreshQueue = Promise.resolve();
     function refreshPlayer(i) {
         if (bgRefresh[i]) return bgRefresh[i];
-        bgRefresh[i] = (async () => {
+        // Chain refreshes sequentially with delay to avoid rate limit
+        _refreshQueue = _refreshQueue.then(() => new Promise(r => setTimeout(r, 3000)));
+        bgRefresh[i] = _refreshQueue.then(async () => {
             try {
                 const fresh = await fetchPlayerFast(i);
                 const prev = cache[i];
@@ -600,7 +604,7 @@
                 if (typeof onPlayerRefreshed === 'function') onPlayerRefreshed(i, fresh);
             } catch(_) {}
             delete bgRefresh[i];
-        })();
+        });
         return bgRefresh[i];
     }
 
@@ -623,9 +627,10 @@
             const alreadyLoaded = new Set(base.matches.map(m => m.metadata?.matchId).filter(Boolean));
             const toLoad = ids.slice(0, MAX_MATCHES).filter(mid => !alreadyLoaded.has(mid));
             const newMatches = [];
-            // Fetch in batches of 5 to avoid rate limits
-            for (let b = 0; b < toLoad.length; b += 5) {
-                await Promise.all(toLoad.slice(b, b+5).map(mid =>
+            // Fetch in batches of 3 with delay to avoid rate limits
+            for (let b = 0; b < toLoad.length; b += 3) {
+                if (b > 0) await new Promise(r => setTimeout(r, 2000));
+                await Promise.all(toLoad.slice(b, b+3).map(mid =>
                     riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => newMatches.push(d)).catch(() => {})
                 ));
             }
@@ -845,8 +850,9 @@
                 renderSoloQRanking(rankData, loaded < PLAYERS.length);
                 renderTimeline();
                 if (loaded === PLAYERS.length) {
-                    PLAYERS.forEach((_, j) => loadPlayerBackground(j));
-                    // Start retry loop for failed players
+                    _allPlayersLoaded = true;
+                    // Stagger background loading: 5s apart per player to avoid rate limit
+                    PLAYERS.forEach((_, j) => setTimeout(() => loadPlayerBackground(j), j * 5000));
                     startRetryLoop();
                 }
             });
@@ -2686,16 +2692,19 @@
 
     // ======================== NOTIFICAÇÃO DE PARTIDA AO VIVO ========================
     let _liveAlerts = {};
+    let _allPlayersLoaded = false;
     async function checkSquadInGame() {
-        if (apiExpired) return;
+        // Only check after all players have loaded AND key is valid
+        if (apiExpired || !_allPlayersLoaded) return;
         for (let i = 0; i < PLAYERS.length; i++) {
             const d = cache[i];
             if (!d?.account?.puuid) continue;
-            const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
+            const p = PLAYERS[i], pl = plat(p.region);
             try {
                 const resp = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${d.account.puuid}`, {
                     headers: { 'X-Riot-Token': RIOT_KEY }
                 });
+                if (resp.status === 429) break; // Stop checking if rate limited
                 if (resp.ok) {
                     if (!_liveAlerts[i]) {
                         _liveAlerts[i] = true;
@@ -2706,6 +2715,8 @@
                     delete _liveAlerts[i];
                 }
             } catch(_) {}
+            // Small delay between spectator checks to avoid rate limit
+            await new Promise(r => setTimeout(r, 1500));
         }
     }
 
@@ -2831,9 +2842,9 @@
     // Set presence for logged user
     const initUser = getLoggedUser();
     if (initUser) updatePresence(initUser);
-    // Check squad in game every 2 min
-    setTimeout(checkSquadInGame, 5000);
-    setInterval(checkSquadInGame, 120000);
+    // Check squad in game every 5 min (delayed start to not compete with initial load)
+    setTimeout(checkSquadInGame, 60000);
+    setInterval(checkSquadInGame, 300000);
     // Load LP history from Firebase into localStorage
     if (db) {
         db.ref('lpHistory').once('value').then(snap => {
