@@ -198,6 +198,43 @@
         if (modal) modal.remove();
     };
 
+    // ======================== PROFILE SETTINGS ========================
+    window.switchProfTab = function(tab) {
+        document.querySelectorAll('.prof-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+        const s = $('prof-tab-stats'), c = $('prof-tab-config');
+        if (s) s.style.display = tab === 'stats' ? '' : 'none';
+        if (c) c.style.display = tab === 'config' ? '' : 'none';
+    };
+
+    window.pickIcon = function(idx, iconId) {
+        setCustomIcon(idx, iconId);
+        // Update preview and main icon
+        const preview = $('cfg-icon-preview');
+        if (preview) preview.src = profImg(iconId);
+        const main = $('prof-main-icon');
+        if (main) main.src = profImg(iconId);
+        // Update selection highlight
+        document.querySelectorAll('.cfg-icon-opt').forEach(el => {
+            el.classList.toggle('cfg-icon-sel', String(el.dataset.iid) === String(iconId));
+        });
+    };
+
+    window.changePin = function(idx) {
+        const msg = $('cfg-pin-msg');
+        const oldP = $('cfg-old-pin')?.value || '';
+        const newP = $('cfg-new-pin')?.value || '';
+        const conf = $('cfg-confirm-pin')?.value || '';
+        if (!msg) return;
+        if (!/^\d{4}$/.test(oldP)) { msg.textContent = 'PIN atual deve ter 4 dígitos'; msg.className = 'cfg-msg cfg-msg-err'; return; }
+        if (!checkPin(idx, oldP)) { msg.textContent = 'PIN atual incorreto!'; msg.className = 'cfg-msg cfg-msg-err'; return; }
+        if (!/^\d{4}$/.test(newP)) { msg.textContent = 'Novo PIN deve ter 4 dígitos'; msg.className = 'cfg-msg cfg-msg-err'; return; }
+        if (newP !== conf) { msg.textContent = 'PINs não conferem'; msg.className = 'cfg-msg cfg-msg-err'; return; }
+        setPin(idx, newP);
+        msg.textContent = 'PIN alterado com sucesso!';
+        msg.className = 'cfg-msg cfg-msg-ok';
+        $('cfg-old-pin').value = ''; $('cfg-new-pin').value = ''; $('cfg-confirm-pin').value = '';
+    };
+
     // ======================== API KEY MODAL ========================
     window.showApiKeyModal = function() {
         const old = document.getElementById('apikey-modal');
@@ -246,6 +283,9 @@
     const itemImg = id => id?`https://ddragon.leagueoflegends.com/cdn/${DVER}/img/item/${id}.png`:'';
     const spellImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/spell/${id}.png`;
     const profImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/${id}.png`;
+    function getCustomIcon(idx) { return localStorage.getItem('profa_custom_icon_'+idx); }
+    function setCustomIcon(idx, iconId) { localStorage.setItem('profa_custom_icon_'+idx, iconId); }
+    function playerIcon(idx, defaultIcon) { return getCustomIcon(idx) || defaultIcon || 5885; }
     const modeName= m => ({CLASSIC:"Summoner's Rift",ARAM:'ARAM',TUTORIAL:'Tutorial'})[m]||m||'Normal';
     const rankCls = t => t?`rank-${t.toLowerCase()}`:'';
     const drgEmoji= d => ({ocean:'🌊',infernal:'🔥',cloud:'💨',mountain:'⛰️',elder:'🐲',hextech:'⚡',chemtech:'☣️'})[d]||'🔥';
@@ -451,7 +491,7 @@
             if (!card) { loaded++; return; }
 
             loadPlayerFast(i).then(d => {
-                const s  = d.summoner, ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
+                const s  = d.summoner, ic = playerIcon(i, s.profileIconId), lv = s.summonerLevel || '?';
                 const solo = d.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
                 const wr   = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
                 const recent = d.matches.length
@@ -508,7 +548,7 @@
                         wins: solo.wins||0,
                         losses: solo.losses||0,
                         idx: i,
-                        icon: ic
+                        icon: playerIcon(i, s.profileIconId)
                     });
                 }
             }).catch(err => {
@@ -715,7 +755,7 @@
 
         loadPlayer(idx).then(d => {
             const { account:a, summoner:s, league:le, mastery:ma, matches:mt } = d;
-            const ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
+            const ic = playerIcon(idx, s.profileIconId), lv = s.summonerLevel || '?';
             const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
 
             let tv=0, td=0; le.forEach(e => { tv+=e.wins||0; td+=e.losses||0; });
@@ -798,16 +838,77 @@
                 matchs += '</div>';
             }
 
+            // ---- Settings tab (icon change, PIN, predictions) ----
+            const user = getLoggedUser();
+            const isOwner = user && user.idx === idx;
+            let settingsTab = '';
+            if (isOwner) {
+                // Icon picker - popular LoL profile icons
+                const iconIds = [5885,588,589,590,591,592,593,594,595,596,597,598,599,600,601,602,603,604,605,606,607,608,4951,4952,4953,4954,4955,4956,4957,4958,4959,4960,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
+                let iconGrid = '<div class="cfg-icon-grid">';
+                for (const iid of iconIds) {
+                    const sel = String(ic) === String(iid) ? ' cfg-icon-sel' : '';
+                    iconGrid += `<img src="${profImg(iid)}" class="cfg-icon-opt${sel}" data-iid="${iid}" onclick="pickIcon(${idx},${iid})" ${F}>`;
+                }
+                iconGrid += '</div>';
+
+                // PIN change form
+                const pinSection = `<div class="cfg-section">
+                    <h4>Alterar PIN</h4>
+                    <div class="cfg-pin-form">
+                        <input type="password" id="cfg-old-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="PIN atual" autocomplete="off">
+                        <input type="password" id="cfg-new-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Novo PIN" autocomplete="off">
+                        <input type="password" id="cfg-confirm-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Confirmar novo PIN" autocomplete="off">
+                        <button class="cfg-btn" onclick="changePin(${idx})">Alterar PIN</button>
+                        <div id="cfg-pin-msg" class="cfg-msg"></div>
+                    </div>
+                </div>`;
+
+                // Predictions history
+                let predsHtml = '<div class="cfg-section"><h4>Meus Palpites</h4>';
+                const predKeys = [];
+                for (let k = 0; k < localStorage.length; k++) {
+                    const key = localStorage.key(k);
+                    if (key && key.startsWith('pred_' + idx + '_')) predKeys.push(key);
+                }
+                if (predKeys.length) {
+                    predsHtml += '<div class="cfg-preds">';
+                    for (const key of predKeys) {
+                        try {
+                            const pred = JSON.parse(localStorage.getItem(key));
+                            const mid = key.replace('pred_' + idx + '_', '');
+                            const date = pred.time ? new Date(pred.time).toLocaleDateString('pt-BR') : '?';
+                            const score = pred.scoreA != null && pred.scoreB != null ? pred.scoreA + ' x ' + pred.scoreB : '';
+                            predsHtml += '<div class="cfg-pred-item"><span class="cfg-pred-winner">' + (pred.winner||'?') + '</span>' + (score ? '<span class="cfg-pred-score">' + score + '</span>' : '') + '<span class="cfg-pred-date">' + date + '</span></div>';
+                        } catch(_) {}
+                    }
+                    predsHtml += '</div>';
+                } else {
+                    predsHtml += '<p style="color:var(--dim);font-size:.85em;">Nenhum palpite registrado ainda.</p>';
+                }
+                predsHtml += '</div>';
+
+                settingsTab = `<div class="cfg-section"><h4>Trocar Ícone</h4><div class="cfg-icon-current"><img src="${profImg(ic)}" class="cfg-icon-preview" id="cfg-icon-preview" ${F}><span>Ícone atual</span></div>${iconGrid}</div>${pinSection}${predsHtml}`;
+            }
+
+            const hasCfg = isOwner;
+            const tabs = hasCfg ? `<div class="prof-tabs">
+                <button class="prof-tab on" data-tab="stats" onclick="switchProfTab('stats')">Estatísticas</button>
+                <button class="prof-tab" data-tab="config" onclick="switchProfTab('config')">Configurações</button>
+            </div>` : '';
+
             const rb = solo ? `<span class="prg">${solo.tier} ${solo.rank} &mdash; ${solo.leaguePoints} LP</span>` : `<span class="prg">Não posicionado</span>`;
             app.innerHTML = `<div class="section-wrap-sm">
                 <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
                 <div class="pv">
                     <div class="pb"><div class="pbg"></div><div class="pbi">
-                        <div class="pi"><img src="${profImg(ic)}" alt="" ${F}></div>
+                        <div class="pi"><img src="${profImg(ic)}" alt="" id="prof-main-icon" ${F}></div>
                         <div><div class="pn2">${a.gameName||p.name} <span class="t">#${a.tagLine||p.tag}</span></div>
                         <span class="prg">${p.region}</span>${rb}</div>
                     </div></div>
-                    ${stats}${ranked}${mas}${matchs}
+                    ${tabs}
+                    <div id="prof-tab-stats">${stats}${ranked}${mas}${matchs}</div>
+                    ${hasCfg ? '<div id="prof-tab-config" style="display:none;">' + settingsTab + '</div>' : ''}
                 </div>
             </div>`;
         }).catch(err => {

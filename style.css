@@ -5,7 +5,7 @@
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--txt); min-height: 100vh; display: flex; flex-direction: column; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--txt); min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
 a { text-decoration: none; color: inherit; }
 
 /* NAV */
@@ -665,6 +665,145 @@ body::after {
 }
 .soloq-svg { width: 100%; height: auto; min-width: 500px; }
 
+/* ==================== PROFILE TABS & SETTINGS ==================== */
+.prof-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 16px 0;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.prof-tab {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: var(--dim);
+    font-size: 0.85em;
+    font-weight: 600;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.prof-tab.on {
+    background: var(--pri);
+    color: var(--bg);
+}
+.prof-tab:hover:not(.on) {
+    background: rgba(255,255,255,0.05);
+    color: var(--txt);
+}
+.cfg-section {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.cfg-section h4 {
+    font-size: 1em;
+    font-weight: 700;
+    margin: 0 0 14px 0;
+    color: var(--txt);
+}
+.cfg-icon-current {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    color: var(--dim);
+    font-size: 0.85em;
+}
+.cfg-icon-preview {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid var(--pri);
+}
+.cfg-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.15);
+}
+.cfg-icon-opt {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+    object-fit: cover;
+}
+.cfg-icon-opt:hover {
+    border-color: rgba(0,212,255,0.5);
+    transform: scale(1.1);
+}
+.cfg-icon-sel {
+    border-color: var(--pri) !important;
+    box-shadow: 0 0 8px rgba(0,212,255,0.4);
+}
+.cfg-pin-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 280px;
+}
+.cfg-pin-form input {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: var(--surf);
+    color: var(--txt);
+    font-size: 0.9em;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.cfg-pin-form input:focus {
+    border-color: var(--pri);
+}
+.cfg-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    background: var(--pri);
+    color: var(--bg);
+    font-weight: 600;
+    font-size: 0.85em;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.cfg-btn:hover { opacity: 0.85; }
+.cfg-msg { font-size: 0.82em; margin-top: 4px; font-weight: 600; }
+.cfg-msg-err { color: #ef5350; }
+.cfg-msg-ok { color: #4caf50; }
+.cfg-preds {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.cfg-pred-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--surf);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.85em;
+}
+.cfg-pred-winner { font-weight: 700; color: var(--txt); }
+.cfg-pred-score { color: var(--pri); font-weight: 600; }
+.cfg-pred-date { margin-left: auto; color: var(--dim); font-size: 0.8em; }
+
 /* FOOTER */
 .ft { margin-top: auto; padding: 24px 20px; text-align: center; color: var(--dim); font-size: 0.8em; border-top: 1px solid rgba(255,255,255,0.04); position: relative; }
 .ft::before {
@@ -679,32 +818,246 @@ body::after {
 .ft-icons { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; opacity: 0.4; }
 .ft-icon { width: 20px; height: 20px; border-radius: 50%; }
 
-/* RESPONSIVE */
+/* ==================== RESPONSIVE ==================== */
+
+/* Tablet */
+@media(max-width:900px){
+    .section-wrap, .section-wrap-sm { padding: 16px; }
+    .tg { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .podium { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .podium-card { padding: 14px 10px; }
+    .podium-pts { font-size: 1.4em; }
+    .live-detail-matchup { gap: 1.2rem; }
+}
+
+/* Mobile */
 @media(max-width:760px){
-    .nl{display:none;flex-direction:column;position:absolute;top:62px;left:0;right:0;background:rgba(13,13,26,0.97);padding:16px 24px;gap:4px;border-bottom:1px solid rgba(255,255,255,0.06)}
-    .nl.open{display:flex} #mmb{display:block}
-    .squad-hero-inner h1{font-size:2em}
-    .hero-emblem{width:36px;height:36px}
-    .tg{grid-template-columns:1fr} .tsr{grid-template-columns:1fr}
-    .pbi{flex-direction:column;text-align:center} .ps{grid-template-columns:repeat(2,1fr)}
-    .cblol-title{font-size:2em}
-    .cblol-tabs{flex-wrap:wrap}
-    .cblol-card-teams{flex-direction:column;gap:10px;padding:14px}
-    .cblol-team{justify-content:center!important}
-    .cblol-pred-row{flex-direction:column;align-items:stretch}
-    .cblol-pred-btn{margin-left:0;width:100%}
-    .podium{grid-template-columns:1fr}
-    .live-grid-inner{grid-template-columns:1fr} .live-today-grid{grid-template-columns:1fr}
-    .live-detail-matchup{gap:1rem}
-    .live-detail-team img{width:3.5rem;height:3.5rem}
-    .live-detail-score{font-size:1.5em}
-    .live-obj-grid{grid-template-columns:repeat(2,1fr)}
-    .game-tabs{flex-wrap:wrap}
-    .nav-user{margin-left:auto;margin-right:8px}
-    .login-players{grid-template-columns:1fr}
-    .music-btn{bottom:12px;right:12px;padding:6px 12px}
-    .music-title{display:none}
-    .music-panel{right:12px;bottom:56px;width:240px}
-    .soloq-legend-grid{grid-template-columns:1fr 1fr}
-    .soloq-evo-chart{padding:12px 6px}
+    :root { font-size: 15px; }
+
+    /* Nav */
+    .nl{display:none;flex-direction:column;position:absolute;top:62px;left:0;right:0;background:rgba(13,13,26,0.97);padding:16px 24px;gap:4px;border-bottom:1px solid rgba(255,255,255,0.06);z-index:100}
+    .nl.open{display:flex}
+    .nl a { padding: 12px 16px; font-size: 1em; border-radius: 10px; }
+    #mmb{display:block}
+    .nav-in { padding: 0 14px; }
+    .nav-user { margin-left: auto; margin-right: 4px; }
+    .nav-user-name { font-size: 0.75em; padding: 3px 8px; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nav-user-btn { padding: 5px 10px; font-size: 0.75em; }
+
+    /* Wrappers */
+    .section-wrap, .section-wrap-sm { padding: 12px; }
+
+    /* Hero */
+    .squad-hero { padding: 40px 16px 28px; }
+    .squad-hero-inner h1 { font-size: 1.8em; }
+    .squad-hero-inner p { font-size: 0.9em; }
+    .hero-emblem { width: 36px; height: 36px; }
+
+    /* Cards */
+    .sh { margin: 20px 0 12px; }
+    .sh h2 { font-size: 1.15em; }
+    .tg { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
+    .pc { padding: 14px; border-radius: 12px; }
+    .pch { gap: 10px; margin-bottom: 10px; }
+    .pci { width: 44px; height: 44px; border-radius: 8px; }
+    .pcn { font-size: 1em; }
+    .pr { padding: 8px 10px; gap: 8px; flex-wrap: wrap; }
+    .pt { font-size: 0.9em; }
+    .noob-badge { font-size: 0.6em; padding: 5px 8px; }
+    .noob-footer { padding: 6px 8px; }
+    .noob-stats-fun { flex-direction: column; gap: 4px; align-items: center; }
+
+    /* Profile */
+    .pb { padding: 18px 14px; border-radius: 12px; margin-bottom: 14px; }
+    .pbi { flex-direction: column; text-align: center; gap: 12px; }
+    .pbi .pi { width: 64px; height: 64px; border-radius: 12px; }
+    .pbi .pn2 { font-size: 1.5em; }
+    .prg { font-size: 0.72em; padding: 2px 8px; }
+    .ps { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+    .pst { padding: 10px; border-radius: 8px; }
+    .pst .sv { font-size: 1.4em; }
+    .sx { margin-bottom: 16px; }
+    .sx h3 { font-size: 1em; margin-bottom: 10px; }
+    .mg { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+    .mi { padding: 10px 6px; }
+    .mi img { width: 40px; height: 40px; }
+
+    /* Matches */
+    .mc { padding: 10px; border-radius: 6px; margin-bottom: 6px; }
+    .mh { gap: 8px; font-size: 0.65em; flex-wrap: wrap; }
+    .mhi { font-size: 0.7em; }
+    .mb { gap: 8px; }
+    .mch img { width: 36px; height: 36px; border-radius: 6px; }
+    .mch .mcn { font-size: 0.8em; }
+    .mch .kda { font-size: 0.75em; }
+    .mch .csm { font-size: 0.65em; }
+    .mii img { width: 20px; height: 20px; }
+    .tsr { grid-template-columns: 1fr; gap: 8px; }
+    .or { font-size: 0.62em; }
+    .or img { width: 18px; height: 18px; }
+
+    /* Profile tabs & settings */
+    .prof-tabs { margin: 12px 0; }
+    .prof-tab { padding: 9px 10px; font-size: 0.8em; }
+    .cfg-section { padding: 14px; border-radius: 12px; margin-bottom: 12px; }
+    .cfg-section h4 { font-size: 0.9em; margin-bottom: 10px; }
+    .cfg-icon-preview { width: 44px; height: 44px; }
+    .cfg-icon-grid { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 5px; max-height: 200px; }
+    .cfg-icon-opt { width: 34px; height: 34px; }
+    .cfg-pin-form { max-width: 100%; }
+    .cfg-pin-form input { padding: 10px 12px; font-size: 0.85em; }
+    .cfg-pred-item { padding: 8px 10px; font-size: 0.8em; gap: 8px; flex-wrap: wrap; }
+
+    /* CBLOL */
+    .cblol-hero { padding: 24px 14px 20px; border-radius: 14px; margin-bottom: 16px; }
+    .cblol-badge { font-size: 0.55em; letter-spacing: 2px; padding: 3px 10px; }
+    .cblol-title { font-size: 2em; }
+    .cblol-sub { font-size: 0.82em; }
+    .cblol-tabs { flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 10px; }
+    .cblol-tab { padding: 8px 8px; font-size: 0.75em; gap: 4px; min-width: 0; }
+    .cblol-tab-ic { font-size: 0.9em; }
+    .cblol-card { border-radius: 12px; }
+    .cblol-card-header { padding: 8px 12px; font-size: 0.65em; flex-wrap: wrap; gap: 6px; }
+    .cblol-card-teams { flex-direction: row; gap: 8px; padding: 12px; }
+    .cblol-team img { width: 36px; height: 36px; border-radius: 8px; padding: 3px; }
+    .cblol-team-name { font-size: 0.85em; }
+    .cblol-team-score { font-size: 1.3em; }
+    .cblol-vs-divider { width: 36px; }
+    .cblol-vs-divider span { font-size: 0.7em; }
+    .cblol-pred-form { padding: 10px 12px 12px; }
+    .cblol-pred-row { flex-direction: column; align-items: stretch; gap: 10px; }
+    .cblol-pred-field select { width: 100%; }
+    .cblol-pred-btn { margin-left: 0; width: 100%; padding: 10px; }
+    .cblol-pred-saved { font-size: 0.72em; padding: 6px 10px; }
+
+    /* Predictions ranking */
+    .podium { grid-template-columns: 1fr; gap: 8px; }
+    .podium-card { padding: 14px; display: flex; align-items: center; gap: 12px; text-align: left; }
+    .podium-pos { font-size: 1.2em; margin-bottom: 0; }
+    .podium-name { font-size: 0.95em; margin-bottom: 0; flex: 1; }
+    .podium-pts { font-size: 1.3em; }
+    .podium-stats { margin-top: 0; gap: 6px; font-size: 0.7em; }
+    .rank-row { padding: 10px 12px; gap: 8px; }
+    .rank-pts { font-size: 0.85em; min-width: 50px; }
+
+    /* Solo Q ranking */
+    .soloq-ranking { padding: 14px; border-radius: 12px; margin-top: 16px; }
+    .soloq-header { margin-bottom: 14px; }
+    .soloq-header h2 { font-size: 1.15em; }
+    .soloq-header p { font-size: 0.78em; }
+    .soloq-legend-grid { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .soloq-legend-card { padding: 10px; border-radius: 10px; }
+    .soloq-lc-top { gap: 6px; margin-bottom: 6px; }
+    .soloq-lc-medal { font-size: 0.9em; min-width: 20px; }
+    .soloq-lc-name { font-size: 0.78em; }
+    .soloq-lc-tier { font-size: 0.62em; }
+    .soloq-lc-stats { gap: 6px; font-size: 0.75em; }
+    .soloq-evo { margin-top: 14px; }
+    .soloq-evo h3 { font-size: 0.95em; }
+    .soloq-evo-chart { padding: 10px 4px; border-radius: 10px; }
+    .soloq-svg { min-width: 400px; }
+
+    /* Live page */
+    .live-page-hero { padding: 24px 14px 16px; }
+    .live-page-hero h1 { font-size: 1.6em; gap: 8px; }
+    .live-page-hero p { font-size: 0.82em; }
+    .live-grid-inner { grid-template-columns: 1fr; gap: 1rem; }
+    .live-today-grid { grid-template-columns: 1fr; gap: 1rem; }
+    .live-card-team img { width: 3rem; height: 3rem; }
+    .live-card-team span { font-size: 0.78em; }
+    .live-detail-header { padding: 16px 12px; border-radius: 12px; margin-bottom: 12px; }
+    .live-detail-matchup { gap: 0.8rem; margin-top: 10px; }
+    .live-detail-team img { width: 3rem; height: 3rem; border-radius: 10px; }
+    .live-detail-team span { font-size: 0.9em; }
+    .live-detail-score { font-size: 1.5em; }
+    .live-frame { padding: 12px; border-radius: 10px; }
+    .live-obj-grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+    .obj-row { padding: 6px 3px; }
+    .obj-icon { font-size: 0.6em; }
+    .obj-val { font-size: 0.95em; }
+    .game-tabs { flex-wrap: wrap; gap: 4px; }
+    .game-tab { padding: 6px 8px; font-size: 0.72em; }
+
+    /* Live players table */
+    .lt-wrap { border-radius: 8px; }
+    .lt { min-width: 460px; }
+    .lt-head-row th { padding: 6px 4px; font-size: 0.55em; }
+    .lt td { padding: 4px; font-size: 0.7em; }
+    .lchamp-img { width: 26px; height: 26px; }
+    .lchamp-cn { font-size: 0.7em; }
+    .lchamp-sn { font-size: 0.58em; max-width: 60px; }
+    .litems img { width: 16px; height: 16px; }
+    .li-empty { width: 16px; height: 16px; }
+
+    /* Gold/dragon bars */
+    .gold-header { font-size: 0.78em; }
+    .gold-diff { font-size: 0.68em; }
+    .drg-bar { padding: 4px 8px; margin: 6px 0 10px; }
+    .drg-icon { font-size: 1em; }
+    .drg-label { font-size: 0.58em; padding: 0 6px; }
+
+    /* Login modal */
+    .modal-overlay { padding: 12px; }
+    .modal-box { border-radius: 16px; max-width: 100%; }
+    .modal-header { padding: 20px 16px 14px; }
+    .modal-header h2 { font-size: 1.2em; }
+    .modal-body { padding: 14px 16px 20px; }
+    .login-players { grid-template-columns: 1fr; gap: 6px; }
+    .login-player-btn { padding: 10px; }
+    #login-pin-form input { width: 120px; font-size: 1.3em; }
+
+    /* Music player */
+    .music-btn { bottom: 10px; right: 10px; padding: 6px 10px; border-radius: 30px; }
+    .music-icon { font-size: 1em; }
+    .music-title { display: none; }
+    .music-panel { right: 10px; bottom: 50px; width: 220px; border-radius: 12px; }
+    .mp-header { padding: 8px 10px; }
+    .mp-now { font-size: 0.72em; padding: 6px 10px; }
+    .mp-controls { padding: 4px 10px 6px; }
+    .mp-btn { padding: 5px 10px; font-size: 0.72em; }
+    .mp-vol { padding: 4px 10px 6px; }
+    .mp-list { max-height: 150px; padding: 3px 6px 6px; }
+    .mp-track { padding: 5px 8px; font-size: 0.68em; }
+
+    /* Footer */
+    .ft { padding: 16px 12px; font-size: 0.72em; }
+
+    /* Ranking table */
+    .rt th { padding: 8px 8px; font-size: 0.6em; }
+    .rt td { padding: 8px 8px; font-size: 0.8em; }
+
+    /* Back button & loader */
+    .bb { padding: 6px 12px; font-size: 0.82em; margin-bottom: 14px; }
+    .ld { padding: 40px 16px; }
+}
+
+/* Small phones */
+@media(max-width:400px){
+    :root { font-size: 14px; }
+    .nav-in { padding: 0 10px; height: 56px; }
+    .logo { font-size: 1.2em; gap: 6px; }
+    .logo-icon { width: 22px; height: 22px; }
+    #app { padding-top: 56px; }
+    .section-wrap, .section-wrap-sm { padding: 8px; }
+    .squad-hero { padding: 28px 10px 20px; }
+    .squad-hero-inner h1 { font-size: 1.5em; }
+    .pc { padding: 12px; }
+    .pci { width: 38px; height: 38px; }
+    .pcn { font-size: 0.9em; }
+    .pb { padding: 14px 10px; }
+    .pbi .pi { width: 52px; height: 52px; }
+    .pbi .pn2 { font-size: 1.2em; }
+    .ps { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .pst .sv { font-size: 1.2em; }
+    .cblol-title { font-size: 1.6em; }
+    .cblol-tab { padding: 7px 6px; font-size: 0.68em; }
+    .cblol-team img { width: 30px; height: 30px; }
+    .cblol-team-name { font-size: 0.75em; }
+    .soloq-legend-grid { grid-template-columns: 1fr; }
+    .soloq-svg { min-width: 320px; }
+    .live-card-team img { width: 2.5rem; height: 2.5rem; }
+    .live-detail-team img { width: 2.5rem; height: 2.5rem; }
+    .cfg-icon-grid { grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); }
+    .cfg-icon-opt { width: 30px; height: 30px; }
+    .cfg-icon-preview { width: 38px; height: 38px; }
 }
