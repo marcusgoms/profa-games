@@ -1,0 +1,37 @@
+{
+  "files": {
+    "main.css": "/profa-games/static/css/main.1134976a.css",
+    "main.js": "/profa-games/static/js/main.520dbc1a.js",
+    "static/js/718.54b4b30d.chunk.js": "/profa-games/static/js/718.54b4b30d.chunk.js",
+    "static/media/vermelha_torre_destruida.ogg": "/profa-games/static/media/vermelha_torre_destruida.7728a6795bb037c7d970.ogg",
+    "static/media/vermelha_baron.ogg": "/profa-games/static/media/vermelha_baron.44f2a565223f3d9c30d1.ogg",
+    "static/media/azul_dragao.ogg": "/profa-games/static/media/azul_dragao.01162a2e416287f36914.ogg",
+    "static/media/vermelha_inib_destruido.ogg": "/profa-games/static/media/vermelha_inib_destruido.2f3927dbf655de82c90d.ogg",
+    "static/media/azul_inib_destruido.ogg": "/profa-games/static/media/azul_inib_destruido.e4b2c139ddd9debbba60.ogg",
+    "static/media/campeao_eliminado.ogg": "/profa-games/static/media/campeao_eliminado.8adf323fa94035ab6c9c.ogg",
+    "static/media/azul_baron.ogg": "/profa-games/static/media/azul_baron.68b74d700199fd6c1dc1.ogg",
+    "static/media/vermelha_dragao.ogg": "/profa-games/static/media/vermelha_dragao.1a370a2e9a0377bb3d09.ogg",
+    "static/media/azul_torre_destruida.ogg": "/profa-games/static/media/azul_torre_destruida.09d953cdd92096a48778.ogg",
+    "static/media/firstblood.ogg": "/profa-games/static/media/firstblood.5c1ea1c00aa4d48b8a65.ogg",
+    "static/media/galaxy.svg": "/profa-games/static/media/galaxy.8ee05acd6191a554be5eaedf1e1c0f87.svg",
+    "static/media/dragon-elder.svg": "/profa-games/static/media/dragon-elder.2dd99da46bb0125cf0da8c50f2314239.svg",
+    "static/media/baron.svg": "/profa-games/static/media/baron.99733951bab1ced9bc841273b7ebfbcc.svg",
+    "static/media/league-of-legends.svg": "/profa-games/static/media/league-of-legends.3f6f7c301b6265b79bea1731211c4c5c.svg",
+    "static/media/dragon-cloud.svg": "/profa-games/static/media/dragon-cloud.1a55fc3054609701d472df34736c0fe1.svg",
+    "static/media/dragon-ocean.svg": "/profa-games/static/media/dragon-ocean.ad7cfa522724ab813942b5b94f25e5c8.svg",
+    "static/media/dragon-infernal.svg": "/profa-games/static/media/dragon-infernal.43bfa7f38dc05fdbdafd672a0de8b71a.svg",
+    "index.html": "/profa-games/index.html",
+    "static/media/loading.svg": "/profa-games/static/media/loading.f10f04880a84a0dfbac30aeb8b42ec58.svg",
+    "static/media/github.svg": "/profa-games/static/media/github.04be58c17b3d5e9744424d414240dd85.svg",
+    "static/media/tower.svg": "/profa-games/static/media/tower.3a7fbe61545888e7bb73dbe12d4faebf.svg",
+    "static/media/twitter.svg": "/profa-games/static/media/twitter.5ae9f4cf80c1f851b13c3fb4494b8d39.svg",
+    "static/media/gold.svg": "/profa-games/static/media/gold.ec65d79c952f08080433b7d63489cc07.svg",
+    "static/media/inhibitor.svg": "/profa-games/static/media/inhibitor.5e389683105d41ff0b3db6898525355b.svg",
+    "static/media/kill.svg": "/profa-games/static/media/kill.b4d6f4d2e3d6a470688ed7ca46281132.svg",
+    "static/media/dragon-mountain.svg": "/profa-games/static/media/dragon-mountain.69282d8cc05cb4656bb7809ed548df72.svg"
+  },
+  "entrypoints": [
+    "static/css/main.1134976a.css",
+    "static/js/main.520dbc1a.js"
+  ]
+}
