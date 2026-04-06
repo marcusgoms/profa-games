@@ -267,11 +267,58 @@
         return (carry > 0 ? String(carry) : '') + arr.join('');
     }
 
-    // ======================== API ========================
-    async function riot(url) {
-        const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
-        if (!r.ok) throw new Error(`Riot ${r.status}`);
-        return r.json();
+    // ======================== API (Rate Limited) ========================
+    // Riot Dev Key limits: 20 req/1s, 100 req/2min
+    const riotQueue = [];
+    const riotTimestamps = [];
+    let riotProcessing = false;
+    const RIOT_MAX_PER_SEC = 15;     // stay under 20/s
+    const RIOT_MAX_PER_2MIN = 85;    // stay under 100/2min
+    const RIOT_RETRY_DELAY = 3000;
+    const RIOT_MAX_RETRIES = 4;
+
+    function riotCanSend() {
+        const now = Date.now();
+        // Clean old timestamps
+        while (riotTimestamps.length && riotTimestamps[0] < now - 120000) riotTimestamps.shift();
+        const last1s = riotTimestamps.filter(t => t > now - 1000).length;
+        return last1s < RIOT_MAX_PER_SEC && riotTimestamps.length < RIOT_MAX_PER_2MIN;
+    }
+
+    async function processRiotQueue() {
+        if (riotProcessing) return;
+        riotProcessing = true;
+        while (riotQueue.length) {
+            while (!riotCanSend()) await new Promise(r => setTimeout(r, 200));
+            const { url, resolve, reject, retries } = riotQueue.shift();
+            riotTimestamps.push(Date.now());
+            try {
+                const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
+                if (r.status === 429) {
+                    const retryAfter = parseInt(r.headers.get('Retry-After') || '3') * 1000;
+                    if (retries < RIOT_MAX_RETRIES) {
+                        riotQueue.unshift({ url, resolve, reject, retries: retries + 1 });
+                        await new Promise(r => setTimeout(r, retryAfter || RIOT_RETRY_DELAY));
+                    } else { reject(new Error('Riot 429 (rate limit)')); }
+                    continue;
+                }
+                if (!r.ok) { reject(new Error(`Riot ${r.status}`)); continue; }
+                resolve(await r.json());
+            } catch(e) {
+                if (retries < RIOT_MAX_RETRIES) {
+                    riotQueue.unshift({ url, resolve, reject, retries: retries + 1 });
+                    await new Promise(r => setTimeout(r, RIOT_RETRY_DELAY));
+                } else { reject(e); }
+            }
+        }
+        riotProcessing = false;
+    }
+
+    function riot(url) {
+        return new Promise((resolve, reject) => {
+            riotQueue.push({ url, resolve, reject, retries: 0 });
+            processRiotQueue();
+        });
     }
     async function rots(u, fb=null) { try { return await riot(u); } catch(_) { return fb; } }
 
@@ -298,21 +345,47 @@
         return d.toISOString();
     }
 
-    // ======================== DATA LAYER ========================
+    // ======================== DATA LAYER (with localStorage cache) ========================
     const cache = {};
+    const CACHE_TTL = 5 * 60 * 1000; // 5 min cache in localStorage
+
+    function getCachedPlayer(i) {
+        try {
+            const raw = localStorage.getItem(`profa_player_${i}`);
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (Date.now() - data._ts > CACHE_TTL) { localStorage.removeItem(`profa_player_${i}`); return null; }
+            return data;
+        } catch(_) { return null; }
+    }
+    function setCachedPlayer(i, data) {
+        try { localStorage.setItem(`profa_player_${i}`, JSON.stringify({ ...data, _ts: Date.now() })); } catch(_) {}
+    }
+
     async function loadPlayer(i) {
         if (cache[i]) return cache[i];
+        const cached = getCachedPlayer(i);
+        if (cached) { cache[i] = cached; return cached; }
+
         const p = PLAYERS[i], c = clust(p.region), pl = plat(p.region);
         const account  = await riot(`https://${c}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
         const summoner = await riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`);
         const league   = await rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []) || [];
         const mastery  = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}/top?count=5`, []) || [];
         const matchIds = await rots(`https://${c}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=20`, []) || [];
-        const matches  = [];
-        await Promise.all(matchIds.slice(0, 8).map(mid =>
-            riot(`https://${c}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => matches.push(d)).catch(() => {})
-        ));
+
+        // Load matches in batches of 3 to respect rate limits, load up to 15
+        const matches = [];
+        const toLoad = matchIds.slice(0, 15);
+        for (let b = 0; b < toLoad.length; b += 3) {
+            const batch = toLoad.slice(b, b + 3);
+            await Promise.all(batch.map(mid =>
+                riot(`https://${c}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => matches.push(d)).catch(() => {})
+            ));
+        }
+
         cache[i] = { account, summoner, league, mastery, matches };
+        setCachedPlayer(i, cache[i]);
         return cache[i];
     }
 
@@ -378,11 +451,19 @@
         </div>`;
 
         const rankData = [];
-        let loaded = 0;
+        const loadingStatus = $('soloq-chart');
+        if (loadingStatus) loadingStatus.innerHTML = `<div class="ld"><div class="sp"></div><p style="color:var(--dim);font-size:.85em;margin-top:8px;">Carregando jogadores (0/${PLAYERS.length})…</p></div>`;
 
-        PLAYERS.forEach(async (p, i) => {
+        // Load players sequentially to respect rate limits
+        for (let i = 0; i < PLAYERS.length; i++) {
+            const p = PLAYERS[i];
             const card = document.querySelector(`[data-i="${i}"]`);
-            if (!card) return;
+            if (!card) continue;
+
+            // Update loading progress
+            const statusEl = loadingStatus?.querySelector('p');
+            if (statusEl) statusEl.textContent = `Carregando jogadores (${i}/${PLAYERS.length})… ${p.name}`;
+
             try {
                 const d  = await loadPlayer(i);
                 const s  = d.summoner, ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
@@ -447,17 +528,18 @@
                 }
             } catch(err) {
                 const isAuth = err.message?.includes('403') || err.message?.includes('401');
+                const isRate = err.message?.includes('429');
                 card.innerHTML = `<div class="pch">
                     <div class="pci" style="display:flex;align-items:center;justify-content:center;background:var(--surf);font-size:1.5em;color:var(--dim);">?</div>
                     <div><div class="pcn">${p.name} <span class="t">#${p.tag}</span></div>
-                    <div class="cl" style="color:#ef5350;">${isAuth?'API Key expirada':'Indisponível'}</div></div>
+                    <div class="cl" style="color:#ef5350;">${isAuth?'API Key expirada':isRate?'Rate limit — aguarde':'Indisponível'}</div></div>
                 </div>
                 ${isAuth?'<div style="margin-top:8px;"><button class="api-key-btn" onclick="showApiKeyModal()">Atualizar API Key</button></div>':''}`;
-            } finally {
-                loaded++;
-                if (loaded === PLAYERS.length) renderSoloQRanking(rankData);
             }
-        });
+        }
+
+        // All players loaded, render ranking
+        renderSoloQRanking(rankData);
     }
 
     function renderSoloQRanking(data) {
