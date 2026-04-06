@@ -267,57 +267,62 @@
         return (carry > 0 ? String(carry) : '') + arr.join('');
     }
 
-    // ======================== API (Rate Limited) ========================
+    // ======================== API (Rate Limited — Concurrent) ========================
     // Riot Dev Key limits: 20 req/1s, 100 req/2min
     const riotQueue = [];
     const riotTimestamps = [];
-    let riotProcessing = false;
-    const RIOT_MAX_PER_SEC = 15;     // stay under 20/s
-    const RIOT_MAX_PER_2MIN = 85;    // stay under 100/2min
-    const RIOT_RETRY_DELAY = 3000;
+    let riotInFlight = 0;
+    const RIOT_MAX_PER_SEC = 18;
+    const RIOT_MAX_PER_2MIN = 90;
+    const RIOT_CONCURRENCY = 8;      // max simultaneous fetches
     const RIOT_MAX_RETRIES = 4;
 
     function riotCanSend() {
         const now = Date.now();
-        // Clean old timestamps
         while (riotTimestamps.length && riotTimestamps[0] < now - 120000) riotTimestamps.shift();
         const last1s = riotTimestamps.filter(t => t > now - 1000).length;
-        return last1s < RIOT_MAX_PER_SEC && riotTimestamps.length < RIOT_MAX_PER_2MIN;
+        return last1s < RIOT_MAX_PER_SEC && riotTimestamps.length < RIOT_MAX_PER_2MIN && riotInFlight < RIOT_CONCURRENCY;
     }
 
-    async function processRiotQueue() {
-        if (riotProcessing) return;
-        riotProcessing = true;
-        while (riotQueue.length) {
-            while (!riotCanSend()) await new Promise(r => setTimeout(r, 200));
-            const { url, resolve, reject, retries } = riotQueue.shift();
+    function drainRiotQueue() {
+        while (riotQueue.length && riotCanSend()) {
+            const job = riotQueue.shift();
             riotTimestamps.push(Date.now());
-            try {
-                const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
-                if (r.status === 429) {
-                    const retryAfter = parseInt(r.headers.get('Retry-After') || '3') * 1000;
-                    if (retries < RIOT_MAX_RETRIES) {
-                        riotQueue.unshift({ url, resolve, reject, retries: retries + 1 });
-                        await new Promise(r => setTimeout(r, retryAfter || RIOT_RETRY_DELAY));
-                    } else { reject(new Error('Riot 429 (rate limit)')); }
-                    continue;
-                }
-                if (!r.ok) { reject(new Error(`Riot ${r.status}`)); continue; }
-                resolve(await r.json());
-            } catch(e) {
+            riotInFlight++;
+            fireRiotRequest(job);
+        }
+        // Schedule next drain if there are pending jobs
+        if (riotQueue.length) setTimeout(drainRiotQueue, 120);
+    }
+
+    async function fireRiotRequest({ url, resolve, reject, retries }) {
+        try {
+            const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
+            if (r.status === 429) {
+                const wait = (parseInt(r.headers.get('Retry-After') || '2') + 1) * 1000;
                 if (retries < RIOT_MAX_RETRIES) {
                     riotQueue.unshift({ url, resolve, reject, retries: retries + 1 });
-                    await new Promise(r => setTimeout(r, RIOT_RETRY_DELAY));
-                } else { reject(e); }
+                    await new Promise(r => setTimeout(r, wait));
+                } else { reject(new Error('Riot 429 (rate limit)')); }
+            } else if (!r.ok) {
+                reject(new Error(`Riot ${r.status}`));
+            } else {
+                resolve(await r.json());
             }
+        } catch(e) {
+            if (retries < RIOT_MAX_RETRIES) {
+                riotQueue.push({ url, resolve, reject, retries: retries + 1 });
+            } else { reject(e); }
+        } finally {
+            riotInFlight--;
+            drainRiotQueue();
         }
-        riotProcessing = false;
     }
 
     function riot(url) {
         return new Promise((resolve, reject) => {
             riotQueue.push({ url, resolve, reject, retries: 0 });
-            processRiotQueue();
+            drainRiotQueue();
         });
     }
     async function rots(u, fb=null) { try { return await riot(u); } catch(_) { return fb; } }
