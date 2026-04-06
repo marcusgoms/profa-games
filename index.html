@@ -351,7 +351,7 @@
             if (!events.length) { cc.innerHTML='<div class="err"><p>Nenhuma partida encontrada</p></div>'; return; }
 
             let html = '';
-            for (const ev of (isClosed?events:events.reverse())) {
+            for (const ev of events.reverse()) {
                 const m = ev.match||{}, ts = m.teams||[];
                 if (ts.length<2) continue;
                 const tA=ts[0], tB=ts[1];
