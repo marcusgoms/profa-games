@@ -674,6 +674,7 @@
     function clearLive() {
         if (liveTimer)       { clearInterval(liveTimer);       liveTimer       = null; }
         if (liveDetailTimer) { clearInterval(liveDetailTimer); liveDetailTimer = null; }
+        stopChat();
     }
 
     function nav(hash) {
@@ -689,11 +690,13 @@
         else if (h.startsWith('compare'))     { clearLive(); renderCompare(h); }
         else if (h === 'cblol')               { clearLive(); renderCBLOL('upcoming'); }
         else if (h === 'dashboard')           { clearLive(); renderDashboard(); }
+        else if (h === 'chat')                { clearLive(); renderChat(); }
         else if (h === 'teambuilder')         { clearLive(); renderTeamBuilder(); }
         else                                  { clearLive(); renderTeam(); }
     }
     function pn(h) {
         if (!h || h === 'team' || h.startsWith('profile/') || h.startsWith('compare')) return 'team';
+        if (h === 'chat') return 'chat';
         if (h === 'cblol') return 'cblol';
         if (h.startsWith('live')) return 'live';
         if (h === 'dashboard') return 'dashboard';
@@ -2590,6 +2593,95 @@
     }
 
     function escapeHtml(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+    // ======================== CHAT (Firebase real-time) ========================
+    let _chatRef = null;
+    let _chatMessages = [];
+
+    function renderChat() {
+        const user = getLoggedUser();
+        const online = Object.values(_onlineUsers).filter(u => u.online);
+        app.innerHTML = `<div class="section-wrap-sm">
+            <div class="chat-hero">
+                <h1>Chat <span>do Squad</span></h1>
+                <p style="font-size:.8em;color:${db?'#4caf50':'#ffd740'};">${db?'Online — tempo real':'Offline — sem Firebase'}</p>
+                ${online.length ? `<div class="chat-online"><span class="online-dot"></span> ${online.map(u=>u.name).join(', ')}</div>` : ''}
+            </div>
+            <div class="chat-box" id="chat-box"><div class="ld"><div class="sp"></div></div></div>
+            ${user ? `<div class="chat-input-wrap">
+                <input type="text" id="chat-input" placeholder="Digite sua mensagem..." maxlength="300" autocomplete="off">
+                <button class="chat-send" onclick="sendChat()">Enviar</button>
+            </div>` : '<div class="chat-login-prompt"><p>Faça login para enviar mensagens</p><button class="cfg-btn" onclick="showLoginModal()">Entrar</button></div>'}
+        </div>`;
+
+        stopChat();
+        _chatMessages = [];
+
+        if (db) {
+            _chatRef = db.ref('chat').orderByChild('ts').limitToLast(100);
+            _chatRef.on('value', snap => {
+                _chatMessages = [];
+                snap.forEach(child => _chatMessages.push({ _key: child.key, ...child.val() }));
+                _chatMessages.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+                renderChatMessages();
+            });
+        } else {
+            const box = $('chat-box');
+            if (box) box.innerHTML = '<p class="chat-empty">Configure o Firebase para usar o chat online.</p>';
+        }
+
+        const input = $('chat-input');
+        if (input) {
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+            input.focus();
+        }
+    }
+
+    function stopChat() {
+        if (_chatRef) { _chatRef.off(); _chatRef = null; }
+    }
+
+    function renderChatMessages() {
+        const box = $('chat-box');
+        if (!box) { stopChat(); return; }
+        if (!_chatMessages.length) {
+            box.innerHTML = '<p class="chat-empty">Nenhuma mensagem ainda. Seja o primeiro!</p>';
+            return;
+        }
+        const user = getLoggedUser();
+        const wasAtBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+        box.innerHTML = _chatMessages.map(m => {
+            const isMe = user?.idx === m.idx;
+            const icon = playerIcon(m.idx, null);
+            return `<div class="chat-msg ${isMe ? 'chat-me' : ''}">
+                <img src="${profImg(icon)}" class="chat-avatar" onerror="this.style.display='none'">
+                <div class="chat-bubble">
+                    <div class="chat-msg-head">
+                        <span class="chat-msg-name">${escapeHtml(m.name || '???')}</span>
+                        <span class="chat-msg-time">${fmtAgo(m.ts)}</span>
+                    </div>
+                    <div class="chat-msg-text">${escapeHtml(m.text || '')}</div>
+                </div>
+            </div>`;
+        }).join('');
+        if (wasAtBottom) box.scrollTop = box.scrollHeight;
+    }
+
+    window.sendChat = function() {
+        const user = getLoggedUser();
+        if (!user || !db) return;
+        const input = $('chat-input');
+        if (!input || !input.value.trim()) return;
+        const msg = {
+            idx: user.idx,
+            name: PLAYERS[user.idx]?.name || '???',
+            text: input.value.trim(),
+            ts: Date.now()
+        };
+        db.ref('chat').push(msg).catch(e => console.warn('Chat error:', e.message));
+        input.value = '';
+        input.focus();
+    };
 
     // ======================== PRESENCE (quem está online) ========================
     let _onlineUsers = {};
