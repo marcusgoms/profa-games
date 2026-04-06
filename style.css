@@ -827,6 +827,29 @@ body::after {
 /* ==================== MISC ==================== */
 .local-notice { font-size: 0.72em; color: var(--dim); text-align: center; background: rgba(255,255,255,0.03); padding: 5px 12px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.08); margin-top: 8px; }
 
+/* ==================== ONLINE PRESENCE ==================== */
+.online-badge { display: inline-flex; align-items: center; gap: 5px; font-size: .7em; padding: 3px 10px; border-radius: 12px; background: rgba(76,175,80,0.15); color: #4caf50; cursor: pointer; margin-left: 8px; font-weight: 600; white-space: nowrap; transition: all 0.2s; }
+.online-badge:hover { background: rgba(76,175,80,0.25); }
+.online-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; display: inline-block; animation: pulse-green 2s infinite; }
+@keyframes pulse-green { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+/* ==================== IN-GAME ALERT ==================== */
+.ingame-alert { position: fixed; bottom: 80px; right: 20px; background: var(--card); border: 1px solid rgba(0,212,255,0.3); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: .85em; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,0.3); cursor: pointer; animation: slideInRight 0.4s ease; max-width: 320px; }
+@keyframes slideInRight { from { transform:translateX(100px);opacity:0; } to { transform:translateX(0);opacity:1; } }
+.ingame-alert .ldot { width: 10px; height: 10px; flex-shrink: 0; }
+
+/* ==================== PREDICTION LOCKED ==================== */
+.cblol-pred-locked { text-align: center; padding: 12px; background: rgba(255,215,64,0.05); border-radius: 10px; border: 1px dashed rgba(255,215,64,0.2); margin-top: 8px; }
+
+/* ==================== FEED ==================== */
+.feed-list { display: flex; flex-direction: column; gap: 6px; }
+.feed-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--card); border-radius: 10px; border: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all 0.2s; }
+.feed-item:hover { background: var(--surf); }
+.feed-icon { font-size: 1.3em; flex-shrink: 0; }
+.feed-content { flex: 1; min-width: 0; }
+.feed-msg { font-size: .85em; font-weight: 500; }
+.feed-time { font-size: .7em; color: var(--dim); margin-top: 2px; }
+
 /* ==================== PROFILE TABS & SETTINGS ==================== */
 .prof-tabs {
     display: flex;

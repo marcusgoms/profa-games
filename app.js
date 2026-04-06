@@ -35,8 +35,7 @@
         console.warn('Firebase erro:', e.message, '— usando localStorage');
     }
 
-    // ======================== AUTH / LOGIN ========================
-    // Each player has a simple pin (4 digits). Stored hashed in localStorage on first setup.
+    // ======================== AUTH / LOGIN (Firebase-synced) ========================
     const AUTH_KEY = 'profa_auth_user';
     const PINS_KEY = 'profa_pins';
 
@@ -47,22 +46,40 @@
         if (user) localStorage.setItem(AUTH_KEY, JSON.stringify(user));
         else localStorage.removeItem(AUTH_KEY);
         updateNavUser();
+        // Update presence
+        if (db) updatePresence(user);
     }
 
-    // Simple hash for pins (not cryptographic - just to avoid plain text)
     function simpleHash(str) {
         let h = 0;
         for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
         return String(h);
     }
 
+    // PINs: Firebase first, localStorage fallback
+    let _pinsCache = null;
+    async function loadPinsFromFirebase() {
+        if (!db) return;
+        try {
+            const snap = await db.ref('pins').once('value');
+            const data = snap.val();
+            if (data) {
+                _pinsCache = data;
+                localStorage.setItem(PINS_KEY, JSON.stringify(data));
+            }
+        } catch(_) {}
+    }
+
     function getPins() {
+        if (_pinsCache) return _pinsCache;
         try { return JSON.parse(localStorage.getItem(PINS_KEY)) || {}; } catch(_) { return {}; }
     }
     function setPin(playerIdx, pin) {
         const pins = getPins();
         pins[playerIdx] = simpleHash(pin);
+        _pinsCache = pins;
         localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+        if (db) db.ref(`pins/${playerIdx}`).set(pins[playerIdx]).catch(() => {});
     }
     function checkPin(playerIdx, pin) {
         const pins = getPins();
@@ -190,12 +207,13 @@
 
     window.pickIcon = function(idx, iconId) {
         setCustomIcon(idx, iconId);
+        // Sync icon to Firebase
+        if (db) db.ref(`userPrefs/${idx}/icon`).set(iconId).catch(() => {});
         // Update preview and main icon
         const preview = $('cfg-icon-preview');
         if (preview) preview.src = profImg(iconId);
         const main = $('prof-main-icon');
         if (main) main.src = profImg(iconId);
-        // Update selection highlight
         document.querySelectorAll('.cfg-icon-opt').forEach(el => {
             el.classList.toggle('cfg-icon-sel', String(el.dataset.iid) === String(iconId));
         });
@@ -574,6 +592,8 @@
                     if (prev.mastery?.length) fresh.mastery = prev.mastery;
                     fresh._full = prev._full || false;
                 }
+                // Detect rank changes for feed
+                if (prev) detectRankChanges(i, prev, fresh);
                 cache[i] = fresh;
                 lsSet(`profa_player_${i}`, fresh);
                 fbSavePlayer(i, fresh);
@@ -866,7 +886,7 @@
         const tierColors = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
         const medals = ['🥇','🥈','🥉'];
 
-        // Save snapshot for history tracking
+        // Save snapshot for history tracking (Firebase + localStorage)
         const histKey = 'soloq_history';
         const today = new Date().toISOString().split('T')[0];
         let history = {};
@@ -874,6 +894,12 @@
         if (!history[today]) history[today] = {};
         sorted.forEach(d => { history[today][d.name] = d.totalLP; });
         localStorage.setItem(histKey, JSON.stringify(history));
+        // Sync LP history to Firebase
+        if (db) {
+            const todayData = {};
+            sorted.forEach(d => { todayData[d.name] = d.totalLP; });
+            db.ref(`lpHistory/${today}`).set(todayData).catch(() => {});
+        }
 
         const dates = Object.keys(history).sort();
 
@@ -1324,6 +1350,7 @@
                     const bo=m.strategy?.count||1;
                     const maxW=Math.ceil(bo/2);
                     const sp=getPred(mid);
+                    const locked = isPredictionLocked(ev.startTime);
                     html += `<div class="cblol-card upcoming">
                         <div class="cblol-card-header">
                             <span class="cblol-card-date">${dateStr} &bull; ${timeStr}</span>
@@ -1341,7 +1368,10 @@
                                 <img src="${tB.image||''}" alt="${cB}">
                             </div>
                         </div>
-                        <div class="cblol-pred-form">
+                        ${locked ? `<div class="cblol-pred-locked">
+                            <span style="color:#ffd740;">🔒 Palpites encerrados</span>
+                            ${sp ? `<div class="cblol-pred-saved">Seu palpite: <b>${sp.winner}</b>${sp.scoreA!=null?' &mdash; '+sp.scoreA+'x'+sp.scoreB:''}</div>` : '<span style="color:var(--dim);font-size:.8em;">Você não fez palpite</span>'}
+                        </div>` : `<div class="cblol-pred-form">
                             <div class="cblol-pred-row">
                                 <div class="cblol-pred-field">
                                     <label>Vencedor <span class="pts-tag">+10 pts</span></label>
@@ -1360,7 +1390,7 @@
                                 <button class="cblol-pred-btn" onclick="savePred('${mid}')">Salvar Palpite</button>
                             </div>
                             ${sp?`<div class="cblol-pred-saved">Palpite salvo: <b>${sp.winner}</b>${sp.scoreA!=null?' &mdash; '+sp.scoreA+'x'+sp.scoreB:''}</div>`:''}
-                        </div>
+                        </div>`}
                     </div>`;
                 }
             }
@@ -1594,6 +1624,8 @@
         } catch(_) {}
 
         const rk=[...sc].sort((a,b) => b.pts-a.pts||a.name.localeCompare(b.name));
+        // Save ranking snapshot for history
+        saveRankingSnapshot(rk);
         const podium = rk.slice(0,3);
         const rest = rk.slice(3);
         const syncStatus = db ? '<span style="color:#4caf50;">Online</span>' : '<span style="color:#ffd740;">Local</span>';
@@ -2111,6 +2143,9 @@
         localStorage.setItem('profa_theme', t);
         const btn = $('theme-toggle');
         if (btn) btn.innerHTML = t === 'light' ? '&#9728;' : '&#9789;';
+        // Sync theme to Firebase for logged user
+        const user = getLoggedUser();
+        if (db && user) db.ref(`userPrefs/${user.idx}/theme`).set(t).catch(() => {});
     }
     $('theme-toggle').addEventListener('click', () => {
         const cur = localStorage.getItem('profa_theme') || 'dark';
@@ -2341,6 +2376,7 @@
 
         // Achievements
         const achievements = computeAchievements(allData);
+        saveAchievements(achievements);
 
         $('dash-content').innerHTML = `
         <div class="dash-grid">
@@ -2409,7 +2445,26 @@
             <div class="dash-badges">
                 ${achievements.map(a => `<div class="dash-badge ${a.unlocked?'':'dash-badge-locked'}"><span class="dash-badge-icon">${a.icon}</span><div><div class="dash-badge-title">${a.title}</div><div class="dash-badge-desc">${a.desc}</div>${a.player?'<div class="dash-badge-player">'+a.player+'</div>':''}</div></div>`).join('')}
             </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Feed de Atividade</h3>
+            <div id="dash-feed"><div class="ld"><div class="sp"></div></div></div>
         </div>`;
+
+        // Load feed
+        loadFeed(20).then(items => {
+            const feedEl = $('dash-feed');
+            if (!feedEl) return;
+            if (!items.length) { feedEl.innerHTML = '<p style="color:var(--dim);text-align:center;">Nenhuma atividade recente</p>'; return; }
+            feedEl.innerHTML = `<div class="feed-list">${items.map(item => `<div class="feed-item" ${item.idx !== undefined ? `onclick="location.hash='profile/${item.idx}'"` : ''}>
+                <span class="feed-icon">${feedIcon(item.type)}</span>
+                <div class="feed-content">
+                    <div class="feed-msg">${escapeHtml(item.msg || '')}</div>
+                    <div class="feed-time">${fmtAgo(item.ts)}</div>
+                </div>
+            </div>`).join('')}</div>`;
+        });
     }
 
     // ======================== ACHIEVEMENTS ========================
@@ -2530,6 +2585,228 @@
 
     function escapeHtml(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
 
+    // ======================== PRESENCE (quem está online) ========================
+    let _onlineUsers = {};
+    function updatePresence(user) {
+        if (!db) return;
+        if (user) {
+            const ref = db.ref(`presence/${user.idx}`);
+            ref.set({ name: PLAYERS[user.idx]?.name || 'User', ts: Date.now(), online: true });
+            ref.onDisconnect().set({ name: PLAYERS[user.idx]?.name || 'User', ts: Date.now(), online: false });
+        }
+    }
+    function listenPresence() {
+        if (!db) return;
+        db.ref('presence').on('value', snap => {
+            _onlineUsers = snap.val() || {};
+            renderOnlineBadge();
+        });
+    }
+    function renderOnlineBadge() {
+        let el = document.getElementById('online-badge');
+        const count = Object.values(_onlineUsers).filter(u => u.online).length;
+        if (!count) { if (el) el.remove(); return; }
+        if (!el) {
+            el = document.createElement('span');
+            el.id = 'online-badge';
+            el.className = 'online-badge';
+            el.title = 'Jogadores online agora';
+            el.onclick = () => showOnlineModal();
+            document.querySelector('.nav-in')?.appendChild(el);
+        }
+        el.innerHTML = `<span class="online-dot"></span>${count} online`;
+    }
+    window.showOnlineModal = function() {
+        const old = document.getElementById('online-modal');
+        if (old) old.remove();
+        const modal = document.createElement('div');
+        modal.id = 'online-modal';
+        modal.className = 'modal-overlay';
+        const users = Object.entries(_onlineUsers).map(([idx, u]) => ({
+            idx: parseInt(idx), name: u.name, online: u.online, ts: u.ts
+        })).sort((a, b) => b.online - a.online || b.ts - a.ts);
+        modal.innerHTML = `<div class="modal-box" style="max-width:360px;">
+            <button class="modal-close" onclick="document.getElementById('online-modal').remove()">&times;</button>
+            <div class="modal-header"><h2>Squad Online</h2></div>
+            <div class="modal-body">
+                ${users.map(u => `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <span class="online-dot" style="background:${u.online ? '#4caf50' : '#666'};"></span>
+                    <span style="font-weight:600;">${u.name}</span>
+                    <span style="margin-left:auto;font-size:.75em;color:var(--dim);">${u.online ? 'agora' : fmtAgo(u.ts)}</span>
+                </div>`).join('')}
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    };
+
+    // ======================== FEED DE ATIVIDADE ========================
+    function postFeedEvent(event) {
+        if (!db) return;
+        const entry = { ...event, ts: Date.now() };
+        db.ref('feed').push(entry).catch(() => {});
+        // Keep only last 100 events
+        db.ref('feed').orderByChild('ts').limitToFirst(1).once('value', snap => {
+            const count = snap.numChildren();
+            // Cleanup happens naturally as we limitToLast when reading
+        });
+    }
+
+    async function loadFeed(limit = 20) {
+        if (!db) return [];
+        try {
+            const snap = await db.ref('feed').orderByChild('ts').limitToLast(limit).once('value');
+            const items = [];
+            snap.forEach(child => items.push(child.val()));
+            return items.sort((a, b) => b.ts - a.ts);
+        } catch(_) { return []; }
+    }
+
+    function feedIcon(type) {
+        const icons = { rank_up: '📈', rank_down: '📉', prediction_exact: '🎯', prediction_win: '✅', achievement: '🏆', match_win: '⭐', pentakill: '💀' };
+        return icons[type] || '📌';
+    }
+
+    // Detect rank changes and post to feed
+    function detectRankChanges(playerIdx, oldData, newData) {
+        if (!oldData?.league || !newData?.league) return;
+        const oldSolo = oldData.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
+        const newSolo = newData.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
+        if (!oldSolo || !newSolo) return;
+        const tierOrder = { IRON: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4, EMERALD: 5, DIAMOND: 6, MASTER: 7, GRANDMASTER: 8, CHALLENGER: 9 };
+        const oldVal = (tierOrder[oldSolo.tier] || 0) * 4 + ({ I: 3, II: 2, III: 1, IV: 0 }[oldSolo.rank] || 0);
+        const newVal = (tierOrder[newSolo.tier] || 0) * 4 + ({ I: 3, II: 2, III: 1, IV: 0 }[newSolo.rank] || 0);
+        const name = PLAYERS[playerIdx]?.name || '?';
+        if (newVal > oldVal) {
+            postFeedEvent({ type: 'rank_up', player: name, idx: playerIdx, msg: `${name} subiu para ${newSolo.tier} ${newSolo.rank}!` });
+        } else if (newVal < oldVal) {
+            postFeedEvent({ type: 'rank_down', player: name, idx: playerIdx, msg: `${name} caiu para ${newSolo.tier} ${newSolo.rank}` });
+        }
+    }
+
+    // ======================== NOTIFICAÇÃO DE PARTIDA AO VIVO ========================
+    let _liveAlerts = {};
+    async function checkSquadInGame() {
+        if (apiExpired) return;
+        for (let i = 0; i < PLAYERS.length; i++) {
+            const d = cache[i];
+            if (!d?.account?.puuid) continue;
+            const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
+            try {
+                const resp = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${d.account.puuid}`, {
+                    headers: { 'X-Riot-Token': RIOT_KEY }
+                });
+                if (resp.ok) {
+                    if (!_liveAlerts[i]) {
+                        _liveAlerts[i] = true;
+                        showInGameAlert(i, d.account.gameName || p.name);
+                        postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${p.name} está em partida agora!` });
+                    }
+                } else {
+                    delete _liveAlerts[i];
+                }
+            } catch(_) {}
+        }
+    }
+
+    function showInGameAlert(idx, name) {
+        // Don't show if there's already an alert
+        if (document.getElementById(`ingame-alert-${idx}`)) return;
+        const alert = document.createElement('div');
+        alert.id = `ingame-alert-${idx}`;
+        alert.className = 'ingame-alert';
+        alert.innerHTML = `<span class="ldot"></span><b>${name}</b> está em partida agora! <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.2em;margin-left:8px;">&times;</button>`;
+        alert.onclick = (e) => { if (e.target.tagName !== 'BUTTON') location.hash = `profile/${idx}`; };
+        document.body.appendChild(alert);
+        setTimeout(() => alert.remove(), 30000);
+    }
+
+    // ======================== PALPITES COM PRAZO ========================
+    function isPredictionLocked(startTime) {
+        if (!startTime) return false;
+        return Date.now() >= new Date(startTime).getTime();
+    }
+
+    // ======================== RANKING HISTORY (por semana) ========================
+    async function saveRankingSnapshot(rankings) {
+        if (!db) return;
+        const week = getWeekId();
+        const data = {};
+        rankings.forEach(r => { data[r.name] = { pts: r.pts, ex: r.ex, wn: r.wn, wr: r.wr }; });
+        db.ref(`rankingHistory/${week}`).set(data).catch(() => {});
+    }
+
+    function getWeekId() {
+        const d = new Date();
+        const start = new Date(d.getFullYear(), 0, 1);
+        const week = Math.ceil(((d - start) / 86400000 + start.getDay() + 1) / 7);
+        return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+    }
+
+    async function loadRankingHistory() {
+        if (!db) return {};
+        try {
+            const snap = await db.ref('rankingHistory').orderByKey().limitToLast(8).once('value');
+            return snap.val() || {};
+        } catch(_) { return {}; }
+    }
+
+    // ======================== CONQUISTAS ONLINE ========================
+    async function saveAchievements(achievements) {
+        if (!db) return;
+        const data = {};
+        achievements.forEach((a, i) => { if (a.unlocked) data[i] = { title: a.title, player: a.player || '', icon: a.icon }; });
+        db.ref('achievements').set(data).catch(() => {});
+    }
+
+    // ======================== REAÇÕES NOS PALPITES ========================
+    window.reactPred = function(matchId, emoji) {
+        const user = getLoggedUser();
+        if (!user || !db) return;
+        const safeMid = matchId.replace(/[.#$/\[\]]/g, '_');
+        db.ref(`predReactions/${safeMid}/${user.idx}`).set({ emoji, name: PLAYERS[user.idx]?.name || '?', ts: Date.now() }).catch(() => {});
+        // Update UI
+        const btn = document.querySelector(`[data-react-mid="${matchId}"][data-react-emoji="${emoji}"]`);
+        if (btn) btn.classList.add('reacted');
+    };
+
+    async function getPredReactions(matchId) {
+        if (!db) return {};
+        const safeMid = matchId.replace(/[.#$/\[\]]/g, '_');
+        try {
+            const snap = await db.ref(`predReactions/${safeMid}`).once('value');
+            return snap.val() || {};
+        } catch(_) { return {}; }
+    }
+
+    // ======================== LOAD USER PREFS FROM FIREBASE ========================
+    async function loadUserPrefs() {
+        if (!db) return;
+        const user = getLoggedUser();
+        if (!user) return;
+        try {
+            const snap = await db.ref(`userPrefs/${user.idx}`).once('value');
+            const prefs = snap.val();
+            if (!prefs) return;
+            // Sync theme
+            if (prefs.theme && prefs.theme !== localStorage.getItem('profa_theme')) {
+                applyTheme(prefs.theme);
+            }
+            // Sync icon
+            if (prefs.icon) {
+                setCustomIcon(user.idx, prefs.icon);
+            }
+        } catch(_) {}
+        // Load icons for all players
+        try {
+            const snap = await db.ref('userPrefs').once('value');
+            const all = snap.val() || {};
+            for (const [idx, prefs] of Object.entries(all)) {
+                if (prefs.icon) setCustomIcon(parseInt(idx), prefs.icon);
+            }
+        } catch(_) {}
+    }
+
     // ======================== INIT ========================
     // Theme
     applyTheme(localStorage.getItem('profa_theme') || 'dark');
@@ -2543,11 +2820,31 @@
     // Check API key health on load (non-blocking)
     checkKeyHealth();
     updateKeyStatus();
-    // Refresh key status every minute
     setInterval(updateKeyStatus, 60000);
     // Live badge check every 60s
     checkLiveBadge();
     liveBadgeTimer = setInterval(checkLiveBadge, 60000);
+    // Firebase-powered features (non-blocking)
+    loadPinsFromFirebase();
+    loadUserPrefs();
+    listenPresence();
+    // Set presence for logged user
+    const initUser = getLoggedUser();
+    if (initUser) updatePresence(initUser);
+    // Check squad in game every 2 min
+    setTimeout(checkSquadInGame, 5000);
+    setInterval(checkSquadInGame, 120000);
+    // Load LP history from Firebase into localStorage
+    if (db) {
+        db.ref('lpHistory').once('value').then(snap => {
+            const fbHistory = snap.val();
+            if (fbHistory) {
+                const local = JSON.parse(localStorage.getItem('soloq_history') || '{}');
+                const merged = { ...fbHistory, ...local };
+                localStorage.setItem('soloq_history', JSON.stringify(merged));
+            }
+        }).catch(() => {});
+    }
     // PWA Service Worker
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
