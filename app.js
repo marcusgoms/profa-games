@@ -1,0 +1,2316 @@
+    (async () => {
+    'use strict';
+
+    // ======================== CONFIG ========================
+    const PLAYERS = [
+        { name:'PROF',        tag:'ANON',  region:'BR1' },
+        { name:'loadt',       tag:'9753',  region:'BR1' },
+        { name:'Spring Boot', tag:'Getss', region:'BR1' },
+        { name:'tume',        tag:'br1',   region:'BR1' },
+        { name:'Bruvel',      tag:'BTC',   region:'BR1' },
+        { name:'Matraca IV',  tag:'kash',  region:'BR1' },
+        { name:'BOONSKT',     tag:'br1',   region:'BR1' },
+        { name:'Nick',        tag:'LSD21', region:'BR1' },
+        { name:'Malaric',     tag:'PR1',   region:'BR1', special:'noob' },
+    ];
+    const RIOT_KEY    = window.PROFA_CONFIG?.riotKey    || localStorage.getItem('lol_key')     || 'RGAPI-16e48557-eb13-41e8-9caa-6d30b83932bb';
+    const ESPORTS_KEY = window.PROFA_CONFIG?.esportsKey || localStorage.getItem('esports_key') || '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
+    const CBLOL_ID    = '98767991332355509';
+    const DVER        = '14.24.1';
+
+    // ======================== AUTH / LOGIN ========================
+    // Each player has a simple pin (4 digits). Stored hashed in localStorage on first setup.
+    const AUTH_KEY = 'profa_auth_user';
+    const PINS_KEY = 'profa_pins';
+
+    function getLoggedUser() {
+        try { return JSON.parse(localStorage.getItem(AUTH_KEY)); } catch(_) { return null; }
+    }
+    function setLoggedUser(user) {
+        if (user) localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+        else localStorage.removeItem(AUTH_KEY);
+        updateNavUser();
+    }
+
+    // Simple hash for pins (not cryptographic - just to avoid plain text)
+    function simpleHash(str) {
+        let h = 0;
+        for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+        return String(h);
+    }
+
+    function getPins() {
+        try { return JSON.parse(localStorage.getItem(PINS_KEY)) || {}; } catch(_) { return {}; }
+    }
+    function setPin(playerIdx, pin) {
+        const pins = getPins();
+        pins[playerIdx] = simpleHash(pin);
+        localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+    }
+    function checkPin(playerIdx, pin) {
+        const pins = getPins();
+        return pins[playerIdx] === simpleHash(pin);
+    }
+    function hasPin(playerIdx) {
+        return !!getPins()[playerIdx];
+    }
+
+    function updateNavUser() {
+        const el = $('nav-user');
+        if (!el) return;
+        const user = getLoggedUser();
+        if (user) {
+            el.innerHTML = `<div class="nav-user-info">
+                <span class="nav-user-name">${PLAYERS[user.idx]?.name || 'User'}</span>
+                <button class="nav-user-btn logout" onclick="doLogout()" title="Sair">Sair</button>
+            </div>`;
+        } else {
+            el.innerHTML = `<button class="nav-user-btn login" onclick="showLoginModal()">Entrar</button>`;
+        }
+    }
+
+    window.doLogout = function() {
+        setLoggedUser(null);
+    };
+
+    window.showLoginModal = function() {
+        // Remove existing modal
+        const old = $('login-modal');
+        if (old) old.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'login-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-box">
+                <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+                <div class="modal-header">
+                    <h2>Entrar no Squad</h2>
+                    <p>Selecione seu jogador e digite seu PIN</p>
+                </div>
+                <div class="modal-body">
+                    <div class="login-players" id="login-players">
+                        ${PLAYERS.map((p,i) => `<button class="login-player-btn" data-idx="${i}" onclick="selectLoginPlayer(${i})">
+                            <span class="login-player-name">${p.name}</span>
+                            <span class="login-player-tag">#${p.tag}</span>
+                        </button>`).join('')}
+                    </div>
+                    <div id="login-pin-section" style="display:none;">
+                        <div class="login-selected" id="login-selected-name"></div>
+                        <div id="login-pin-form">
+                            <label id="login-pin-label">Digite seu PIN (4 d&iacute;gitos)</label>
+                            <input type="password" id="login-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="****" autocomplete="off">
+                            <div id="login-error" class="login-error"></div>
+                            <button class="login-submit" onclick="submitLogin()">Entrar</button>
+                            <button class="login-back" onclick="backToPlayerSelect()">Voltar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) closeLoginModal(); });
+    };
+
+    let selectedPlayerIdx = null;
+
+    window.selectLoginPlayer = function(idx) {
+        selectedPlayerIdx = idx;
+        $('login-players').style.display = 'none';
+        $('login-pin-section').style.display = 'block';
+        $('login-selected-name').textContent = `${PLAYERS[idx].name} #${PLAYERS[idx].tag}`;
+        $('login-error').textContent = '';
+        const pinInput = $('login-pin');
+        pinInput.value = '';
+        if (!hasPin(idx)) {
+            $('login-pin-label').textContent = 'Crie seu PIN (4 d\u00edgitos) — primeira vez';
+        } else {
+            $('login-pin-label').textContent = 'Digite seu PIN (4 d\u00edgitos)';
+        }
+        pinInput.onkeydown = e => { if (e.key === 'Enter') submitLogin(); };
+        setTimeout(() => pinInput.focus(), 100);
+    };
+
+    window.backToPlayerSelect = function() {
+        $('login-players').style.display = '';
+        $('login-pin-section').style.display = 'none';
+        selectedPlayerIdx = null;
+    };
+
+    window.submitLogin = function() {
+        const pin = $('login-pin').value;
+        if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+            $('login-error').textContent = 'PIN deve ter 4 d\u00edgitos num\u00e9ricos';
+            return;
+        }
+        if (!hasPin(selectedPlayerIdx)) {
+            // First time: create PIN
+            setPin(selectedPlayerIdx, pin);
+            setLoggedUser({ idx: selectedPlayerIdx, name: PLAYERS[selectedPlayerIdx].name });
+            closeLoginModal();
+            return;
+        }
+        if (checkPin(selectedPlayerIdx, pin)) {
+            setLoggedUser({ idx: selectedPlayerIdx, name: PLAYERS[selectedPlayerIdx].name });
+            closeLoginModal();
+        } else {
+            $('login-error').textContent = 'PIN incorreto!';
+            $('login-pin').value = '';
+        }
+    };
+
+    window.closeLoginModal = function() {
+        const modal = $('login-modal');
+        if (modal) modal.remove();
+    };
+
+    // ======================== PROFILE SETTINGS ========================
+    window.switchProfTab = function(tab) {
+        document.querySelectorAll('.prof-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+        const s = $('prof-tab-stats'), c = $('prof-tab-config');
+        if (s) s.style.display = tab === 'stats' ? '' : 'none';
+        if (c) c.style.display = tab === 'config' ? '' : 'none';
+    };
+
+    window.pickIcon = function(idx, iconId) {
+        setCustomIcon(idx, iconId);
+        // Update preview and main icon
+        const preview = $('cfg-icon-preview');
+        if (preview) preview.src = profImg(iconId);
+        const main = $('prof-main-icon');
+        if (main) main.src = profImg(iconId);
+        // Update selection highlight
+        document.querySelectorAll('.cfg-icon-opt').forEach(el => {
+            el.classList.toggle('cfg-icon-sel', String(el.dataset.iid) === String(iconId));
+        });
+    };
+
+    window.changePin = function(idx) {
+        const msg = $('cfg-pin-msg');
+        const oldP = $('cfg-old-pin')?.value || '';
+        const newP = $('cfg-new-pin')?.value || '';
+        const conf = $('cfg-confirm-pin')?.value || '';
+        if (!msg) return;
+        if (!/^\d{4}$/.test(oldP)) { msg.textContent = 'PIN atual deve ter 4 dígitos'; msg.className = 'cfg-msg cfg-msg-err'; return; }
+        if (!checkPin(idx, oldP)) { msg.textContent = 'PIN atual incorreto!'; msg.className = 'cfg-msg cfg-msg-err'; return; }
+        if (!/^\d{4}$/.test(newP)) { msg.textContent = 'Novo PIN deve ter 4 dígitos'; msg.className = 'cfg-msg cfg-msg-err'; return; }
+        if (newP !== conf) { msg.textContent = 'PINs não conferem'; msg.className = 'cfg-msg cfg-msg-err'; return; }
+        setPin(idx, newP);
+        msg.textContent = 'PIN alterado com sucesso!';
+        msg.className = 'cfg-msg cfg-msg-ok';
+        $('cfg-old-pin').value = ''; $('cfg-new-pin').value = ''; $('cfg-confirm-pin').value = '';
+    };
+
+    // ======================== API KEY MODAL ========================
+    window.showApiKeyModal = function() {
+        const old = document.getElementById('apikey-modal');
+        if (old) old.remove();
+        const modal = document.createElement('div');
+        modal.id = 'apikey-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-box" style="max-width:480px;">
+                <button class="modal-close" onclick="document.getElementById('apikey-modal').remove()">&times;</button>
+                <div class="modal-header">
+                    <h2>Atualizar API Key</h2>
+                    <p>A chave da Riot expira a cada 24h</p>
+                </div>
+                <div class="modal-body">
+                    <div style="margin-bottom:16px;">
+                        <label style="font-size:.8em;color:var(--dim);font-weight:600;">Riot API Key</label>
+                        <p style="font-size:.7em;color:var(--dim);margin:4px 0 8px;">Pegue em <a href="https://developer.riotgames.com/" target="_blank" style="color:var(--pri);">developer.riotgames.com</a></p>
+                        <input id="apikey-riot" type="text" placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value="${RIOT_KEY}" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--surf);color:var(--txt);font-size:.85em;font-family:monospace;">
+                    </div>
+                    <button onclick="saveApiKey()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--pri),#0098b3);color:#fff;font-size:1em;font-weight:700;cursor:pointer;">Salvar e Recarregar</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    };
+
+    window.saveApiKey = function() {
+        const key = document.getElementById('apikey-riot')?.value?.trim();
+        if (key) {
+            localStorage.setItem('lol_key', key);
+            window.location.reload();
+        }
+    };
+
+    // ======================== UTILS ========================
+    const $      = id => document.getElementById(id);
+    const app    = $('appc');
+    const plat   = r => ({BR1:'br1',NA1:'na1',EUW1:'euw1',EUN1:'eun1',KR:'kr',TR1:'tr1',LA1:'la1',LA2:'la2',OC1:'oc1'})[r]||'br1';
+    const clust  = r => (['NA1','BR1','LA1','LA2','OC1'].includes(r))?'americas':(['EUW1','EUN1'].includes(r))?'europe':'asia';
+    const fmtDur = s => s ? `${(s/60)|0}min` : '?';
+    const fmtAgo = ts => { if(!ts) return ''; const d=(Date.now()-ts)/1000; return d<3600?`${(d/60)|0}min atrás`:d<86400?`${(d/3600)|0}h atrás`:`${(d/86400)|0}d atrás`; };
+    const fmtGold= g => g>=1000?(g/1000).toFixed(1)+'K':String(g||0);
+    const fmtTime= s => `${(s/60)|0}:${String((s%60)|0).padStart(2,'0')}`;
+    const champImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${CMAP[id]||id||'Teemo'}.png`;
+    const itemImg = id => id?`https://ddragon.leagueoflegends.com/cdn/${DVER}/img/item/${id}.png`:'';
+    const spellImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/spell/${id}.png`;
+    const profImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/${id}.png`;
+    function getCustomIcon(idx) { return localStorage.getItem('profa_custom_icon_'+idx); }
+    function setCustomIcon(idx, iconId) { localStorage.setItem('profa_custom_icon_'+idx, iconId); }
+    function playerIcon(idx, defaultIcon) { return getCustomIcon(idx) || defaultIcon || 5885; }
+    const modeName= m => ({CLASSIC:"Summoner's Rift",ARAM:'ARAM',TUTORIAL:'Tutorial'})[m]||m||'Normal';
+    const rankCls = t => t?`rank-${t.toLowerCase()}`:'';
+    const drgEmoji= d => ({ocean:'🌊',infernal:'🔥',cloud:'💨',mountain:'⛰️',elder:'🐲',hextech:'⚡',chemtech:'☣️'})[d]||'🔥';
+    const profFB  = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%2316213e%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%238892b0%22 font-size=%2250%22>?</text></svg>`;
+    const F       = `onerror="this.onerror=null;this.src='${profFB}'"`;
+
+    let CMAP = {};
+
+    // BigNumber string addition (event IDs exceed Number.MAX_SAFE_INTEGER)
+    function bigAdd(numStr, n) {
+        const s = String(numStr);
+        const arr = s.split('').map(Number);
+        let carry = n;
+        for (let i = arr.length - 1; i >= 0 && carry > 0; i--) {
+            const sum = arr[i] + carry;
+            arr[i] = sum % 10;
+            carry = (sum / 10) | 0;
+        }
+        return (carry > 0 ? String(carry) : '') + arr.join('');
+    }
+
+    // ======================== API ========================
+    let apiExpired = false;
+
+    function showApiBanner() {
+        if (document.getElementById('api-banner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'api-banner';
+        banner.className = 'api-banner';
+        banner.innerHTML = `<span>⚠️ API Key expirada — os dados podem estar desatualizados</span><button onclick="showApiKeyModal()">Atualizar Chave</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--dim);font-size:1.2em;cursor:pointer;padding:0 4px;">&times;</button>`;
+        document.body.prepend(banner);
+    }
+
+    // Simple fetch with retry on 429. Shows banner on auth errors.
+    async function riot(url, retries=3) {
+        const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
+        if (r.status === 429 && retries > 0) {
+            const wait = (parseInt(r.headers.get('Retry-After') || '2') + 1) * 1000;
+            await new Promise(res => setTimeout(res, wait));
+            return riot(url, retries - 1);
+        }
+        if (r.status === 401 || r.status === 403) {
+            apiExpired = true;
+            showApiBanner();
+        }
+        if (!r.ok) throw new Error(`Riot ${r.status}`);
+        return r.json();
+    }
+    async function rots(u, fb=null) { try { return await riot(u); } catch(_) { return fb; } }
+
+    async function esp(url) {
+        const full = url.startsWith('http') ? url : `https://esports-api.lolesports.com/persisted/gw${url}`;
+        const r = await fetch(full, { headers:{ 'x-api-key': ESPORTS_KEY } });
+        if (!r.ok) throw new Error(`Esports ${r.status}`);
+        return r.json();
+    }
+    async function esps(u, fb=null) { try { return await esp(u); } catch(_) { return fb; } }
+
+    async function live(u, params) {
+        const full = u.startsWith('http') ? u : `https://feed.lolesports.com/livestats/v1${u}`;
+        const q = params ? '?'+new URLSearchParams(params) : '';
+        const r = await fetch(full+q, { headers:{ 'x-api-key': ESPORTS_KEY } });
+        if (!r.ok) return null;
+        return r.json();
+    }
+
+    function isoRound10() {
+        const d = new Date(); d.setMilliseconds(0);
+        if (d.getSeconds()%10!==0) d.setSeconds(d.getSeconds()-(d.getSeconds()%10));
+        d.setSeconds(d.getSeconds()-60);
+        return d.toISOString();
+    }
+
+    // ======================== DATA LAYER ========================
+    // Stale-while-revalidate: show cached data instantly, refresh in background.
+    const cache = {};
+    const CACHE_TTL = 5 * 60 * 1000; // 5 min — data fresher than this skips API entirely
+
+    function lsGet(key) { try { const d=JSON.parse(localStorage.getItem(key)); return d||null; } catch(_) { return null; } }
+    function lsGetFresh(key) { const d=lsGet(key); return d&&Date.now()-(d._ts||0)<CACHE_TTL?d:null; }
+    function lsSet(key, data) { try { localStorage.setItem(key, JSON.stringify({...data, _ts:Date.now()})); } catch(_) {} }
+    function isStale(d) { return !d?._ts || Date.now()-d._ts >= CACHE_TTL; }
+
+    // Track background loading/refresh promises so we don't duplicate work
+    const bgLoading = {};
+    const bgRefresh = {};
+
+    // Fetch fresh fast data from API (always hits network)
+    async function fetchPlayerFast(i) {
+        const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
+        const account = await riot(`https://${cl}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
+        const [summoner, league, matchIds] = await Promise.all([
+            riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`),
+            rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []),
+            rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=20`, []),
+        ]);
+        const ids = matchIds || [];
+        let recentMatch = null;
+        if (ids.length) {
+            recentMatch = await rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${ids[0]}`, null);
+        }
+        return { account, summoner, league: league||[], mastery:[], matches: recentMatch?[recentMatch]:[], _matchIds: ids };
+    }
+
+    // FAST: returns cached data instantly if available, fetches from API otherwise.
+    // If cached data is stale, starts a background refresh and returns stale data immediately.
+    async function loadPlayerFast(i) {
+        // Fresh memory cache — return immediately
+        if (cache[i] && !isStale(cache[i])) return cache[i];
+
+        // Any localStorage data (even stale) — return it instantly
+        const stored = lsGet(`profa_player_${i}`);
+        if (stored) {
+            cache[i] = stored;
+            // If stale, kick off background refresh (non-blocking)
+            if (isStale(stored)) refreshPlayer(i);
+            return cache[i];
+        }
+
+        // Nothing cached — must fetch from API
+        const data = await fetchPlayerFast(i);
+        data._ts = Date.now();
+        cache[i] = data;
+        lsSet(`profa_player_${i}`, data);
+        return cache[i];
+    }
+
+    // Background refresh: fetches fresh data from API and updates cache + UI silently
+    function refreshPlayer(i) {
+        if (bgRefresh[i]) return bgRefresh[i];
+        bgRefresh[i] = (async () => {
+            try {
+                const fresh = await fetchPlayerFast(i);
+                // Preserve full data (mastery + extra matches) if we had it
+                const prev = cache[i];
+                fresh._ts = Date.now();
+                if (prev?._full) {
+                    fresh.mastery = prev.mastery;
+                    fresh.matches = [...fresh.matches, ...prev.matches.filter(m => m.metadata?.matchId !== fresh.matches[0]?.metadata?.matchId)];
+                    fresh._full = false; // will be re-completed by background loader
+                }
+                cache[i] = fresh;
+                lsSet(`profa_player_${i}`, fresh);
+                // Notify UI about refresh if on team page
+                if (typeof onPlayerRefreshed === 'function') onPlayerRefreshed(i, fresh);
+            } catch(_) {}
+            delete bgRefresh[i];
+        })();
+        return bgRefresh[i];
+    }
+
+    // BACKGROUND: loads remaining matches + mastery after fast load
+    function loadPlayerBackground(i) {
+        if (bgLoading[i]) return bgLoading[i];
+        if (cache[i]?._full && !isStale(cache[i])) return Promise.resolve(cache[i]);
+
+        bgLoading[i] = (async () => {
+            const base = cache[i] || await loadPlayerFast(i);
+            if (base._full && !isStale(base)) return base;
+
+            const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
+            const puuid = base.account.puuid;
+            const ids = base._matchIds || [];
+
+            const mastery = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []);
+
+            // Load remaining matches (skip already loaded)
+            const alreadyLoaded = new Set(base.matches.map(m => m.metadata?.matchId));
+            const toLoad = ids.slice(0, 15).filter(mid => !alreadyLoaded.has(mid));
+            const newMatches = [];
+            for (let b = 0; b < toLoad.length; b += 5) {
+                await Promise.all(toLoad.slice(b, b+5).map(mid =>
+                    riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => newMatches.push(d)).catch(() => {})
+                ));
+            }
+
+            cache[i] = { ...base, mastery: mastery||[], matches: [...base.matches, ...newMatches], _full: true, _ts: Date.now() };
+            lsSet(`profa_player_${i}`, cache[i]);
+            delete bgLoading[i];
+            return cache[i];
+        })();
+        return bgLoading[i];
+    }
+
+    // FULL: returns complete data — waits for background if needed, or starts it
+    async function loadPlayer(i) {
+        if (cache[i]?._full && !isStale(cache[i])) return cache[i];
+        // Return full cached data even if stale for instant display
+        const c = lsGet(`profa_player_${i}`);
+        if (c?._full) {
+            cache[i] = c;
+            // Trigger background refresh if stale
+            if (isStale(c)) { refreshPlayer(i); loadPlayerBackground(i); }
+            return c;
+        }
+        return loadPlayerBackground(i);
+    }
+
+    // ======================== ROUTER ========================
+    let liveTimer = null;
+    let liveDetailTimer = null;
+    function clearLive() {
+        if (liveTimer)       { clearInterval(liveTimer);       liveTimer       = null; }
+        if (liveDetailTimer) { clearInterval(liveDetailTimer); liveDetailTimer = null; }
+    }
+
+    function nav(hash) {
+        const h = hash.replace(/^#/, '');
+        document.querySelectorAll('.nl a').forEach(a => a.classList.remove('on'));
+        const ln = document.querySelector(`.nl a[data-p="${pn(h)}"]`);
+        if (ln) ln.classList.add('on');
+        // Page transition
+        app.classList.remove('page-enter'); void app.offsetWidth; app.classList.add('page-enter');
+        if (!h || h === 'team')               { clearLive(); renderTeam(); }
+        else if (h.startsWith('live'))        { clearLive(); renderLivePage(h); }
+        else if (h.startsWith('profile/'))    renderProfile(parseInt(h.split('/')[1]));
+        else if (h.startsWith('compare'))     { clearLive(); renderCompare(h); }
+        else if (h === 'cblol')               { clearLive(); renderCBLOL('upcoming'); }
+        else if (h === 'dashboard')           { clearLive(); renderDashboard(); }
+        else if (h === 'chat')                { clearLive(); renderChat(); }
+        else if (h === 'teambuilder')         { clearLive(); renderTeamBuilder(); }
+        else                                  { clearLive(); renderTeam(); }
+    }
+    function pn(h) {
+        if (!h || h === 'team' || h.startsWith('profile/') || h.startsWith('compare')) return 'team';
+        if (h === 'cblol') return 'cblol';
+        if (h.startsWith('live')) return 'live';
+        if (h === 'dashboard') return 'dashboard';
+        if (h === 'chat') return 'chat';
+        if (h === 'teambuilder') return 'dashboard';
+        return 'team';
+    }
+
+    window.addEventListener('hashchange', () => nav(location.hash));
+    document.addEventListener('click', e => {
+        const a = e.target.closest('a[href^="#"]');
+        if (a) { e.preventDefault(); location.hash = a.getAttribute('href').slice(1); }
+    });
+    $('mmb').addEventListener('click', () => $('nav').classList.toggle('open'));
+    $('nav').addEventListener('click', () => $('nav').classList.remove('open'));
+
+    // ======================== TEAM ========================
+    async function renderTeam() {
+        app.innerHTML = `
+        <div class="squad-hero">
+            <div class="squad-hero-bg"></div>
+            <div class="squad-hero-splash"></div>
+            <div class="squad-hero-inner">
+                <img src="https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/4644.png" alt="" class="hero-emblem">
+                <h1>O <span>Squad</span></h1>
+                <p>Clique em um jogador para ver perfil, ranked e partidas recentes</p>
+            </div>
+        </div>
+        <div class="section-wrap">
+            <div class="tg" id="squad-grid">
+                ${PLAYERS.map((p,i) => `<div class="pc ${p.special==='noob'?'pc-noob':''}" data-i="${i}" onclick="location.hash='profile/${i}'"><div class="ld"><div class="sp"></div></div></div>`).join('')}
+            </div>
+        </div>
+        <div class="section-wrap">
+            <div class="squad-actions">
+                <button class="squad-action-btn" onclick="location.hash='compare'">Comparar Jogadores</button>
+                <button class="squad-action-btn" onclick="location.hash='dashboard'">Dashboard</button>
+            </div>
+            <div class="soloq-ranking" id="soloq-ranking">
+                <div class="soloq-header">
+                    <h2>Ranking Solo Q</h2>
+                    <p>Evolu&ccedil;&atilde;o di&aacute;ria de LP do squad (s&eacute;ries temporais)</p>
+                </div>
+                <div class="soloq-chart" id="soloq-chart"><div class="ld"><div class="sp"></div></div></div>
+            </div>
+        </div>
+        <div class="section-wrap">
+            <div class="tl-section" id="squad-timeline-wrap">
+                <div class="tl-header"><h2>Timeline do Squad</h2><p>Últimas partidas de todos os jogadores</p></div>
+                <div id="squad-timeline"><p style="color:var(--dim);text-align:center;padding:1rem;">Carregando...</p></div>
+            </div>
+        </div>`;
+
+        const rankData = [];
+        let loaded = 0;
+
+        // Renders a single player card given their data
+        function renderCard(i, d) {
+            const card = document.querySelector(`[data-i="${i}"]`);
+            if (!card) return null;
+            const p = PLAYERS[i];
+            const s = d.summoner, ic = playerIcon(i, s.profileIconId), lv = s.summonerLevel || '?';
+            const solo = d.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
+            const wr = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
+            const recent = d.matches.length
+                ? [...d.matches].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))[0]
+                : null;
+            const ago = recent ? fmtAgo(recent.info.gameCreation) : '';
+            const rmp = recent?.info?.participants?.find(x => x.puuid === d.account.puuid);
+            const rChId = rmp?.championId;
+            const rWin = rmp?.win;
+
+            const isNoob = p.special === 'noob';
+            const noobBadge = isNoob ? `<div class="noob-badge">AMON 🤡 O NOOB DO SQUAD</div>` : '';
+            const noobTitle = isNoob ? `<span class="noob-crown">👑💀</span>` : '';
+            const noobFooter = isNoob ? `<div class="noob-footer">
+                <span class="noob-quote">"Eu juro que tava lagando"</span>
+                <div class="noob-stats-fun">
+                    <span>🏆 Rei dos 0/10</span>
+                    <span>🎯 Farm? Nunca ouvi falar</span>
+                </div>
+            </div>` : '';
+
+            card.innerHTML = `
+            ${noobBadge}
+            <div class="pch">
+                <div class="pci ${isNoob?'pci-noob':''}">${isNoob?'<div class="noob-ring"></div>':''}
+                    <img src="${profImg(ic)}" alt="" ${F}>
+                </div>
+                <div>
+                    <div class="pcn">${noobTitle}${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
+                    <div class="cl">Nível ${lv}${isNoob?' — AMON (Hardstuck)':''}</div>
+                </div>
+            </div>
+            ${solo
+                ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>`
+                : `<div class="pn">Sem ranked</div>`}
+            ${rChId ? `<div class="lr">
+                <img src="${champImg(rChId)}" style="width:22px;height:22px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
+                <span class="dot ${rWin?'g':'r'}"></span>
+                <span>${CMAP[rChId]||'?'} &bull; ${ago}</span>
+            </div>` : ago ? `<div class="lr"><span class="dot g"></span><span>${ago}</span></div>` : ''}
+            ${noobFooter}`;
+
+            // Return rank data for chart
+            if (solo) {
+                const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
+                const rankOrder = {I:3,II:2,III:1,IV:0};
+                const totalLP = (tierOrder[solo.tier]||0)*400 + (rankOrder[solo.rank]||0)*100 + (solo.leaguePoints||0);
+                return { name: d.account.gameName||p.name, tier: solo.tier, rank: solo.rank, lp: solo.leaguePoints||0, totalLP, wins: solo.wins||0, losses: solo.losses||0, idx: i, icon: playerIcon(i, s.profileIconId) };
+            }
+            return null;
+        }
+
+        // Callback for background refresh — updates card + ranking silently
+        window.onPlayerRefreshed = function(i, d) {
+            const rd = renderCard(i, d);
+            // Update rankData for this player
+            const existing = rankData.findIndex(r => r.idx === i);
+            if (rd) { if (existing >= 0) rankData[existing] = rd; else rankData.push(rd); }
+            else if (existing >= 0) rankData.splice(existing, 1);
+            renderSoloQRanking(rankData, false);
+        };
+
+        // Load ALL players in parallel.
+        // Each player updates its card + ranking chart as soon as it resolves.
+        PLAYERS.forEach((p, i) => {
+            const card = document.querySelector(`[data-i="${i}"]`);
+            if (!card) { loaded++; return; }
+
+            loadPlayerFast(i).then(d => {
+                const rd = renderCard(i, d);
+                if (rd) rankData.push(rd);
+            }).catch(err => {
+                const isAuth = err.message?.includes('403') || err.message?.includes('401');
+                const isRate = err.message?.includes('429');
+                card.innerHTML = `<div class="pch">
+                    <div class="pci" style="display:flex;align-items:center;justify-content:center;background:var(--surf);font-size:1.5em;color:var(--dim);">?</div>
+                    <div><div class="pcn">${p.name} <span class="t">#${p.tag}</span></div>
+                    <div class="cl" style="color:#ef5350;">${isAuth?'API Key expirada':isRate?'Rate limit — aguarde':'Indisponível'}</div></div>
+                </div>
+                ${isAuth?'<div style="margin-top:8px;"><button class="api-key-btn" onclick="showApiKeyModal()">Atualizar API Key</button></div>':''}`;
+            }).finally(() => {
+                loaded++;
+                // Re-render ranking progressively — each player that arrives updates the chart
+                renderSoloQRanking(rankData, loaded < PLAYERS.length);
+                // Update timeline with what we have so far
+                renderTimeline();
+                // Once all cards are rendered, start background loading for full data
+                if (loaded === PLAYERS.length) {
+                    PLAYERS.forEach((_, j) => loadPlayerBackground(j));
+                }
+            });
+        });
+    }
+
+    function renderSoloQRanking(data, stillLoading) {
+        const el = $('soloq-chart');
+        if (!el) return;
+        if (!data.length && !stillLoading) { el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:2rem;">Nenhum jogador posicionado na Solo Q</p>'; return; }
+        if (!data.length && stillLoading) { return; } // wait for first player
+
+        const sorted = [...data].sort((a,b) => b.totalLP - a.totalLP);
+        const tierColors = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
+        const medals = ['🥇','🥈','🥉'];
+
+        // Save snapshot for history tracking
+        const histKey = 'soloq_history';
+        const today = new Date().toISOString().split('T')[0];
+        let history = {};
+        try { history = JSON.parse(localStorage.getItem(histKey)||'{}'); } catch(_) {}
+        if (!history[today]) history[today] = {};
+        sorted.forEach(d => { history[today][d.name] = d.totalLP; });
+        localStorage.setItem(histKey, JSON.stringify(history));
+
+        const dates = Object.keys(history).sort();
+
+        // Legend cards (compact)
+        let legendHtml = '<div class="soloq-legend-grid">';
+        sorted.forEach((d, i) => {
+            const wr = ((d.wins/(d.wins+d.losses))*100).toFixed(0);
+            const color = tierColors[d.tier] || 'var(--pri)';
+            const medal = i < 3 ? medals[i] : `${i+1}º`;
+            const isNoob = PLAYERS[d.idx]?.special === 'noob';
+            legendHtml += `<div class="soloq-legend-card ${isNoob?'noob-legend':''}" onclick="location.hash='profile/${d.idx}'">
+                <div class="soloq-lc-top">
+                    <span class="soloq-lc-medal">${medal}</span>
+                    <img src="${profImg(d.icon)}" alt="" class="soloq-lc-icon" ${F}>
+                    <div>
+                        <div class="soloq-lc-name">${d.name}${isNoob?' 🤡':''}</div>
+                        <div class="soloq-lc-tier ${rankCls(d.tier)}">${d.tier} ${d.rank}</div>
+                    </div>
+                </div>
+                <div class="soloq-lc-stats">
+                    <span style="color:${color};font-weight:900;">${d.lp} LP</span>
+                    <span style="color:var(--dim);font-size:.8em;">${wr}% WR</span>
+                    <span style="color:var(--dim);font-size:.75em;">${d.wins}V ${d.losses}D</span>
+                </div>
+                <div class="soloq-lc-color" style="background:${color};"></div>
+            </div>`;
+        });
+        legendHtml += '</div>';
+
+        // Loading indicator
+        const loadingHtml = stillLoading
+            ? `<div class="soloq-loading"><div class="sp" style="width:18px;height:18px;border-width:2px;"></div><span>Carregando mais jogadores…</span></div>`
+            : '';
+
+        // Build chart
+        let html = legendHtml + loadingHtml;
+        html += `<div class="soloq-evo">
+            <h3>Evolução de LP (dia a dia)</h3>
+            <div class="soloq-evo-chart" id="soloq-evo-chart"></div>
+        </div>`;
+
+        el.innerHTML = html;
+        renderLPEvolution(dates, history, sorted);
+    }
+
+    function renderLPEvolution(dates, history, data) {
+        const chartEl = $('soloq-evo-chart');
+        if (!chartEl) return;
+
+        const tierColors = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
+
+        // If only 1 date, show a message
+        if (dates.length < 2) {
+            chartEl.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--dim);">
+                <p style="font-size:1.2em;margin-bottom:8px;">📊 Dados do dia registrados!</p>
+                <p style="font-size:.85em;">Volte amanhã para ver a evolução no gráfico de linhas.</p>
+                <p style="font-size:.75em;margin-top:8px;color:var(--pri);">Hoje: ${dates[0]}</p>
+            </div>`;
+            return;
+        }
+
+        const W = 800, H = 380, PADL = 65, PADR = 90, PADT = 25, PADB = 50;
+        const cw = W - PADL - PADR, ch = H - PADT - PADB;
+
+        // Collect all LP values for y-axis range
+        let allVals = [];
+        data.forEach(d => {
+            dates.forEach(dt => { if (history[dt]?.[d.name] !== undefined) allVals.push(history[dt][d.name]); });
+        });
+        const minY = Math.min(...allVals) - 20, maxY = Math.max(...allVals) + 20;
+        const rangeY = maxY - minY || 100;
+
+        const xStep = dates.length > 1 ? cw / (dates.length - 1) : cw;
+        const scaleY = v => PADT + ch - ((v - minY) / rangeY) * ch;
+        const scaleX = i => PADL + i * xStep;
+
+        let svg = `<svg viewBox="0 0 ${W} ${H}" class="soloq-svg" xmlns="http://www.w3.org/2000/svg">`;
+
+        // Defs for gradients
+        svg += `<defs>`;
+        data.forEach((d, idx) => {
+            const color = tierColors[d.tier] || '#00d4ff';
+            svg += `<linearGradient id="grad${idx}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+            </linearGradient>`;
+        });
+        svg += `</defs>`;
+
+        // Background grid
+        const gridCount = 5;
+        for (let i = 0; i <= gridCount; i++) {
+            const y = PADT + (ch / gridCount) * i;
+            const val = Math.round(maxY - (rangeY / gridCount) * i);
+            svg += `<line x1="${PADL}" y1="${y}" x2="${W-PADR}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
+            svg += `<text x="${PADL-10}" y="${y+4}" fill="#8892b0" font-size="10" text-anchor="end" font-family="system-ui">${val}</text>`;
+        }
+
+        // Vertical grid + date labels
+        dates.forEach((dt, i) => {
+            const x = scaleX(i);
+            svg += `<line x1="${x}" y1="${PADT}" x2="${x}" y2="${H-PADB}" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>`;
+            const parts = dt.split('-');
+            const label = `${parts[2]}/${parts[1]}`;
+            svg += `<text x="${x}" y="${H-12}" fill="#8892b0" font-size="10" text-anchor="middle" font-family="system-ui">${label}</text>`;
+        });
+
+        // Area fills + lines per player
+        data.forEach((d, idx) => {
+            const color = tierColors[d.tier] || '#00d4ff';
+            let points = [];
+            dates.forEach((dt, i) => {
+                if (history[dt]?.[d.name] !== undefined) {
+                    points.push({ x: scaleX(i), y: scaleY(history[dt][d.name]), val: history[dt][d.name] });
+                }
+            });
+
+            if (points.length > 1) {
+                // Area fill
+                const areaPath = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)} ` +
+                    points.slice(1).map(p => `L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') +
+                    ` L${points[points.length-1].x.toFixed(1)},${(H-PADB).toFixed(1)} L${points[0].x.toFixed(1)},${(H-PADB).toFixed(1)} Z`;
+                svg += `<path d="${areaPath}" fill="url(#grad${idx})" opacity="0.4"/>`;
+
+                // Line
+                const isNoob = PLAYERS[d.idx]?.special === 'noob';
+                const strokeW = isNoob ? '3.5' : '2.5';
+                const linePath = points.map((p, i) => `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                svg += `<path d="${linePath}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
+            }
+
+            // Dots with tooltips
+            points.forEach(p => {
+                svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg)" stroke-width="2.5" opacity="0.95"/>`;
+            });
+
+            // Label at the end
+            if (points.length) {
+                const last = points[points.length - 1];
+                const isNoob = PLAYERS[d.idx]?.special === 'noob';
+                const suffix = isNoob ? ' 🤡' : '';
+                svg += `<text x="${last.x + 8}" y="${last.y - 6}" fill="${color}" font-size="11" font-weight="800" font-family="system-ui">${d.name}${suffix}</text>`;
+                svg += `<text x="${last.x + 8}" y="${last.y + 8}" fill="#8892b0" font-size="9" font-family="system-ui">${last.val} LP</text>`;
+            }
+        });
+
+        // Axis lines
+        svg += `<line x1="${PADL}" y1="${PADT}" x2="${PADL}" y2="${H-PADB}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+        svg += `<line x1="${PADL}" y1="${H-PADB}" x2="${W-PADR}" y2="${H-PADB}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+
+        svg += '</svg>';
+        chartEl.innerHTML = svg;
+    }
+
+    // ======================== PROFILE ========================
+    function renderProfile(idx) {
+        const p = PLAYERS[idx];
+        if (!p) { location.hash = 'team'; return; }
+        app.innerHTML = `<div class="section-wrap-sm">
+            <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+            <div class="pv"><div class="ld"><div class="sp"></div><p>Carregando ${p.name}…</p></div></div>
+        </div>`;
+
+        loadPlayer(idx).then(d => {
+            const { account:a, summoner:s, league:le, mastery:ma, matches:mt } = d;
+            const ic = playerIcon(idx, s.profileIconId), lv = s.summonerLevel || '?';
+            const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
+
+            let tv=0, td=0; le.forEach(e => { tv+=e.wins||0; td+=e.losses||0; });
+            const tg=tv+td, wr2=tg>0?((tv/tg)*100).toFixed(1):'—';
+            let tk=0,tkd=0,ta=0,tcs=0;
+            mt.forEach(m => { const mp=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; tk+=mp.kills||0; tkd+=mp.deaths||0; ta+=mp.assists||0; tcs+=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0); });
+            const kda = mt.length ? ((tk+ta)/Math.max(tkd,1)).toFixed(1) : '—';
+            const acs = mt.length ? (tcs/mt.length)|0 : 0;
+
+            const stats = `<div class="ps">
+                <div class="pst"><div class="sm">Nível</div><div class="sv">${lv}</div></div>
+                <div class="pst"><div class="sm">Partidas</div><div class="sv">${tg}</div><div class="ss">${tv}V ${td}D</div></div>
+                <div class="pst"><div class="sm">Win Rate</div><div class="sv">${wr2}%</div></div>
+                <div class="pst"><div class="sm">KDA</div><div class="sv">${kda}</div><div class="ss">${tk}/${tkd}/${ta}</div></div>
+                <div class="pst"><div class="sm">CS Médio</div><div class="sv">${acs}</div></div>
+            </div>`;
+
+            let ranked = '';
+            if (le.length) {
+                const qn = {'RANKED_SOLO_5x5':'Solo/Duo','RANKED_FLEX_SR':'Flex 5v5'};
+                ranked = '<div class="sx"><h3>🏆 Ranked</h3>';
+                for (const e of le) {
+                    const w2 = ((e.wins/(e.wins+e.losses))*100).toFixed(0);
+                    ranked += `<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.04);">
+                        <div style="font-size:.75em;color:var(--dim);text-transform:uppercase;font-weight:600;">${qn[e.queueType]||e.queueType}</div>
+                        <div class="${rankCls(e.tier)}" style="font-size:1.4em;font-weight:900;">${e.tier} ${e.rank} &mdash; ${e.leaguePoints} LP</div>
+                        <div style="font-size:.85em;color:var(--dim);">${e.wins}V ${e.losses}D (${w2}% WR)</div>
+                        ${e.hotStreak?'<span style="font-size:.75em;color:#ef5350;">🔥 Hot Streak</span>':''}${e.veteran?' <span style="font-size:.75em;color:#c89b3c;">Veterano</span>':''}</div>`;
+                }
+                ranked += '</div>';
+            }
+
+            let mas = '';
+            if (ma.length) {
+                mas = '<div class="sx"><h3>⭐ Maestria</h3><div class="mg">';
+                for (const m of ma) {
+                    mas += `<div class="mi"><span class="ml">M${m.championLevel}</span><img src="${champImg(m.championId)}" alt="" onerror="this.style.opacity='0.3'"><div class="mn">${CMAP[m.championId]||'?'}</div><div class="mp">${(m.championPoints||0).toLocaleString()} pts</div></div>`;
+                }
+                mas += '</div></div>';
+            }
+
+            // Sort matches most recent first
+            const sm = [...mt].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0));
+            let matchs = '';
+            if (sm.length) {
+                // Collect unique champs and modes for filter
+                const champSet = new Set(), modeSet = new Set();
+                sm.forEach(m => { const mp=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; if(mp.championId) champSet.add(mp.championId); if(m.info?.gameMode) modeSet.add(m.info.gameMode); });
+                const filterBar = `<div class="match-filters">
+                    <select id="filter-champ" onchange="filterMatches()"><option value="">Campeão</option>${[...champSet].map(c=>`<option value="${c}">${CMAP[c]||c}</option>`).join('')}</select>
+                    <select id="filter-mode" onchange="filterMatches()"><option value="">Modo</option>${[...modeSet].map(m=>`<option value="${m}">${modeName(m)}</option>`).join('')}</select>
+                    <select id="filter-result" onchange="filterMatches()"><option value="">Resultado</option><option value="w">Vitória</option><option value="l">Derrota</option></select>
+                </div>`;
+                matchs = '<div class="sx"><h3>📜 Partidas Recentes</h3>' + filterBar;
+                for (const m of sm) {
+                    const mp  = m.info?.participants?.find(x => x.puuid === a.puuid) || {};
+                    const tw  = m.info.teams?.find(t => t.teamId === mp.teamId)?.win;
+                    const dur = m.info.gameDuration, cre = m.info.gameCreation;
+                    const k=mp.kills||0, dd=mp.deaths||0, as2=mp.assists||0;
+                    const cs2=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
+                    const cn=CMAP[mp.championId]||`#${mp.championId}`, cl2=mp.champLevel||'';
+                    let items='';
+                    for(let j=0;j<=6;j++){if(mp['item'+j]) items+=`<img src="${itemImg(mp['item'+j])}" alt="" loading="lazy">`;}
+                    let sums='';
+                    if(mp.summoner1Id) sums+=`<img src="${spellImg(mp.summoner1Id)}" style="width:20px;height:20px;border-radius:4px;" loading="lazy">`;
+                    if(mp.summoner2Id) sums+=`<img src="${spellImg(mp.summoner2Id)}" style="width:20px;height:20px;border-radius:4px;" loading="lazy">`;
+                    const cls=tw?'w':'l', res=tw?'VITÓRIA':'DERROTA';
+                    const t100=(m.info?.participants||[]).filter(x=>x.teamId===100);
+                    const t200=(m.info?.participants||[]).filter(x=>x.teamId===200);
+                    const row = o => `<div class="or ${o.teamId===100?'b':'r'}">${o.puuid===a.puuid?'<b style="color:var(--pri);min-width:10px;">▶</b>':'<span style="min-width:10px;"></span>'}<img src="${champImg(o.championId)}" loading="lazy" onerror="this.style.visibility='hidden'"><span class="on">${o.riotIdGameName||'???'}</span><span class="ok"><b>${o.kills||0}</b>/<span style="color:#ef5350;">${o.deaths||0}</span>/<span style="color:var(--pri);">${o.assists||0}</span></span></div>`;
+                    matchs += `<div class="mc ${cls}" data-champ="${mp.championId}" data-mode="${m.info.gameMode}" data-result="${cls}">
+                        <div class="mh"><span>${res}</span><span class="mhi">${fmtDur(dur)} &bull; ${modeName(m.info.gameMode)} &bull; ${fmtAgo(cre)}</span></div>
+                        <div class="mb">
+                            <div class="mch"><img src="${champImg(mp.championId)}" alt="${cn}" loading="lazy"><div>
+                                <div class="mcn">${cn} Nv.${cl2}</div>
+                                <div class="kda"><b>${k}</b>/<span style="color:#ef5350;">${dd}</span>/<span style="color:var(--pri);">${as2}</span> KDA</div>
+                                <div class="csm">${cs2} CS &bull; Visão ${mp.visionScore||0} &bull; ${mp.goldEarned>0?(mp.goldEarned/1000).toFixed(1)+'K':0} ouro</div>
+                                <div style="margin-top:4px;">${sums}</div>
+                            </div></div>
+                            <div class="mii">${items}</div>
+                        </div>
+                        <div class="os"><div class="tsr">
+                            <div><div class="th"><span class="td b"></span> AZUL ${mp.teamId===100?'← Seu time':''}</div>${t100.map(row).join('')}</div>
+                            <div><div class="th"><span class="td r"></span> VERMELHA ${mp.teamId===200?'← Seu time':''}</div>${t200.map(row).join('')}</div>
+                        </div></div>
+                    </div>`;
+                }
+                matchs += '</div>';
+            }
+
+            // ---- Settings tab (icon change, PIN, predictions) ----
+            const user = getLoggedUser();
+            const isOwner = user && user.idx === idx;
+            let settingsTab = '';
+            if (isOwner) {
+                // Icon picker - popular LoL profile icons
+                const iconIds = [5885,588,589,590,591,592,593,594,595,596,597,598,599,600,601,602,603,604,605,606,607,608,4951,4952,4953,4954,4955,4956,4957,4958,4959,4960,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
+                let iconGrid = '<div class="cfg-icon-grid">';
+                for (const iid of iconIds) {
+                    const sel = String(ic) === String(iid) ? ' cfg-icon-sel' : '';
+                    iconGrid += `<img src="${profImg(iid)}" class="cfg-icon-opt${sel}" data-iid="${iid}" onclick="pickIcon(${idx},${iid})" ${F}>`;
+                }
+                iconGrid += '</div>';
+
+                // PIN change form
+                const pinSection = `<div class="cfg-section">
+                    <h4>Alterar PIN</h4>
+                    <div class="cfg-pin-form">
+                        <input type="password" id="cfg-old-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="PIN atual" autocomplete="off">
+                        <input type="password" id="cfg-new-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Novo PIN" autocomplete="off">
+                        <input type="password" id="cfg-confirm-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Confirmar novo PIN" autocomplete="off">
+                        <button class="cfg-btn" onclick="changePin(${idx})">Alterar PIN</button>
+                        <div id="cfg-pin-msg" class="cfg-msg"></div>
+                    </div>
+                </div>`;
+
+                // Predictions history
+                let predsHtml = '<div class="cfg-section"><h4>Meus Palpites</h4>';
+                const predKeys = [];
+                for (let k = 0; k < localStorage.length; k++) {
+                    const key = localStorage.key(k);
+                    if (key && key.startsWith('pred_' + idx + '_')) predKeys.push(key);
+                }
+                if (predKeys.length) {
+                    predsHtml += '<div class="cfg-preds">';
+                    for (const key of predKeys) {
+                        try {
+                            const pred = JSON.parse(localStorage.getItem(key));
+                            const mid = key.replace('pred_' + idx + '_', '');
+                            const date = pred.time ? new Date(pred.time).toLocaleDateString('pt-BR') : '?';
+                            const score = pred.scoreA != null && pred.scoreB != null ? pred.scoreA + ' x ' + pred.scoreB : '';
+                            predsHtml += '<div class="cfg-pred-item"><span class="cfg-pred-winner">' + (pred.winner||'?') + '</span>' + (score ? '<span class="cfg-pred-score">' + score + '</span>' : '') + '<span class="cfg-pred-date">' + date + '</span></div>';
+                        } catch(_) {}
+                    }
+                    predsHtml += '</div>';
+                } else {
+                    predsHtml += '<p style="color:var(--dim);font-size:.85em;">Nenhum palpite registrado ainda.</p>';
+                }
+                predsHtml += '</div>';
+
+                settingsTab = `<div class="cfg-section"><h4>Trocar Ícone</h4><div class="cfg-icon-current"><img src="${profImg(ic)}" class="cfg-icon-preview" id="cfg-icon-preview" ${F}><span>Ícone atual</span></div>${iconGrid}</div>${pinSection}${predsHtml}`;
+            }
+
+            const hasCfg = isOwner;
+            const tabs = hasCfg ? `<div class="prof-tabs">
+                <button class="prof-tab on" data-tab="stats" onclick="switchProfTab('stats')">Estatísticas</button>
+                <button class="prof-tab" data-tab="config" onclick="switchProfTab('config')">Configurações</button>
+            </div>` : '';
+
+            const rb = solo ? `<span class="prg">${solo.tier} ${solo.rank} &mdash; ${solo.leaguePoints} LP</span>` : `<span class="prg">Não posicionado</span>`;
+            app.innerHTML = `<div class="section-wrap-sm">
+                <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+                <div class="pv">
+                    <div class="pb"><div class="pbg"></div><div class="pbi">
+                        <div class="pi"><img src="${profImg(ic)}" alt="" id="prof-main-icon" ${F}></div>
+                        <div><div class="pn2">${a.gameName||p.name} <span class="t">#${a.tagLine||p.tag}</span></div>
+                        <span class="prg">${p.region}</span>${rb}</div>
+                    </div></div>
+                    ${tabs}
+                    <div id="prof-tab-stats">${stats}${ranked}${mas}${matchs}</div>
+                    ${hasCfg ? '<div id="prof-tab-config" style="display:none;">' + settingsTab + '</div>' : ''}
+                </div>
+            </div>`;
+        }).catch(err => {
+            app.innerHTML = `<div class="section-wrap-sm"><button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+                <div class="err"><p style="font-size:2em;margin-bottom:12px;">❌</p><p style="font-size:1.2em;margin-bottom:8px;">Erro ao carregar perfil</p><p>${err.message}</p>
+                <button onclick="renderProfile(${idx})" style="margin-top:16px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar Novamente</button></div></div>`;
+        });
+    }
+
+    // ======================== CBLOL ========================
+    const cblolTabs = [
+        {k:'upcoming',l:'Próximas',ic:'&#128197;'}, {k:'running',l:'Ao Vivo',ic:'&#128308;'}, {k:'closed',l:'Finalizadas',ic:'&#127942;'}, {k:'ranking',l:'Ranking',ic:'&#127941;'}
+    ];
+
+    function renderCBLOL(tab) {
+        tab = tab || 'upcoming';
+        app.innerHTML = `<div class="section-wrap-sm">
+            <div class="cv">
+                <div class="cblol-hero">
+                    <div class="cblol-hero-bg"></div>
+                    <div class="cblol-hero-content">
+                        <div class="cblol-badge">CAMPEONATO BRASILEIRO</div>
+                        <h1 class="cblol-title">CBLOL <span>2025</span></h1>
+                        <p class="cblol-sub">Acompanhe partidas, fa&ccedil;a palpites e dispute com o squad</p>
+                    </div>
+                </div>
+                <div class="cblol-tabs">${cblolTabs.map(t => `<button class="cblol-tab ${t.k===tab?'on':''}" data-t="${t.k}"><span class="cblol-tab-ic">${t.ic}</span>${t.l}</button>`).join('')}</div>
+                <div id="cc"><div class="ld"><div class="sp"></div></div></div>
+            </div>
+        </div>`;
+
+        document.querySelectorAll('.cblol-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.cblol-tab').forEach(b => b.classList.remove('on'));
+                btn.classList.add('on');
+                const t = btn.dataset.t;
+                if (t==='upcoming') { clearLive(); loadSchedule('upcoming'); }
+                else if (t==='running') loadLive();
+                else if (t==='closed') { clearLive(); loadSchedule('closed'); }
+                else { clearLive(); loadRanking(); }
+            });
+        });
+
+        if (tab==='running') loadLive();
+        else if (tab==='closed') { clearLive(); loadSchedule('closed'); }
+        else if (tab==='ranking') { clearLive(); loadRanking(); }
+        else { clearLive(); loadSchedule('upcoming'); }
+    }
+
+    async function loadSchedule(type) {
+        clearLive();
+        const cc = $('cc');
+        cc.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        const isClosed = type === 'closed';
+        try {
+            let events=[], pageToken='', first=true;
+            do {
+                let u = `https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL_ID}`;
+                if (pageToken) u += `&pageToken=${encodeURIComponent(pageToken)}`;
+                const data = await esp(u);
+                if (!data?.data?.schedule) break;
+                events.push(...(data.data.schedule.events||[]));
+                pageToken = data.data.schedule.pages?.older||'';
+                first = false;
+            } while (pageToken && (isClosed ? events.length<100 : false));
+
+            events = events.filter(e => isClosed?(e.state==='completed'):(e.state==='unstarted'));
+            // For upcoming: sort chronologically (nearest first), filter out TBD-only games
+            if (!isClosed) {
+                events = events.filter(e => {
+                    const ts = e.match?.teams || [];
+                    return ts.length >= 2 && !(ts[0].code === 'TBD' && ts[1].code === 'TBD');
+                });
+                events.sort((a,b) => new Date(a.startTime) - new Date(b.startTime));
+            } else {
+                // For closed: most recent first
+                events.sort((a,b) => new Date(b.startTime) - new Date(a.startTime));
+            }
+            if (!events.length) { cc.innerHTML='<div class="err"><p>Nenhuma partida encontrada</p></div>'; return; }
+
+            let html = '<div class="cblol-match-list">';
+            for (const ev of events) {
+                const m=ev.match||{}, ts=m.teams||[];
+                if (ts.length<2) continue;
+                const tA=ts[0], tB=ts[1];
+                const cA=tA.code||tA.name||'A', cB=tB.code||tB.name||'B';
+                const rA=tA.result||{}, rB=tB.result||{};
+                const sA=rA.gameWins||0, sB=rB.gameWins||0;
+                const wA=rA.outcome==='win', wB=rB.outcome==='win';
+                const winner=wA?tA:wB?tB:null;
+                const mid=ev.id||m.id||ev.slug||'';
+                const dt=ev.startTime?new Date(ev.startTime):null;
+                const bn=ev.blockName||'';
+                const dateStr = dt ? dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'}) : '';
+                const timeStr = dt ? dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+
+                if (isClosed) {
+                    const ac={winnerCode:winner?(winner.code||winner.name):'',a:sA,b:sB};
+                    html += `<div class="cblol-card ${wA||wB?'finished':''}">
+                        <div class="cblol-card-header">
+                            <span class="cblol-card-date">${dateStr} &bull; ${timeStr}</span>
+                            <span class="cblol-card-block">${bn}</span>
+                            <span class="cblol-card-badge done">Finalizada</span>
+                        </div>
+                        <div class="cblol-card-teams">
+                            <div class="cblol-team ${wA?'winner':''}">
+                                <img src="${tA.image||''}" alt="${cA}">
+                                <span class="cblol-team-name">${cA}</span>
+                                <span class="cblol-team-score ${wA?'w':''}">${sA}</span>
+                            </div>
+                            <div class="cblol-vs-divider"><span>VS</span></div>
+                            <div class="cblol-team ${wB?'winner':''}">
+                                <span class="cblol-team-score ${wB?'w':''}">${sB}</span>
+                                <span class="cblol-team-name">${cB}</span>
+                                <img src="${tB.image||''}" alt="${cB}">
+                            </div>
+                        </div>
+                        ${predResult(mid,{code:cA},{code:cB},{winnerCode:winner?(winner.code||winner.name):'',a:sA,b:sB})}
+                    </div>`;
+                } else {
+                    const bo=m.strategy?.count||1;
+                    const maxW=Math.ceil(bo/2);
+                    const sp=getPred(mid);
+                    html += `<div class="cblol-card upcoming">
+                        <div class="cblol-card-header">
+                            <span class="cblol-card-date">${dateStr} &bull; ${timeStr}</span>
+                            <span class="cblol-card-block">${bn}</span>
+                            <span class="cblol-card-badge next">MD${bo}</span>
+                        </div>
+                        <div class="cblol-card-teams">
+                            <div class="cblol-team">
+                                <img src="${tA.image||''}" alt="${cA}">
+                                <span class="cblol-team-name">${cA}</span>
+                            </div>
+                            <div class="cblol-vs-divider"><span>VS</span></div>
+                            <div class="cblol-team">
+                                <span class="cblol-team-name">${cB}</span>
+                                <img src="${tB.image||''}" alt="${cB}">
+                            </div>
+                        </div>
+                        <div class="cblol-pred-form">
+                            <div class="cblol-pred-row">
+                                <div class="cblol-pred-field">
+                                    <label>Vencedor <span class="pts-tag">+10 pts</span></label>
+                                    <select id="pw-${mid}"><option value="${cA}" ${sp?.winner===cA?'selected':''}>${cA}</option><option value="${cB}" ${sp?.winner===cB?'selected':''}>${cB}</option></select>
+                                </div>
+                                <div class="cblol-pred-field">
+                                    <label>Placar ${bo>1?'(MD'+bo+')':''} <span class="pts-tag">+25 pts</span></label>
+                                    <div class="cblol-score-input">
+                                        <span class="score-label">${cA}</span>
+                                        <select id="psa-${mid}">${Array.from({length:maxW+1},(_,i)=>`<option value="${i}" ${sp?.scoreA===i?'selected':''}>${i}</option>`).join('')}</select>
+                                        <span class="score-sep">&times;</span>
+                                        <select id="psb-${mid}">${Array.from({length:maxW+1},(_,i)=>`<option value="${i}" ${sp?.scoreB===i?'selected':''}>${i}</option>`).join('')}</select>
+                                        <span class="score-label">${cB}</span>
+                                    </div>
+                                </div>
+                                <button class="cblol-pred-btn" onclick="savePred('${mid}')">Salvar Palpite</button>
+                            </div>
+                            ${sp?`<div class="cblol-pred-saved">Palpite salvo: <b>${sp.winner}</b>${sp.scoreA!=null?' &mdash; '+sp.scoreA+'x'+sp.scoreB:''}</div>`:''}
+                        </div>
+                    </div>`;
+                }
+            }
+            html += '</div>';
+            cc.innerHTML = html || '<div class="err"><p>Nenhuma partida encontrada.</p></div>';
+        } catch(e) {
+            cc.innerHTML = `<div class="err"><p>Erro: ${e.message}</p><button onclick="loadSchedule('${type}')" style="margin-top:12px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
+        }
+    }
+
+    // ======================== PREDICTIONS ========================
+    // Predictions are keyed per user: pred_{userIdx}_{matchId}
+    // Legacy (no user) keys: pred_{matchId}
+    function pk(mid, userIdx) {
+        if (userIdx !== undefined && userIdx !== null) return `pred_${userIdx}_${mid}`;
+        const user = getLoggedUser();
+        return user ? `pred_${user.idx}_${mid}` : `pred_${mid}`;
+    }
+    function getPred(mid, userIdx) {
+        try { return JSON.parse(localStorage.getItem(pk(mid, userIdx))||'null'); } catch(_) { return null; }
+    }
+    // Get prediction for any user (for ranking)
+    function getPredForUser(mid, userIdx) {
+        return getPred(mid, userIdx);
+    }
+    window.savePred = function(mid) {
+        const user = getLoggedUser();
+        if (!user) { showLoginModal(); return; }
+        const w=$(`pw-${mid}`), sa=$(`psa-${mid}`), sb=$(`psb-${mid}`);
+        if (!w) return;
+        localStorage.setItem(pk(mid), JSON.stringify({winner:w.value,scoreA:sa?+sa.value:null,scoreB:sb?+sb.value:null,time:Date.now()}));
+        const btn=document.querySelector(`[onclick="savePred('${mid}')"]`);
+        if (btn) { btn.textContent='Salvo!'; setTimeout(()=>btn.textContent='Salvar Palpite',1500); }
+    };
+    function predResult(mid, tA, tB, ac) {
+        const sp=getPred(mid); if (!sp) return '<div class="pr pd">Sem palpite</div>';
+        const gw=sp.winner===ac.winnerCode;
+        const gs=sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===ac.a&&sp.scoreB===ac.b;
+        if (gs) return `<div class="pr ex">✓ PERFEITO! +35 pts · ${sp.scoreA}—${sp.scoreB}</div>`;
+        if (gw) return `<div class="pr ok">✓ Acertou o vencedor! (+10 pts)</div>`;
+        return `<div class="pr no">✗ Errou! Palpite: ${sp.winner}</div>`;
+    }
+
+    // ======================== CBLOL LIVE (sub-aba) ========================
+    async function loadLive() {
+        const cc = $('cc');
+        cc.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        try {
+            const data = await esp('https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR');
+            const evs  = data?.data?.schedule?.events || [];
+            if (!evs.length) {
+                cc.innerHTML = '<div class="err"><p style="font-size:1.2em;margin-bottom:8px;">Nenhum jogo ao vivo</p><button onclick="loadLive()" style="margin-top:8px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Verificar</button></div>';
+                return;
+            }
+            evs.sort((a,b) => (a.league?.id===CBLOL_ID?0:1)-(b.league?.id===CBLOL_ID?0:1));
+            let html = '';
+            for (const ev of evs) {
+                const m=ev.match||{}, ts=m.teams||[];
+                if (ts.length<2) continue;
+                const gid=ev.id||m.id||'';
+                html += `<div class="lg" id="lg-${gid}" data-gid="${gid}" data-ts="${ev.startTime||''}">
+                    <div class="lgh"><span class="ldot"></span> AO VIVO${ev.league?.name?' · '+ev.league.name:''}</div>
+                    <div class="ldet" onclick="togLive('${gid}','${ev.startTime||''}')">
+                        <div class="lgp"><div class="lgt"><img src="${ts[0].image||''}"><div class="ln">${ts[0].code}</div></div><div class="lvs">vs</div><div class="lgt"><img src="${ts[1].image||''}"><div class="ln">${ts[1].code}</div></div></div>
+                        <div class="lrs"><span class="lrw">${ts[0].result?.gameWins||0}</span><span>&mdash;</span><span class="lrw">${ts[1].result?.gameWins||0}</span></div>
+                        <div style="text-align:center;font-size:.7em;color:var(--dim);margin-top:4px;">▼ Ver detalhes</div>
+                    </div>
+                    <div id="lp-${gid}" class="ldp" style="display:none;"></div>
+                </div>`;
+            }
+            cc.innerHTML = html;
+            liveTimer = setInterval(refreshInline, 2000);
+        } catch(e) {
+            cc.innerHTML = `<div class="err"><p>Erro: ${e.message}</p><button onclick="loadLive()" style="margin-top:12px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
+        }
+    }
+
+    window.togLive = async (gid, ts) => {
+        const p = $(`lp-${gid}`);
+        if (!p) return;
+        if (p.style.display !== 'none') { p.style.display='none'; return; }
+        p.style.display = 'block';
+        p.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        await fetchInline(gid, ts, p);
+        const label = document.querySelector(`[data-gid="${gid}"] .ldet div:last-child`);
+        if (label) label.textContent = '▲ Recolher';
+    };
+
+    async function refreshInline() {
+        document.querySelectorAll('.ldp[style*="block"]').forEach(p => {
+            const lg = p.closest('.lg');
+            if (lg) fetchInline(lg.dataset.gid, lg.dataset.ts, p);
+        });
+    }
+
+    // Cache gwid per event to avoid repeated getEventDetails calls
+    const gwidCache = {};
+    async function fetchInline(gid, ts, p) {
+        if (!p) p = $(`lp-${gid}`); if (!p) return;
+        try {
+            // Resolve correct game window ID (cached)
+            if (!gwidCache[gid]) {
+                gwidCache[gid] = bigAdd(gid, 1);
+                try {
+                    const evResp = await esp(`https://esports-api.lolesports.com/persisted/gw/getEventDetails?hl=pt-BR&id=${gid}`);
+                    const evData = evResp?.data?.event;
+                    const games = evData?.match?.games || [];
+                    for (const g of games) {
+                        if (g.state === 'inProgress') { gwidCache[gid] = bigAdd(gid, g.number); break; }
+                    }
+                    // Store team info for buildLiveFrame
+                    gwidCache[gid+'_t1'] = evData?.match?.teams?.[0] || {};
+                    gwidCache[gid+'_t2'] = evData?.match?.teams?.[1] || {};
+                } catch(_) {}
+            }
+            const gwid = gwidCache[gid];
+            const ct1 = gwidCache[gid+'_t1'] || {};
+            const ct2 = gwidCache[gid+'_t2'] || {};
+            const date = isoRound10();
+            const [wd, dd] = await Promise.all([
+                live(`/window/${gwid}`, { hl:'pt-BR', startingTime:date }),
+                live(`/details/${gwid}`, { hl:'pt-BR', startingTime:date })
+            ]);
+            if (!wd) { p.innerHTML='<div class="err"><p>Dados indispon&iacute;veis</p></div>'; return; }
+            const frW=wd.frames||[], frD=dd?.frames||[];
+            if (!frW.length) { p.innerHTML='<div class="err"><p>Aguardando dados…</p></div>'; return; }
+            const lf=frW[frW.length-1];
+            const df=frD.length?frD[frD.length-1]:null;
+            const gm=wd.gameMetadata||{};
+            // Use the same full buildLiveFrame as the standalone page
+            p.innerHTML = buildLiveFrame(lf, df, gm, ct1, ct2, gwid, frW);
+        } catch(e) { p.innerHTML=`<div class="err"><p>Erro: ${e.message}</p></div>`; }
+    }
+
+    // inlineObjs and inlinePlayers removed — CBLOL sub-tab now uses buildLiveFrame
+
+    // ======================== RANKING ========================
+    async function loadRanking() {
+        const cc = $('cc');
+        const sc = PLAYERS.map((p,i) => ({name:p.name,pts:0,ex:0,wn:0,wr:0,tot:0,idx:i}));
+        try {
+            let evs=[], pageToken='', first=true;
+            do {
+                let u=`https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL_ID}`;
+                if (pageToken) u+=`&pageToken=${encodeURIComponent(pageToken)}`;
+                const data=await esps(u);
+                if (!data?.data?.schedule) break;
+                evs.push(...(data.data.schedule.events||[]).filter(e=>e.state==='completed'));
+                pageToken=data.data.schedule.pages?.older||'';
+                first=false;
+            } while (pageToken && evs.length<200);
+
+            for (const ev of evs) {
+                const mid=ev.id||ev.match?.id||ev.slug||'';
+                const ts=ev.match?.teams||[]; if (ts.length<2) continue;
+                const w=(ts[0].result?.outcome==='win')?ts[0]:(ts[1].result?.outcome==='win')?ts[1]:null;
+                if (!w) continue;
+                const wc=w.code||w.name;
+                const sa=ts[0].result?.gameWins||0, sb=ts[1].result?.gameWins||0;
+                // Check each player's prediction individually
+                for (const s of sc) {
+                    const sp = getPredForUser(mid, s.idx);
+                    if (!sp) continue;
+                    s.tot++;
+                    const gw=sp.winner===wc, gs=sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===sa&&sp.scoreB===sb;
+                    if (gs) { s.pts+=35; s.ex++; }
+                    else if (gw) { s.pts+=10; s.wn++; }
+                    else s.wr++;
+                }
+            }
+        } catch(_) {}
+
+        const rk=[...sc].sort((a,b) => b.pts-a.pts||a.name.localeCompare(b.name));
+        const podium = rk.slice(0,3);
+        const rest = rk.slice(3);
+        cc.innerHTML = `
+            <div class="rank-header">
+                <h3>Ranking de Palpites</h3>
+                <div class="rank-legend">
+                    <span><span class="rank-dot exact"></span> Exato +35</span>
+                    <span><span class="rank-dot win"></span> Vencedor +10</span>
+                </div>
+            </div>
+            ${podium.length ? `<div class="podium">
+                ${podium.map((s,i) => {
+                    const medals = ['gold','silver','bronze'];
+                    const pos = ['1&ordm;','2&ordm;','3&ordm;'];
+                    return `<div class="podium-card ${medals[i]}" onclick="location.hash='profile/${s.idx}'">
+                        <div class="podium-pos">${pos[i]}</div>
+                        <div class="podium-name">${s.name}</div>
+                        <div class="podium-pts">${s.pts} <small>pts</small></div>
+                        <div class="podium-stats">
+                            <span title="Exatos" style="color:#4caf50;">${s.ex}P</span>
+                            <span title="Vencedores" style="color:#ffd740;">${s.wn}V</span>
+                            <span title="Erros" style="color:#ef5350;">${Math.max(0,s.wr)}E</span>
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>` : ''}
+            ${rest.length ? `<div class="rank-rest">
+                ${rest.map((s,i) => `<div class="rank-row" onclick="location.hash='profile/${s.idx}'">
+                    <span class="rank-pos">${i+4}</span>
+                    <span class="rank-name">${s.name}</span>
+                    <span class="rank-stat" style="color:#4caf50;">${s.ex}P</span>
+                    <span class="rank-stat" style="color:#ffd740;">${s.wn}V</span>
+                    <span class="rank-stat" style="color:#ef5350;">${Math.max(0,s.wr)}E</span>
+                    <span class="rank-pts">${s.pts} pts</span>
+                </div>`).join('')}
+            </div>` : ''}
+            <p style="margin-top:16px;font-size:.75em;color:var(--dim);text-align:center;">Clique no jogador para ver o perfil</p>
+            <p class="local-notice" style="margin-top:8px;">Palpites e pontuação ficam salvos neste navegador</p>`;
+    }
+
+    // ======================== LIVE PAGE (standalone) ========================
+    function renderLivePage(h) {
+        const gameId = h.startsWith('live/') ? h.split('/')[1] : null;
+        clearLive();
+        if (liveDetailTimer) { clearInterval(liveDetailTimer); liveDetailTimer = null; }
+
+        if (!gameId) {
+            app.innerHTML = `<div class="section-wrap">
+                <div class="live-page-hero">
+                    <span class="ldot"></span>
+                    <h1>Jogos <span>Ao Vivo</span></h1>
+                    <p>Selecione um jogo para acompanhar em tempo real</p>
+                </div>
+                <div class="live-grid" id="live-grid"><div class="ld"><div class="sp"></div></div></div>
+                <div id="live-today-wrap" style="display:none;">
+                    <div class="live-today-title">JOGOS DO DIA</div>
+                    <div class="live-today-grid" id="live-today-grid"></div>
+                </div>
+            </div>`;
+            loadLiveCardList();
+        } else {
+            app.innerHTML = `<div class="section-wrap-sm">
+                <button class="bb" onclick="location.hash='live'">&larr; Jogos ao vivo</button>
+                <div id="live-detail"><div class="ld"><div class="sp"></div></div></div>
+            </div>`;
+            loadLiveGameDetail(gameId);
+        }
+    }
+
+    async function loadLiveCardList() {
+        try {
+            const [liveData, scheduleData] = await Promise.all([
+                esp('https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR'),
+                esp('https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR')
+            ]);
+            const liveEvents = (liveData?.data?.schedule?.events||[]).filter(e => e.match);
+            const today = new Date().toISOString().split('T')[0];
+            const todayEvents = (scheduleData?.data?.schedule?.events||[]).filter(e => e.match && e.startTime?.startsWith(today));
+            const grid = $('live-grid');
+
+            if (liveEvents.length) {
+                grid.innerHTML = `<div class="live-grid-inner">${liveEvents.map(g => {
+                    const t1=g.match?.teams?.[0], t2=g.match?.teams?.[1];
+                    return `<div class="live-game-card" onclick="location.hash='live/${g.id}'">
+                        <div class="lgc-league"><span class="ldot"></span> ${g.league?.name||''}</div>
+                        <div class="live-card-body">
+                            <div class="live-card-team"><img src="${t1?.image||''}"><span>${t1?.code||t1?.name||'?'}</span></div>
+                            <div class="live-card-vs">
+                                <div class="live-score">${t1?.result?.gameWins||0} — ${t2?.result?.gameWins||0}</div>
+                                <div style="font-size:.7em;color:var(--dim);margin-top:4px;">Ver detalhes</div>
+                            </div>
+                            <div class="live-card-team"><img src="${t2?.image||''}"><span>${t2?.code||t2?.name||'?'}</span></div>
+                        </div>
+                    </div>`;
+                }).join('')}</div>`;
+            } else {
+                grid.innerHTML = `<div class="live-empty"><p style="color:var(--dim);text-align:center;padding:4rem 0;font-size:1.1em;">Nenhum jogo ao vivo no momento</p></div>`;
+            }
+
+            if (todayEvents.length) {
+                const wrap = $('live-today-wrap');
+                const tg   = $('live-today-grid');
+                if (wrap) wrap.style.display = 'block';
+                if (tg) tg.innerHTML = todayEvents.map(g => {
+                    const t1=g.match?.teams?.[0], t2=g.match?.teams?.[1];
+                    const dt=new Date(g.startTime);
+                    return `<div class="live-game-card today">
+                        <div class="lgc-league">${g.league?.name||''} · ${dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+                        <div class="live-card-body">
+                            <div class="live-card-team"><img src="${t1?.image||''}"><span>${t1?.code||t1?.name||'?'}</span></div>
+                            <div class="live-card-vs"><span style="font-size:1em;font-weight:700;color:var(--dim);">VS</span></div>
+                            <div class="live-card-team"><img src="${t2?.image||''}"><span>${t2?.code||t2?.name||'?'}</span></div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        } catch(e) {
+            $('live-grid').innerHTML = `<div class="err"><p>Erro: ${e.message}</p><button onclick="loadLiveCardList()" style="margin-top:8px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
+        }
+    }
+
+    async function loadLiveGameDetail(gid) {
+        try {
+            const detailsResp = await esp(`https://esports-api.lolesports.com/persisted/gw/getEventDetails?hl=pt-BR&id=${gid}`);
+            const eventData   = detailsResp?.data?.event;
+            const games       = eventData?.match?.games || [];
+            let gameWindowId  = bigAdd(gid, 1);
+            let activeGameNum = 1;
+
+            // Find in-progress game first, then latest completed
+            for (const game of games) {
+                if (game.state === 'inProgress') {
+                    gameWindowId = bigAdd(gid, game.number);
+                    activeGameNum = game.number;
+                    break;
+                }
+            }
+            if (activeGameNum === 1 && games.length) {
+                // No in-progress: pick the latest completed or unstarted
+                for (let i = games.length - 1; i >= 0; i--) {
+                    if (games[i].state === 'completed') {
+                        gameWindowId = bigAdd(gid, games[i].number);
+                        activeGameNum = games[i].number;
+                        break;
+                    }
+                }
+            }
+
+            const teams = eventData?.match?.teams || [];
+            const t1 = teams[0]||{}, t2 = teams[1]||{};
+            const ln = eventData?.league?.name||'', li = eventData?.league?.image||'';
+            const wins1 = t1?.result?.gameWins||0, wins2 = t2?.result?.gameWins||0;
+            const bo = eventData?.match?.strategy?.count || 1;
+
+            // Game selector tabs for BO3/BO5
+            let gameTabs = '';
+            if (games.length > 1) {
+                gameTabs = `<div class="game-tabs" id="game-tabs">${games.map(g => {
+                    const active = g.number === activeGameNum;
+                    const stateIcon = g.state === 'inProgress' ? '<span class="ldot" style="width:6px;height:6px;"></span> ' :
+                                      g.state === 'completed' ? '' : '';
+                    const stateClass = g.state === 'inProgress' ? 'live' : g.state === 'completed' ? 'done' : 'pending';
+                    return `<button class="game-tab ${active?'on':''} ${stateClass}" data-gnum="${g.number}" onclick="switchGame('${gid}',${g.number})">${stateIcon}Jogo ${g.number}</button>`;
+                }).join('')}</div>`;
+            }
+
+            $('live-detail').innerHTML = `
+                <div class="live-detail-header">
+                    <div class="live-detail-league">
+                        ${li?`<img src="${li}" class="live-league-icon" alt="${ln}"> `:''}
+                        <span>${ln}</span>
+                        ${bo > 1 ? `<span class="live-bo-badge">MD${bo}</span>` : ''}
+                    </div>
+                    <div class="live-detail-matchup">
+                        <div class="live-detail-team">
+                            <img src="${t1.image||''}" alt="${t1.code||''}">
+                            <span>${t1.code||t1.name||'?'}</span>
+                        </div>
+                        <div class="live-detail-vs">
+                            <div class="live-detail-score">${wins1} — ${wins2}</div>
+                            <span class="ldot"></span>
+                        </div>
+                        <div class="live-detail-team">
+                            <img src="${t2.image||''}" alt="${t2.code||''}">
+                            <span>${t2.code||t2.name||'?'}</span>
+                        </div>
+                    </div>
+                </div>
+                ${gameTabs}
+                <div id="live-frame" class="live-frame"><div class="ld"><div class="sp"></div></div></div>`;
+
+            // Expose game switching
+            window.switchGame = (eid, num) => {
+                gameWindowId = bigAdd(eid, num);
+                document.querySelectorAll('.game-tab').forEach(b => b.classList.remove('on'));
+                const active = document.querySelector(`.game-tab[data-gnum="${num}"]`);
+                if (active) active.classList.add('on');
+                $('live-frame').innerHTML = '<div class="ld"><div class="sp"></div></div>';
+                fetchFrame();
+            };
+
+            const fetchFrame = async () => {
+                try {
+                    const date = isoRound10();
+                    const [wd, dd] = await Promise.all([
+                        live(`/window/${gameWindowId}`, {hl:'pt-BR',startingTime:date}),
+                        live(`/details/${gameWindowId}`, {hl:'pt-BR',startingTime:date})
+                    ]);
+                    if (!wd) { $('live-frame').innerHTML='<div class="err"><p>Dados indispon&iacute;veis para este jogo</p></div>'; return; }
+                    const frW = wd?.frames||[];
+                    if (!frW.length) { $('live-frame').innerHTML='<div class="err"><p>Aguardando dados do jogo…</p></div>'; return; }
+                    const lf = frW[frW.length-1];
+                    const df = dd?.frames?.length ? dd.frames[dd.frames.length-1] : null;
+                    const gm = wd.gameMetadata||{};
+                    $('live-frame').innerHTML = buildLiveFrame(lf, df, gm, t1, t2, gameWindowId, frW);
+                } catch(_) { /* retry silently */ }
+            };
+            await fetchFrame();
+            if (liveDetailTimer) clearInterval(liveDetailTimer);
+            liveDetailTimer = setInterval(fetchFrame, 2000);
+        } catch(e) {
+            $('live-detail').innerHTML = `<div class="err"><p>Erro ao carregar: ${e.message}</p>
+                <button onclick="loadLiveGameDetail('${gid}')" style="margin-top:12px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
+        }
+    }
+
+    // Track earliest frame timestamp per game window id for elapsed time calculation
+    const _gameStartTs = {};
+
+    function buildLiveFrame(lf, df, gm, t1, t2, gwid, allFrames) {
+        const bt = lf.blueTeam  || {participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
+        const rt = lf.redTeam   || {participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
+        const bMeta = gm.blueTeamMetadata || {};
+        const rMeta = gm.redTeamMetadata  || {};
+        const dParts = df?.participants || [];
+        const gs = lf.gameState||'in_game';
+        // gameTime not in API — calculate elapsed from earliest seen frame
+        let gt = 0;
+        if (gwid && allFrames?.length) {
+            const firstTs = allFrames[0].rfc460Timestamp;
+            if (firstTs) {
+                const t = new Date(firstTs).getTime();
+                if (!_gameStartTs[gwid] || t < _gameStartTs[gwid]) _gameStartTs[gwid] = t;
+            }
+            if (_gameStartTs[gwid] && lf.rfc460Timestamp) {
+                gt = Math.max(0, Math.round((new Date(lf.rfc460Timestamp).getTime() - _gameStartTs[gwid]) / 1000));
+            }
+        }
+
+        const goldTotal = (bt.totalGold||0) + (rt.totalGold||0);
+        const gbPct = goldTotal ? Math.round((bt.totalGold / goldTotal) * 100) : 50;
+        const goldDiff = (bt.totalGold||0) - (rt.totalGold||0);
+        const goldDiffStr = goldDiff > 0 ? `+${fmtGold(goldDiff)} Azul` : goldDiff < 0 ? `+${fmtGold(-goldDiff)} Verm.` : 'Empate';
+
+        // ---- team stats bar (objectives) ----
+        function objRow(labelB, icon, labelR) {
+            return `<div class="obj-row"><span class="obj-val ob">${labelB}</span><span class="obj-icon">${icon}</span><span class="obj-val or2">${labelR}</span></div>`;
+        }
+
+        // ---- dragons ----
+        const bDrg = (bt.dragons||[]).map(d => `<span class="drg-icon" title="${d}">${drgEmoji(d)}</span>`).join('');
+        const rDrg = (rt.dragons||[]).map(d => `<span class="drg-icon" title="${d}">${drgEmoji(d)}</span>`).join('');
+
+        // ---- player row builder ----
+        function playerRow(p, side, opp) {
+            const mi     = side==='b' ? (p.participantId-1) : (p.participantId-6);
+            const meta   = side==='b' ? bMeta : rMeta;
+            const pmeta  = meta?.participantMetadata?.[mi] || {};
+            const champId= pmeta.championId || '?';
+            const sName  = pmeta.summonerName || '';
+            const role   = pmeta.role || '';
+
+            const di   = p.participantId - 1;
+            const dp   = dParts[di] || {};
+            const items= dp.items || [];
+
+            const k=p.kills||0, d=p.deaths||0, a=p.assists||0, cs=p.creepScore||0, lv=p.level||1;
+            const curHp  = p.currentHealth||0, maxHp = p.maxHealth||1;
+            const hp     = maxHp>0 ? Math.round((curHp/maxHp)*100) : 100;
+            const hpClr  = hp>60?'#4caf50':hp>30?'#ff9800':'#ef5350';
+            const gold   = p.totalGold||0;
+
+            const gd     = gold - (opp?.totalGold||0);
+            const gdStr  = gd>0 ? `+${fmtGold(gd)}` : gd<0 ? fmtGold(gd) : '-';
+            const gdCls  = gd>0 ? 'gpos' : gd<0 ? 'gneg' : '';
+
+            const color  = side==='b' ? 'var(--pri)' : 'var(--acc)';
+
+            // items: sort trinkets to end (IDs 3340, 3363, 3364)
+            const trinkets = [3340, 3363, 3364, 3513, 2055];
+            const mainItems = items.filter(id => id && !trinkets.includes(id));
+            const trinket   = items.find(id => id && trinkets.includes(id));
+            const slots = [...mainItems.slice(0,6)];
+            while (slots.length < 6) slots.push(0);
+            slots.push(trinket || 0);
+
+            const itemsHtml = slots.map(id =>
+                id ? `<img src="${itemImg(id)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+                   : `<span class="li-empty"></span>`
+            ).join('');
+
+            return `<tr>
+                <td class="lt-champ-cell">
+                    <div class="lchamp">
+                        <img src="${champImg(champId)}" alt="${champId}" onerror="this.style.opacity='0.3'" class="lchamp-img" style="border-color:${color};">
+                        <div>
+                            <div class="lchamp-cn">${champId} <span class="lchamp-lv" style="color:${color};">Lv.${lv}</span></div>
+                            <div class="lchamp-sn">${sName}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="lt-hp-cell">
+                    <div class="lhp"><div class="lhp-fill" style="width:${hp}%;background:${hpClr};"></div></div>
+                    <div class="lhp-text">${hp}%</div>
+                </td>
+                <td><div class="litems">${itemsHtml}</div></td>
+                <td class="lt-num">${cs}</td>
+                <td class="lt-k">${k}</td>
+                <td class="lt-d">${d}</td>
+                <td class="lt-a">${a}</td>
+                <td class="lt-num">${fmtGold(gold)}</td>
+                <td class="${gdCls} lt-num">${gdStr}</td>
+            </tr>`;
+        }
+
+        // ---- full team table ----
+        function teamTable(participants, side, teamLabel, teamImg, oppParticipants) {
+            const color = side==='b' ? 'var(--pri)' : 'var(--acc)';
+            const rows  = participants.map((p,i) => playerRow(p, side, oppParticipants[i]||{})).join('');
+            return `<div class="lt-wrap">
+                <table class="lt">
+                    <thead>
+                        <tr class="lt-head-row" style="--team-color:${color};">
+                            <th class="lt-th-main"><span class="lt-team-dot" style="background:${color};"></span>${teamLabel}</th>
+                            <th>VIDA</th>
+                            <th>ITENS</th>
+                            <th>CS</th>
+                            <th style="color:#4caf50;">K</th>
+                            <th style="color:#ef5350;">D</th>
+                            <th style="color:var(--pri);">A</th>
+                            <th>OURO</th>
+                            <th>+/-</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+        }
+
+        const bLabel = t1?.code||'Azul', rLabel = t2?.code||'Vermelha';
+        const bTable = teamTable(bt.participants||[], 'b', bLabel, t1?.image, rt.participants||[]);
+        const rTable = teamTable(rt.participants||[], 'r', rLabel, t2?.image, bt.participants||[]);
+
+        return `
+            <div class="live-status ${gs}">
+                <span class="ldot"></span>
+                ${gt>0 ? fmtTime(gt)+' &mdash; ' : ''}${gs==='in_game'?'AO VIVO':gs==='paused'?'⏸ PAUSADO':'FINALIZADO'}
+            </div>
+
+            <div class="live-obj-grid">
+                ${objRow(bt.totalKills||0, '⚔️ Kills', rt.totalKills||0)}
+                ${objRow(bt.towers||0, '🗼 Torres', rt.towers||0)}
+                ${objRow(bt.barons||0, '👾 Bar&otilde;es', rt.barons||0)}
+                ${objRow(bt.inhibitors||0, '⛩️ Inibs', rt.inhibitors||0)}
+            </div>
+
+            <div class="gold-section">
+                <div class="gold-header">
+                    <span style="color:var(--pri);font-weight:800;">${fmtGold(bt.totalGold||0)}</span>
+                    <span class="gold-diff">${goldDiffStr}</span>
+                    <span style="color:var(--acc);font-weight:800;">${fmtGold(rt.totalGold||0)}</span>
+                </div>
+                <div class="gadvbar">
+                    <div class="gadv-b" style="width:${gbPct}%;"></div>
+                    <div class="gadv-r" style="width:${100-gbPct}%;"></div>
+                </div>
+            </div>
+
+            ${bDrg||rDrg ? `<div class="drg-bar">
+                <div class="drg-b">${bDrg||'<span class="drg-none">-</span>'}</div>
+                <div class="drg-label">Drag&otilde;es</div>
+                <div class="drg-r">${rDrg||'<span class="drg-none">-</span>'}</div>
+            </div>` : ''}
+
+            ${bTable}
+            ${rTable}
+        `;
+    }
+
+    // ======================== MUSIC PLAYER ========================
+    const PLAYLIST = [
+        { title:'Legends Never Die', id:'4Q46xYqUwZQ' },
+        { title:'Warriors', id:'fmI_Ndrxy14' },
+        { title:'RISE', id:'fB8TyLTD7EE' },
+        { title:'Enemy (Arcane)', id:'F5tSoaJ93ac' },
+        { title:'Playground (Arcane)', id:'WBN1GvX4eFE' },
+        { title:'Guns for Hire (Arcane)', id:'r4jJGBHv04g' },
+        { title:'Burn It All Down', id:'GCKeCntqnpI' },
+        { title:'Awaken', id:'zF5Ddo9JdpY' },
+    ];
+    let musicIdx = parseInt(localStorage.getItem('profa_music_idx')||'0') % PLAYLIST.length;
+    let musicPlaying = false;
+    let ytPlayer = null;
+    const MUSIC_VOL = 15; // 0-100, suave
+
+    // Create floating music button
+    const musicBtn = document.createElement('div');
+    musicBtn.id = 'music-btn';
+    musicBtn.className = 'music-btn';
+    musicBtn.innerHTML = `<span class="music-icon">&#9835;</span><span class="music-title" id="music-title">Musica</span>`;
+    document.body.appendChild(musicBtn);
+
+    // Music panel
+    const musicPanel = document.createElement('div');
+    musicPanel.id = 'music-panel';
+    musicPanel.className = 'music-panel';
+    musicPanel.style.display = 'none';
+    musicPanel.innerHTML = `
+        <div class="mp-header">
+            <span class="mp-label">LoL / Arcane OST</span>
+            <button class="mp-close" onclick="toggleMusicPanel()">&#215;</button>
+        </div>
+        <div class="mp-now" id="mp-now">Clique play para ouvir</div>
+        <div class="mp-controls">
+            <button class="mp-btn" id="mp-prev" onclick="musicPrev()">&#9664;&#9664;</button>
+            <button class="mp-btn mp-play" id="mp-play" onclick="musicToggle()">&#9654;</button>
+            <button class="mp-btn" id="mp-next" onclick="musicNext()">&#9654;&#9654;</button>
+        </div>
+        <div class="mp-vol">
+            <span style="font-size:.7em;color:var(--dim);">Vol</span>
+            <input type="range" id="mp-vol-slider" min="0" max="30" value="${MUSIC_VOL}" oninput="musicVol(this.value)">
+        </div>
+        <div class="mp-list" id="mp-list">${PLAYLIST.map((t,i) => `<div class="mp-track ${i===musicIdx?'on':''}" data-i="${i}" onclick="musicPlay(${i})">${t.title}</div>`).join('')}</div>
+    `;
+    document.body.appendChild(musicPanel);
+
+    // Hidden YT iframe container
+    const ytDiv = document.createElement('div');
+    ytDiv.id = 'yt-player';
+    ytDiv.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
+    document.body.appendChild(ytDiv);
+
+    // Load YT API
+    const ytScript = document.createElement('script');
+    ytScript.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(ytScript);
+
+    window.onYouTubeIframeAPIReady = function() {
+        ytPlayer = new YT.Player('yt-player', {
+            height: '1', width: '1',
+            videoId: PLAYLIST[musicIdx].id,
+            playerVars: { autoplay:1, controls:0, disablekb:1, fs:0, modestbranding:1, rel:0 },
+            events: {
+                onReady: () => {
+                    ytPlayer.setVolume(MUSIC_VOL);
+                    ytPlayer.playVideo();
+                },
+                onStateChange: (e) => {
+                    if (e.data === YT.PlayerState.ENDED) musicNext();
+                    musicPlaying = e.data === YT.PlayerState.PLAYING;
+                    updateMusicUI();
+                }
+            }
+        });
+    };
+    // Autoplay on first user interaction (browsers block autoplay without interaction)
+    function tryAutoplay() {
+        if (ytPlayer?.playVideo && !musicPlaying) {
+            ytPlayer.playVideo();
+        }
+        document.removeEventListener('click', tryAutoplay);
+        document.removeEventListener('keydown', tryAutoplay);
+        document.removeEventListener('scroll', tryAutoplay);
+    }
+    document.addEventListener('click', tryAutoplay);
+    document.addEventListener('keydown', tryAutoplay);
+    document.addEventListener('scroll', tryAutoplay);
+
+    function updateMusicUI() {
+        const playBtn = document.getElementById('mp-play');
+        const nowEl = document.getElementById('mp-now');
+        const titleEl = document.getElementById('music-title');
+        const btn = document.getElementById('music-btn');
+        if (playBtn) playBtn.innerHTML = musicPlaying ? '&#9646;&#9646;' : '&#9654;';
+        if (nowEl) nowEl.textContent = musicPlaying ? PLAYLIST[musicIdx].title : 'Pausado';
+        if (titleEl) titleEl.textContent = musicPlaying ? PLAYLIST[musicIdx].title : 'Musica';
+        if (btn) btn.classList.toggle('playing', musicPlaying);
+        document.querySelectorAll('.mp-track').forEach((el,i) => el.classList.toggle('on', i===musicIdx));
+    }
+
+    window.toggleMusicPanel = function() {
+        const p = document.getElementById('music-panel');
+        p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+    };
+    musicBtn.addEventListener('click', toggleMusicPanel);
+
+    window.musicToggle = function() {
+        if (!ytPlayer?.playVideo) return;
+        if (musicPlaying) { ytPlayer.pauseVideo(); } else { ytPlayer.playVideo(); }
+    };
+    window.musicPlay = function(i) {
+        musicIdx = i;
+        localStorage.setItem('profa_music_idx', String(i));
+        if (ytPlayer?.loadVideoById) { ytPlayer.loadVideoById(PLAYLIST[i].id); }
+        updateMusicUI();
+    };
+    window.musicNext = function() { musicPlay((musicIdx+1)%PLAYLIST.length); };
+    window.musicPrev = function() { musicPlay((musicIdx-1+PLAYLIST.length)%PLAYLIST.length); };
+    window.musicVol = function(v) { if (ytPlayer?.setVolume) ytPlayer.setVolume(parseInt(v)); };
+
+    // ======================== THEME TOGGLE ========================
+    function applyTheme(t) {
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('profa_theme', t);
+        const btn = $('theme-toggle');
+        if (btn) btn.innerHTML = t === 'light' ? '&#9728;' : '&#9789;';
+    }
+    $('theme-toggle').addEventListener('click', () => {
+        const cur = localStorage.getItem('profa_theme') || 'dark';
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+    });
+
+    // ======================== LIVE BADGE ========================
+    let liveBadgeTimer = null;
+    async function checkLiveBadge() {
+        try {
+            const data = await esps('https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR');
+            const evs = data?.data?.schedule?.events || [];
+            const badge = document.querySelector('.nl a[data-p="live"]');
+            if (badge) {
+                const existing = badge.querySelector('.live-badge-dot');
+                if (evs.length > 0) {
+                    if (!existing) badge.insertAdjacentHTML('beforeend', ' <span class="live-badge-dot"></span>');
+                } else {
+                    if (existing) existing.remove();
+                }
+            }
+        } catch(_) {}
+    }
+
+    // ======================== COMPARE PLAYERS ========================
+    function renderCompare(h) {
+        const parts = h.split('/');
+        const a = parts[1] !== undefined ? parseInt(parts[1]) : null;
+        const b = parts[2] !== undefined ? parseInt(parts[2]) : null;
+
+        let selectHtml = `<div class="section-wrap-sm">
+            <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+            <div class="compare-hero"><h1>Comparar <span>Jogadores</span></h1><p>Selecione dois jogadores para comparar estatísticas</p></div>
+            <div class="compare-select">
+                <select id="cmp-a" onchange="updateCompare()">
+                    <option value="">Jogador 1</option>
+                    ${PLAYERS.map((p,i) => `<option value="${i}" ${i===a?'selected':''}>${p.name}</option>`).join('')}
+                </select>
+                <span class="compare-vs">VS</span>
+                <select id="cmp-b" onchange="updateCompare()">
+                    <option value="">Jogador 2</option>
+                    ${PLAYERS.map((p,i) => `<option value="${i}" ${i===b?'selected':''}>${p.name}</option>`).join('')}
+                </select>
+            </div>
+            <div id="compare-result"></div>
+        </div>`;
+        app.innerHTML = selectHtml;
+
+        window.updateCompare = function() {
+            const va = $('cmp-a').value, vb = $('cmp-b').value;
+            if (va !== '' && vb !== '' && va !== vb) {
+                location.hash = `compare/${va}/${vb}`;
+            }
+        };
+
+        if (a !== null && b !== null && a !== b) loadCompare(a, b);
+    }
+
+    async function loadCompare(ai, bi) {
+        const res = $('compare-result');
+        if (!res) return;
+        res.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        try {
+            const [da, db] = await Promise.all([loadPlayer(ai), loadPlayer(bi)]);
+            const pa = PLAYERS[ai], pb = PLAYERS[bi];
+            const sa = da.league.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const sb = db.league.find(e=>e.queueType==='RANKED_SOLO_5x5');
+
+            function pStats(d) {
+                const mt = d.matches, a = d.account;
+                let k=0,dd=0,as=0,cs=0,g=0;
+                mt.forEach(m => { const p=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; k+=p.kills||0; dd+=p.deaths||0; as+=p.assists||0; cs+=(p.totalMinionsKilled||0)+(p.neutralMinionsKilled||0); g+=p.goldEarned||0; });
+                const n=mt.length||1;
+                const wins = mt.filter(m => { const p=m.info?.participants?.find(x=>x.puuid===a.puuid); return p?.win; }).length;
+                return { kda:((k+as)/Math.max(dd,1)).toFixed(1), avgK:(k/n).toFixed(1), avgD:(dd/n).toFixed(1), avgA:(as/n).toFixed(1), avgCS:(cs/n)|0, avgGold:((g/n)/1000).toFixed(1), wr: mt.length?((wins/mt.length)*100).toFixed(0):'—', wins, losses:mt.length-wins, games:mt.length };
+            }
+
+            const stA = pStats(da), stB = pStats(db);
+            const icA = playerIcon(ai, da.summoner.profileIconId), icB = playerIcon(bi, db.summoner.profileIconId);
+            const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
+            const rankOrder = {I:3,II:2,III:1,IV:0};
+            const lpA = sa ? (tierOrder[sa.tier]||0)*400+(rankOrder[sa.rank]||0)*100+(sa.leaguePoints||0) : 0;
+            const lpB = sb ? (tierOrder[sb.tier]||0)*400+(rankOrder[sb.rank]||0)*100+(sb.leaguePoints||0) : 0;
+
+            function bar(label, va, vb, unit='', higher=true) {
+                const na=parseFloat(va), nb=parseFloat(vb);
+                const max=Math.max(na,nb,1), pa=((na/max)*100).toFixed(0), ppb=((nb/max)*100).toFixed(0);
+                const wA = higher ? na>=nb : na<=nb, wB = higher ? nb>=na : nb<=na;
+                return `<div class="cmp-row">
+                    <div class="cmp-val ${wA?'cmp-win':''}">${va}${unit}</div>
+                    <div class="cmp-bars"><div class="cmp-bar-wrap"><div class="cmp-bar cmp-bar-a" style="width:${pa}%"></div></div><div class="cmp-label">${label}</div><div class="cmp-bar-wrap"><div class="cmp-bar cmp-bar-b" style="width:${ppb}%"></div></div></div>
+                    <div class="cmp-val ${wB?'cmp-win':''}">${vb}${unit}</div>
+                </div>`;
+            }
+
+            // Top champions
+            function topChamps(d) {
+                return (d.mastery||[]).slice(0,3).map(m => `<img src="${champImg(m.championId)}" title="${CMAP[m.championId]||'?'}" class="cmp-champ-icon">`).join('');
+            }
+
+            res.innerHTML = `
+            <div class="cmp-header">
+                <div class="cmp-player"><img src="${profImg(icA)}" class="cmp-avatar" ${F}><div class="cmp-name">${da.account.gameName||pa.name}</div><div class="cmp-rank ${rankCls(sa?.tier)}">${sa?sa.tier+' '+sa.rank+' — '+sa.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(da)}</div></div>
+                <div class="cmp-vs-big">VS</div>
+                <div class="cmp-player"><img src="${profImg(icB)}" class="cmp-avatar" ${F}><div class="cmp-name">${db.account.gameName||pb.name}</div><div class="cmp-rank ${rankCls(sb?.tier)}">${sb?sb.tier+' '+sb.rank+' — '+sb.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(db)}</div></div>
+            </div>
+            <div class="cmp-stats">
+                ${bar('Elo (LP Total)', lpA, lpB)}
+                ${bar('Win Rate', stA.wr, stB.wr, '%')}
+                ${bar('KDA', stA.kda, stB.kda)}
+                ${bar('Kills/jogo', stA.avgK, stB.avgK)}
+                ${bar('Deaths/jogo', stA.avgD, stB.avgD, '', false)}
+                ${bar('Assists/jogo', stA.avgA, stB.avgA)}
+                ${bar('CS/jogo', stA.avgCS, stB.avgCS)}
+                ${bar('Gold/jogo', stA.avgGold, stB.avgGold, 'K')}
+                ${bar('Partidas', stA.games, stB.games)}
+            </div>`;
+        } catch(e) { res.innerHTML = `<div class="err"><p>Erro: ${e.message}</p></div>`; }
+    }
+
+    // ======================== MATCH FILTER (Profile) ========================
+    window.filterMatches = function() {
+        const champF = $('filter-champ')?.value || '';
+        const modeF = $('filter-mode')?.value || '';
+        const resultF = $('filter-result')?.value || '';
+        document.querySelectorAll('.mc[data-champ]').forEach(card => {
+            const matchChamp = card.dataset.champ || '';
+            const matchMode = card.dataset.mode || '';
+            const matchResult = card.dataset.result || '';
+            let show = true;
+            if (champF && matchChamp !== champF) show = false;
+            if (modeF && matchMode !== modeF) show = false;
+            if (resultF && matchResult !== resultF) show = false;
+            card.style.display = show ? '' : 'none';
+        });
+    };
+
+    // ======================== SQUAD TIMELINE ========================
+    function renderTimeline() {
+        const el = $('squad-timeline');
+        if (!el) return;
+        // Collect all matches from all cached players
+        const allMatches = [];
+        PLAYERS.forEach((p, i) => {
+            const d = cache[i];
+            if (!d?.matches) return;
+            d.matches.forEach(m => {
+                const mp = m.info?.participants?.find(x => x.puuid === d.account.puuid);
+                if (!mp) return;
+                allMatches.push({ player: d.account.gameName||p.name, playerIdx: i, icon: playerIcon(i, d.summoner?.profileIconId), champ: mp.championId, win: mp.win, kills: mp.kills||0, deaths: mp.deaths||0, assists: mp.assists||0, time: m.info.gameCreation, mode: m.info.gameMode, duration: m.info.gameDuration });
+            });
+        });
+        allMatches.sort((a,b) => b.time - a.time);
+        if (!allMatches.length) { el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;">Carregando partidas...</p>'; return; }
+
+        let html = '<div class="tl-list">';
+        for (const m of allMatches.slice(0, 30)) {
+            html += `<div class="tl-item ${m.win?'tl-win':'tl-loss'}" onclick="location.hash='profile/${m.playerIdx}'">
+                <img src="${profImg(m.icon)}" class="tl-avatar" ${F}>
+                <img src="${champImg(m.champ)}" class="tl-champ" onerror="this.style.opacity='0.3'">
+                <div class="tl-info">
+                    <div class="tl-name">${m.player}</div>
+                    <div class="tl-detail">${CMAP[m.champ]||'?'} &bull; ${m.kills}/${m.deaths}/${m.assists} &bull; ${fmtDur(m.duration)}</div>
+                </div>
+                <div class="tl-right">
+                    <span class="tl-result ${m.win?'g':'r'}">${m.win?'V':'D'}</span>
+                    <span class="tl-ago">${fmtAgo(m.time)}</span>
+                </div>
+            </div>`;
+        }
+        html += '</div>';
+        el.innerHTML = html;
+    }
+
+    // ======================== DASHBOARD ========================
+    async function renderDashboard() {
+        app.innerHTML = `<div class="section-wrap">
+            <div class="dash-hero"><h1>Dashboard <span>do Squad</span></h1><p>Visão geral das estatísticas do grupo</p></div>
+            <div class="dash-actions">
+                <button class="dash-btn" onclick="location.hash='compare'">Comparar Jogadores</button>
+                <button class="dash-btn" onclick="location.hash='teambuilder'">Montar Time</button>
+            </div>
+            <div id="dash-content"><div class="ld"><div class="sp"></div></div></div>
+        </div>`;
+
+        // Load all players
+        const allData = [];
+        await Promise.all(PLAYERS.map(async (p, i) => {
+            try {
+                const d = await loadPlayerFast(i);
+                allData[i] = d;
+            } catch(_) { allData[i] = null; }
+        }));
+
+        let totalGames=0, totalWins=0, totalKills=0, totalDeaths=0, totalAssists=0;
+        const eloDistro = {};
+        const champPop = {};
+        const hourMap = new Array(24).fill(0);
+        const playerStats = [];
+
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i];
+            if (!d) return;
+            const solo = d.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            if (solo) eloDistro[solo.tier] = (eloDistro[solo.tier]||0)+1;
+            let pK=0,pD=0,pA=0,pW=0,pG=0;
+            (d.matches||[]).forEach(m => {
+                const mp = m.info?.participants?.find(x=>x.puuid===d.account?.puuid);
+                if (!mp) return;
+                pK+=mp.kills||0; pD+=mp.deaths||0; pA+=mp.assists||0; pG++;
+                if (mp.win) { pW++; totalWins++; }
+                totalKills+=mp.kills||0; totalDeaths+=mp.deaths||0; totalAssists+=mp.assists||0; totalGames++;
+                const cid = mp.championId;
+                champPop[cid] = (champPop[cid]||0)+1;
+                if (m.info.gameCreation) {
+                    const h = new Date(m.info.gameCreation).getHours();
+                    hourMap[h]++;
+                }
+            });
+            playerStats.push({ name:d.account?.gameName||p.name, idx:i, games:pG, wins:pW, kills:pK, deaths:pD, assists:pA, wr:pG?((pW/pG)*100).toFixed(0):0 });
+        });
+
+        const topChamps = Object.entries(champPop).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const eloOrder = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+        const peakHour = hourMap.indexOf(Math.max(...hourMap));
+        const sortedByWR = [...playerStats].filter(s=>s.games>0).sort((a,b)=>b.wr-a.wr);
+        const sortedByGames = [...playerStats].sort((a,b)=>b.games-a.games);
+
+        // Achievements
+        const achievements = computeAchievements(allData);
+
+        $('dash-content').innerHTML = `
+        <div class="dash-grid">
+            <div class="dash-card">
+                <div class="dash-card-title">Partidas do Squad</div>
+                <div class="dash-big">${totalGames}</div>
+                <div class="dash-sub">${totalWins}V ${totalGames-totalWins}D &bull; ${totalGames?((totalWins/totalGames)*100).toFixed(0):0}% WR</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card-title">KDA Geral</div>
+                <div class="dash-big">${totalDeaths?((totalKills+totalAssists)/totalDeaths).toFixed(1):'∞'}</div>
+                <div class="dash-sub">${totalKills}K / ${totalDeaths}D / ${totalAssists}A</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card-title">Horário Pico</div>
+                <div class="dash-big">${peakHour}h</div>
+                <div class="dash-sub">${hourMap[peakHour]} partidas nesse horário</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card-title">Campeão Favorito</div>
+                <div class="dash-big" style="display:flex;align-items:center;justify-content:center;gap:8px;"><img src="${champImg(topChamps[0]?.[0])}" style="width:32px;height:32px;border-radius:8px;">${CMAP[topChamps[0]?.[0]]||'?'}</div>
+                <div class="dash-sub">${topChamps[0]?.[1]||0} partidas</div>
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Distribuição de Elo</h3>
+            <div class="dash-elo-bar">
+                ${eloOrder.filter(t=>eloDistro[t]).map(t => {
+                    const pct = ((eloDistro[t]/PLAYERS.length)*100).toFixed(0);
+                    return `<div class="dash-elo-seg ${rankCls(t)}" style="flex:${eloDistro[t]}" title="${t}: ${eloDistro[t]}"><span>${t.slice(0,3)} (${eloDistro[t]})</span></div>`;
+                }).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Top Campeões do Squad</h3>
+            <div class="dash-champ-list">
+                ${topChamps.map(([cid,cnt],i) => `<div class="dash-champ-item"><span class="dash-champ-pos">${i+1}</span><img src="${champImg(cid)}" class="dash-champ-img"><span class="dash-champ-name">${CMAP[cid]||'?'}</span><span class="dash-champ-cnt">${cnt} jogos</span></div>`).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Quem mais joga</h3>
+            <div class="dash-rank-list">
+                ${sortedByGames.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${i+1}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val">${s.games} jogos</span><span class="dash-rank-wr">${s.wr}% WR</span></div>`).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Melhor Win Rate</h3>
+            <div class="dash-rank-list">
+                ${sortedByWR.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${i+1}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val" style="color:#4caf50;">${s.wr}%</span><span class="dash-rank-wr">${s.wins}V ${s.losses}D</span></div>`).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Horário de Jogo</h3>
+            <div class="dash-hour-chart">
+                ${hourMap.map((cnt,h) => {const max=Math.max(...hourMap,1); return `<div class="dash-hour-bar" title="${h}h: ${cnt} jogos"><div class="dash-hour-fill" style="height:${(cnt/max)*100}%"></div><span>${h}</span></div>`;}).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Conquistas do Squad</h3>
+            <div class="dash-badges">
+                ${achievements.map(a => `<div class="dash-badge ${a.unlocked?'':'dash-badge-locked'}"><span class="dash-badge-icon">${a.icon}</span><div><div class="dash-badge-title">${a.title}</div><div class="dash-badge-desc">${a.desc}</div>${a.player?'<div class="dash-badge-player">'+a.player+'</div>':''}</div></div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // ======================== ACHIEVEMENTS ========================
+    function computeAchievements(allData) {
+        const badges = [];
+        let bestStreak = { name:'', count:0 };
+        let bestKDA = { name:'', val:0 };
+        let mostPentas = { name:'', count:0 };
+        let mostGames = { name:'', count:0 };
+        let bestCS = { name:'', val:0 };
+        let first10 = { name:'', count:0 };
+
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i]; if (!d?.matches?.length) return;
+            const name = d.account?.gameName || p.name;
+            let streak=0, maxStreak=0, k=0, dd=0, a=0, pentas=0, cs=0;
+            const sorted = [...d.matches].sort((a,b)=>(a.info?.gameCreation||0)-(b.info?.gameCreation||0));
+            sorted.forEach(m => {
+                const mp = m.info?.participants?.find(x=>x.puuid===d.account?.puuid); if(!mp) return;
+                if (mp.win) { streak++; maxStreak=Math.max(maxStreak,streak); } else streak=0;
+                k+=mp.kills||0; dd+=mp.deaths||0; a+=mp.assists||0;
+                cs+=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
+                if (mp.pentaKills) pentas+=mp.pentaKills;
+                if ((mp.kills||0)>=10 && (mp.deaths||0)===0) first10.count++;
+            });
+            const n = d.matches.length;
+            const kda = dd>0?(k+a)/dd:k+a;
+            const avgCS = n>0?cs/n:0;
+            if (maxStreak > bestStreak.count) bestStreak = { name, count:maxStreak };
+            if (kda > bestKDA.val) bestKDA = { name, val:kda };
+            if (pentas > mostPentas.count) mostPentas = { name, count:pentas };
+            if (n > mostGames.count) mostGames = { name, count:n };
+            if (avgCS > bestCS.val) bestCS = { name, val:avgCS };
+        });
+
+        badges.push({ icon:'🔥', title:'Maior Winstreak', desc:`${bestStreak.count} vitórias seguidas`, player:bestStreak.name, unlocked:bestStreak.count>=3 });
+        badges.push({ icon:'⚔️', title:'Melhor KDA', desc:`${bestKDA.val.toFixed(1)} KDA`, player:bestKDA.name, unlocked:bestKDA.val>=3 });
+        badges.push({ icon:'💀', title:'Pentakill!', desc:mostPentas.count>0?`${mostPentas.count} pentas`:'Ninguém fez penta ainda', player:mostPentas.name, unlocked:mostPentas.count>0 });
+        badges.push({ icon:'🎮', title:'Viciado', desc:`${mostGames.count} partidas jogadas`, player:mostGames.name, unlocked:mostGames.count>=10 });
+        badges.push({ icon:'🌾', title:'Rei do Farm', desc:`${bestCS.val.toFixed(0)} CS médio`, player:bestCS.name, unlocked:bestCS.val>=150 });
+        badges.push({ icon:'👑', title:'Perfeito 10/0', desc:first10.count>0?'Jogou 10+ kills sem morrer':'Ninguém conseguiu ainda', player:'', unlocked:first10.count>0 });
+
+        // Prediction badges
+        const predKeys = [];
+        for (let k=0; k<localStorage.length; k++) { const key=localStorage.key(k); if (key?.startsWith('pred_')) predKeys.push(key); }
+        badges.push({ icon:'🎯', title:'Vidente', desc:`${predKeys.length} palpites feitos`, player:'', unlocked:predKeys.length>=5 });
+
+        return badges;
+    }
+
+    // ======================== TEAM BUILDER ========================
+    function renderTeamBuilder() {
+        const roles = ['TOP','JNG','MID','ADC','SUP'];
+        app.innerHTML = `<div class="section-wrap-sm">
+            <button class="bb" onclick="location.hash='dashboard'">&larr; Dashboard</button>
+            <div class="tb-hero"><h1>Montar <span>Time</span></h1><p>Monte a composição do squad para Clash ou Flex</p></div>
+            <div class="tb-slots" id="tb-slots">
+                ${roles.map(r => `<div class="tb-slot" data-role="${r}">
+                    <div class="tb-role">${r}</div>
+                    <select class="tb-select" data-role="${r}" onchange="updateTeamBuilder()">
+                        <option value="">Selecionar</option>
+                        ${PLAYERS.map((p,i) => `<option value="${i}">${p.name}</option>`).join('')}
+                    </select>
+                    <div class="tb-player-info" id="tb-info-${r}"></div>
+                </div>`).join('')}
+            </div>
+            <div id="tb-summary"></div>
+        </div>`;
+
+        window.updateTeamBuilder = async function() {
+            const selected = {};
+            document.querySelectorAll('.tb-select').forEach(sel => {
+                if (sel.value) selected[sel.dataset.role] = parseInt(sel.value);
+            });
+
+            // Show player info per slot
+            for (const role of roles) {
+                const el = $(`tb-info-${role}`);
+                const idx = selected[role];
+                if (idx === undefined) { el.innerHTML = ''; continue; }
+                const d = cache[idx] || await loadPlayerFast(idx).catch(()=>null);
+                if (!d) { el.innerHTML = '<span style="color:var(--dim);font-size:.8em;">Indisponível</span>'; continue; }
+                const solo = d.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+                const ic = playerIcon(idx, d.summoner?.profileIconId);
+                el.innerHTML = `<img src="${profImg(ic)}" class="tb-icon" ${F}><span class="${rankCls(solo?.tier)}" style="font-weight:700;font-size:.85em;">${solo?solo.tier+' '+solo.rank:'Unranked'}</span>`;
+            }
+
+            // Summary
+            const sum = $('tb-summary');
+            const filled = Object.keys(selected).length;
+            if (filled < 2) { sum.innerHTML = ''; return; }
+
+            let totalLP = 0, count = 0;
+            for (const [r, idx] of Object.entries(selected)) {
+                const d = cache[idx];
+                const solo = d?.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+                if (solo) {
+                    const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
+                    const rankOrder = {I:3,II:2,III:1,IV:0};
+                    totalLP += (tierOrder[solo.tier]||0)*400+(rankOrder[solo.rank]||0)*100+(solo.leaguePoints||0);
+                    count++;
+                }
+            }
+            const avgLP = count ? (totalLP/count)|0 : 0;
+            const tiers = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+            const avgTier = tiers[Math.min((avgLP/400)|0, 9)] || 'IRON';
+
+            sum.innerHTML = `<div class="tb-summary-box">
+                <h3>Resumo do Time</h3>
+                <div class="tb-summary-stats">
+                    <div><span class="tb-stat-label">Jogadores</span><span class="tb-stat-val">${filled}/5</span></div>
+                    <div><span class="tb-stat-label">Elo Médio</span><span class="tb-stat-val ${rankCls(avgTier)}">${avgTier}</span></div>
+                    <div><span class="tb-stat-label">LP Médio</span><span class="tb-stat-val">${avgLP}</span></div>
+                </div>
+            </div>`;
+        };
+    }
+
+    // ======================== CHAT ========================
+    function renderChat() {
+        const user = getLoggedUser();
+        app.innerHTML = `<div class="section-wrap-sm">
+            <div class="chat-hero"><h1>Chat <span>do Squad</span></h1><p class="local-notice">As mensagens ficam salvas neste navegador</p></div>
+            <div class="chat-box" id="chat-box"></div>
+            ${user ? `<div class="chat-input-wrap">
+                <input type="text" id="chat-input" placeholder="Digite sua mensagem..." maxlength="200" autocomplete="off">
+                <button class="chat-send" onclick="sendChat()">Enviar</button>
+            </div>` : '<div class="chat-login-prompt"><p>Faça login para enviar mensagens</p><button class="cfg-btn" onclick="showLoginModal()">Entrar</button></div>'}
+        </div>`;
+
+        renderChatMessages();
+        // Auto-refresh chat
+        if (window._chatTimer) clearInterval(window._chatTimer);
+        window._chatTimer = setInterval(renderChatMessages, 3000);
+
+        const input = $('chat-input');
+        if (input) input.addEventListener('keydown', e => { if (e.key==='Enter') sendChat(); });
+    }
+
+    function getChatMessages() {
+        try { return JSON.parse(localStorage.getItem('profa_chat')||'[]'); } catch(_) { return []; }
+    }
+
+    function renderChatMessages() {
+        const box = $('chat-box');
+        if (!box) { if(window._chatTimer) clearInterval(window._chatTimer); return; }
+        const msgs = getChatMessages();
+        if (!msgs.length) { box.innerHTML = '<p class="chat-empty">Nenhuma mensagem ainda. Seja o primeiro!</p>'; return; }
+        box.innerHTML = msgs.slice(-50).map(m => {
+            const isMe = getLoggedUser()?.idx === m.idx;
+            return `<div class="chat-msg ${isMe?'chat-me':''}">
+                <div class="chat-msg-head"><span class="chat-msg-name">${m.name}</span><span class="chat-msg-time">${fmtAgo(m.time)}</span></div>
+                <div class="chat-msg-text">${escapeHtml(m.text)}</div>
+            </div>`;
+        }).join('');
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function escapeHtml(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+    window.sendChat = function() {
+        const user = getLoggedUser(); if (!user) return;
+        const input = $('chat-input'); if (!input || !input.value.trim()) return;
+        const msgs = getChatMessages();
+        msgs.push({ idx:user.idx, name:PLAYERS[user.idx]?.name||'???', text:input.value.trim(), time:Date.now() });
+        // Keep last 200 messages
+        while (msgs.length > 200) msgs.shift();
+        localStorage.setItem('profa_chat', JSON.stringify(msgs));
+        input.value = '';
+        renderChatMessages();
+    };
+
+    // ======================== INIT ========================
+    // Theme
+    applyTheme(localStorage.getItem('profa_theme') || 'dark');
+    // Carrega dados de campeões em background — não bloqueia a renderização
+    fetch(`https://ddragon.leagueoflegends.com/cdn/${DVER}/data/en_US/champion.json`)
+        .then(r => r.json())
+        .then(d => { for (const [k,v] of Object.entries(d.data)) CMAP[v.key] = k; })
+        .catch(() => {});
+    updateNavUser();
+    nav(location.hash || '#team');
+    // Live badge check every 60s
+    checkLiveBadge();
+    liveBadgeTimer = setInterval(checkLiveBadge, 60000);
+    // PWA Service Worker
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+    })();

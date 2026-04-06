@@ -1,5 +1,5 @@
-const CACHE_NAME = 'profa-v2';
-const ASSETS = ['/', '/index.html', '/style.css', '/config.js'];
+const CACHE_NAME = 'profa-v3';
+const ASSETS = ['/', '/index.html', '/style.css', '/config.js', '/app.js'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

@@ -419,6 +419,13 @@ a { text-decoration: none; color: inherit; }
 .api-key-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(233,69,96,0.3); background: rgba(233,69,96,0.1); color: var(--acc); font-size: 0.72em; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .api-key-btn:hover { background: rgba(233,69,96,0.2); }
 
+/* API EXPIRED BANNER */
+.api-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 200; background: linear-gradient(90deg, #d63050, #b71c1c); color: #fff; padding: 8px 16px; display: flex; align-items: center; gap: 12px; font-size: 0.82em; font-weight: 600; justify-content: center; flex-wrap: wrap; }
+.api-banner button:first-of-type { padding: 4px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.15); color: #fff; font-weight: 700; font-size: 0.85em; cursor: pointer; }
+.api-banner button:first-of-type:hover { background: rgba(255,255,255,0.25); }
+.api-banner ~ #main-nav { top: 38px; }
+.api-banner ~ #app { padding-top: 100px; }
+
 /* MUSIC PLAYER */
 .music-btn { position: fixed; bottom: 20px; right: 20px; z-index: 999; background: var(--card); border: 1px solid rgba(0,212,255,0.2); border-radius: 40px; padding: 8px 16px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.25s; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
 .music-btn:hover { border-color: rgba(0,212,255,0.5); box-shadow: 0 4px 24px rgba(0,212,255,0.15); transform: translateY(-2px); }
@@ -836,6 +843,7 @@ body::after {
 .chat-send:hover { opacity: 0.85; transform: translateY(-1px); }
 .chat-login-prompt { text-align: center; padding: 20px; color: var(--dim); }
 .chat-login-prompt p { margin-bottom: 12px; }
+.local-notice { font-size: 0.72em; color: var(--dim); text-align: center; background: rgba(255,255,255,0.03); padding: 5px 12px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.08); margin-top: 8px; }
 
 /* ==================== PROFILE TABS & SETTINGS ==================== */
 .prof-tabs {
