@@ -345,21 +345,21 @@
     }
 
     // ======================== DATA LAYER ========================
+    // Stale-while-revalidate: show cached data instantly, refresh in background.
     const cache = {};
-    const CACHE_TTL = 5 * 60 * 1000; // 5 min
+    const CACHE_TTL = 5 * 60 * 1000; // 5 min — data fresher than this skips API entirely
 
-    function lsGet(key) { try { const d=JSON.parse(localStorage.getItem(key)); return d&&Date.now()-d._ts<CACHE_TTL?d:null; } catch(_) { return null; } }
+    function lsGet(key) { try { const d=JSON.parse(localStorage.getItem(key)); return d||null; } catch(_) { return null; } }
+    function lsGetFresh(key) { const d=lsGet(key); return d&&Date.now()-(d._ts||0)<CACHE_TTL?d:null; }
     function lsSet(key, data) { try { localStorage.setItem(key, JSON.stringify({...data, _ts:Date.now()})); } catch(_) {} }
+    function isStale(d) { return !d?._ts || Date.now()-d._ts >= CACHE_TTL; }
 
-    // Track background loading promises so we don't duplicate work
+    // Track background loading/refresh promises so we don't duplicate work
     const bgLoading = {};
+    const bgRefresh = {};
 
-    // FAST: account + summoner + league + 1 recent match (5 calls) — for team page cards
-    async function loadPlayerFast(i) {
-        if (cache[i]) return cache[i];
-        const c = lsGet(`profa_player_${i}`);
-        if (c) { cache[i] = c; return c; }
-
+    // Fetch fresh fast data from API (always hits network)
+    async function fetchPlayerFast(i) {
         const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
         const account = await riot(`https://${cl}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
         const [summoner, league, matchIds] = await Promise.all([
@@ -367,26 +367,69 @@
             rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []),
             rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=20`, []),
         ]);
-
-        // Load only the most recent match for the card preview
         const ids = matchIds || [];
         let recentMatch = null;
         if (ids.length) {
             recentMatch = await rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${ids[0]}`, null);
         }
+        return { account, summoner, league: league||[], mastery:[], matches: recentMatch?[recentMatch]:[], _matchIds: ids };
+    }
 
-        cache[i] = { account, summoner, league: league||[], mastery:[], matches: recentMatch?[recentMatch]:[], _matchIds: ids };
+    // FAST: returns cached data instantly if available, fetches from API otherwise.
+    // If cached data is stale, starts a background refresh and returns stale data immediately.
+    async function loadPlayerFast(i) {
+        // Fresh memory cache — return immediately
+        if (cache[i] && !isStale(cache[i])) return cache[i];
+
+        // Any localStorage data (even stale) — return it instantly
+        const stored = lsGet(`profa_player_${i}`);
+        if (stored) {
+            cache[i] = stored;
+            // If stale, kick off background refresh (non-blocking)
+            if (isStale(stored)) refreshPlayer(i);
+            return cache[i];
+        }
+
+        // Nothing cached — must fetch from API
+        const data = await fetchPlayerFast(i);
+        data._ts = Date.now();
+        cache[i] = data;
+        lsSet(`profa_player_${i}`, data);
         return cache[i];
+    }
+
+    // Background refresh: fetches fresh data from API and updates cache + UI silently
+    function refreshPlayer(i) {
+        if (bgRefresh[i]) return bgRefresh[i];
+        bgRefresh[i] = (async () => {
+            try {
+                const fresh = await fetchPlayerFast(i);
+                // Preserve full data (mastery + extra matches) if we had it
+                const prev = cache[i];
+                fresh._ts = Date.now();
+                if (prev?._full) {
+                    fresh.mastery = prev.mastery;
+                    fresh.matches = [...fresh.matches, ...prev.matches.filter(m => m.metadata?.matchId !== fresh.matches[0]?.metadata?.matchId)];
+                    fresh._full = false; // will be re-completed by background loader
+                }
+                cache[i] = fresh;
+                lsSet(`profa_player_${i}`, fresh);
+                // Notify UI about refresh if on team page
+                if (typeof onPlayerRefreshed === 'function') onPlayerRefreshed(i, fresh);
+            } catch(_) {}
+            delete bgRefresh[i];
+        })();
+        return bgRefresh[i];
     }
 
     // BACKGROUND: loads remaining matches + mastery after fast load
     function loadPlayerBackground(i) {
         if (bgLoading[i]) return bgLoading[i];
-        if (cache[i]?._full) return Promise.resolve(cache[i]);
+        if (cache[i]?._full && !isStale(cache[i])) return Promise.resolve(cache[i]);
 
         bgLoading[i] = (async () => {
             const base = cache[i] || await loadPlayerFast(i);
-            if (base._full) return base;
+            if (base._full && !isStale(base)) return base;
 
             const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
             const puuid = base.account.puuid;
@@ -394,7 +437,7 @@
 
             const mastery = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []);
 
-            // Load remaining matches (skip first if already loaded)
+            // Load remaining matches (skip already loaded)
             const alreadyLoaded = new Set(base.matches.map(m => m.metadata?.matchId));
             const toLoad = ids.slice(0, 15).filter(mid => !alreadyLoaded.has(mid));
             const newMatches = [];
@@ -404,7 +447,7 @@
                 ));
             }
 
-            cache[i] = { ...base, mastery: mastery||[], matches: [...base.matches, ...newMatches], _full: true };
+            cache[i] = { ...base, mastery: mastery||[], matches: [...base.matches, ...newMatches], _full: true, _ts: Date.now() };
             lsSet(`profa_player_${i}`, cache[i]);
             delete bgLoading[i];
             return cache[i];
@@ -414,9 +457,15 @@
 
     // FULL: returns complete data — waits for background if needed, or starts it
     async function loadPlayer(i) {
-        if (cache[i]?._full) return cache[i];
+        if (cache[i]?._full && !isStale(cache[i])) return cache[i];
+        // Return full cached data even if stale for instant display
         const c = lsGet(`profa_player_${i}`);
-        if (c?._full) { cache[i] = c; return c; }
+        if (c?._full) {
+            cache[i] = c;
+            // Trigger background refresh if stale
+            if (isStale(c)) { refreshPlayer(i); loadPlayerBackground(i); }
+            return c;
+        }
         return loadPlayerBackground(i);
     }
 
@@ -484,73 +533,83 @@
         const rankData = [];
         let loaded = 0;
 
-        // Load ALL players in parallel — rate limiter queue handles throttling.
+        // Renders a single player card given their data
+        function renderCard(i, d) {
+            const card = document.querySelector(`[data-i="${i}"]`);
+            if (!card) return null;
+            const p = PLAYERS[i];
+            const s = d.summoner, ic = playerIcon(i, s.profileIconId), lv = s.summonerLevel || '?';
+            const solo = d.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
+            const wr = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
+            const recent = d.matches.length
+                ? [...d.matches].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))[0]
+                : null;
+            const ago = recent ? fmtAgo(recent.info.gameCreation) : '';
+            const rmp = recent?.info?.participants?.find(x => x.puuid === d.account.puuid);
+            const rChId = rmp?.championId;
+            const rWin = rmp?.win;
+
+            const isNoob = p.special === 'noob';
+            const noobBadge = isNoob ? `<div class="noob-badge">AMON 🤡 O NOOB DO SQUAD</div>` : '';
+            const noobTitle = isNoob ? `<span class="noob-crown">👑💀</span>` : '';
+            const noobFooter = isNoob ? `<div class="noob-footer">
+                <span class="noob-quote">"Eu juro que tava lagando"</span>
+                <div class="noob-stats-fun">
+                    <span>🏆 Rei dos 0/10</span>
+                    <span>🎯 Farm? Nunca ouvi falar</span>
+                </div>
+            </div>` : '';
+
+            card.innerHTML = `
+            ${noobBadge}
+            <div class="pch">
+                <div class="pci ${isNoob?'pci-noob':''}">${isNoob?'<div class="noob-ring"></div>':''}
+                    <img src="${profImg(ic)}" alt="" ${F}>
+                </div>
+                <div>
+                    <div class="pcn">${noobTitle}${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
+                    <div class="cl">Nível ${lv}${isNoob?' — AMON (Hardstuck)':''}</div>
+                </div>
+            </div>
+            ${solo
+                ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>`
+                : `<div class="pn">Sem ranked</div>`}
+            ${rChId ? `<div class="lr">
+                <img src="${champImg(rChId)}" style="width:22px;height:22px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
+                <span class="dot ${rWin?'g':'r'}"></span>
+                <span>${CMAP[rChId]||'?'} &bull; ${ago}</span>
+            </div>` : ago ? `<div class="lr"><span class="dot g"></span><span>${ago}</span></div>` : ''}
+            ${noobFooter}`;
+
+            // Return rank data for chart
+            if (solo) {
+                const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
+                const rankOrder = {I:3,II:2,III:1,IV:0};
+                const totalLP = (tierOrder[solo.tier]||0)*400 + (rankOrder[solo.rank]||0)*100 + (solo.leaguePoints||0);
+                return { name: d.account.gameName||p.name, tier: solo.tier, rank: solo.rank, lp: solo.leaguePoints||0, totalLP, wins: solo.wins||0, losses: solo.losses||0, idx: i, icon: playerIcon(i, s.profileIconId) };
+            }
+            return null;
+        }
+
+        // Callback for background refresh — updates card + ranking silently
+        window.onPlayerRefreshed = function(i, d) {
+            const rd = renderCard(i, d);
+            // Update rankData for this player
+            const existing = rankData.findIndex(r => r.idx === i);
+            if (rd) { if (existing >= 0) rankData[existing] = rd; else rankData.push(rd); }
+            else if (existing >= 0) rankData.splice(existing, 1);
+            renderSoloQRanking(rankData, false);
+        };
+
+        // Load ALL players in parallel.
         // Each player updates its card + ranking chart as soon as it resolves.
         PLAYERS.forEach((p, i) => {
             const card = document.querySelector(`[data-i="${i}"]`);
             if (!card) { loaded++; return; }
 
             loadPlayerFast(i).then(d => {
-                const s  = d.summoner, ic = playerIcon(i, s.profileIconId), lv = s.summonerLevel || '?';
-                const solo = d.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
-                const wr   = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
-                const recent = d.matches.length
-                    ? [...d.matches].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))[0]
-                    : null;
-                const ago   = recent ? fmtAgo(recent.info.gameCreation) : '';
-                const rmp   = recent?.info?.participants?.find(x => x.puuid === d.account.puuid);
-                const rChId = rmp?.championId;
-                const rWin  = rmp?.win;
-
-                const isNoob = p.special === 'noob';
-                const noobBadge = isNoob ? `<div class="noob-badge">AMON 🤡 O NOOB DO SQUAD</div>` : '';
-                const noobTitle = isNoob ? `<span class="noob-crown">👑💀</span>` : '';
-                const noobFooter = isNoob ? `<div class="noob-footer">
-                    <span class="noob-quote">"Eu juro que tava lagando"</span>
-                    <div class="noob-stats-fun">
-                        <span>🏆 Rei dos 0/10</span>
-                        <span>🎯 Farm? Nunca ouvi falar</span>
-                    </div>
-                </div>` : '';
-
-                card.innerHTML = `
-                ${noobBadge}
-                <div class="pch">
-                    <div class="pci ${isNoob?'pci-noob':''}">${isNoob?'<div class="noob-ring"></div>':''}
-                        <img src="${profImg(ic)}" alt="" ${F}>
-                    </div>
-                    <div>
-                        <div class="pcn">${noobTitle}${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
-                        <div class="cl">Nível ${lv}${isNoob?' — AMON (Hardstuck)':''}</div>
-                    </div>
-                </div>
-                ${solo
-                    ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>`
-                    : `<div class="pn">Sem ranked</div>`}
-                ${rChId ? `<div class="lr">
-                    <img src="${champImg(rChId)}" style="width:22px;height:22px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
-                    <span class="dot ${rWin?'g':'r'}"></span>
-                    <span>${CMAP[rChId]||'?'} &bull; ${ago}</span>
-                </div>` : ago ? `<div class="lr"><span class="dot g"></span><span>${ago}</span></div>` : ''}
-                ${noobFooter}`;
-
-                // Collect ranked data for Solo Q ranking chart
-                if (solo) {
-                    const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
-                    const rankOrder = {I:3,II:2,III:1,IV:0};
-                    const totalLP = (tierOrder[solo.tier]||0)*400 + (rankOrder[solo.rank]||0)*100 + (solo.leaguePoints||0);
-                    rankData.push({
-                        name: d.account.gameName||p.name,
-                        tier: solo.tier,
-                        rank: solo.rank,
-                        lp: solo.leaguePoints||0,
-                        totalLP,
-                        wins: solo.wins||0,
-                        losses: solo.losses||0,
-                        idx: i,
-                        icon: playerIcon(i, s.profileIconId)
-                    });
-                }
+                const rd = renderCard(i, d);
+                if (rd) rankData.push(rd);
             }).catch(err => {
                 const isAuth = err.message?.includes('403') || err.message?.includes('401');
                 const isRate = err.message?.includes('429');
