@@ -114,7 +114,11 @@
 
     // ======================== ROUTER ========================
     let liveTimer = null;
-    function clearLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
+    let liveDetailTimer = null;
+    function clearLive() {
+        if (liveTimer)       { clearInterval(liveTimer);       liveTimer       = null; }
+        if (liveDetailTimer) { clearInterval(liveDetailTimer); liveDetailTimer = null; }
+    }
 
     function nav(hash) {
         const h = hash.replace(/^#/, '');
@@ -589,8 +593,6 @@
     }
 
     // ======================== LIVE PAGE (standalone) ========================
-    let liveDetailTimer = null;
-
     function renderLivePage(h) {
         const gameId = h.startsWith('live/') ? h.split('/')[1] : null;
         clearLive();
@@ -800,19 +802,15 @@
             return `<tr>
                 <td class="lt-champ-cell">
                     <div class="lchamp">
-                        <div class="lchamp-img-wrap">
-                            <img src="${champImg(champId)}" alt="${champId}" onerror="this.style.opacity='0.3'">
-                            <span class="lchamp-lv" style="background:${color};">${lv}</span>
-                        </div>
+                        <img src="${champImg(champId)}" alt="${champId}" onerror="this.style.opacity='0.3'" class="lchamp-img">
                         <div>
-                            <div class="lchamp-cn">${champId}</div>
+                            <div class="lchamp-cn">${champId} <span class="lchamp-lv" style="color:${color};">Lv.${lv}</span></div>
                             <div class="lchamp-sn">${sName}</div>
                         </div>
                     </div>
                 </td>
                 <td class="lt-hp-cell">
                     <div class="lhp"><div class="lhp-fill" style="width:${hp}%;background:${hpClr};"></div></div>
-                    <div class="lhp-val">${p.currentHealth||0}/${p.maxHealth||0}</div>
                 </td>
                 <td><div class="litems">${itemsHtml}</div></td>
                 <td class="lt-num">${cs}</td>
@@ -884,10 +882,11 @@
     }
 
     // ======================== INIT ========================
-    try {
-        const d = await fetch(`https://ddragon.leagueoflegends.com/cdn/${DVER}/data/en_US/champion.json`).then(r=>r.json());
-        for (const [k,v] of Object.entries(d.data)) CMAP[v.key] = k;
-    } catch(_) {}
+    // Carrega dados de campeões em background — não bloqueia a renderização
+    fetch(`https://ddragon.leagueoflegends.com/cdn/${DVER}/data/en_US/champion.json`)
+        .then(r => r.json())
+        .then(d => { for (const [k,v] of Object.entries(d.data)) CMAP[v.key] = k; })
+        .catch(() => {});
     nav(location.hash || '#team');
 
     })();
