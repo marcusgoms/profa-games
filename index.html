@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#00d4ff">
+    <link rel="manifest" href="manifest.json">
     <title>PROFA GAMES</title>
     <link rel="stylesheet" href="style.css">
     <script src="config.js"></script>
@@ -13,9 +15,12 @@
             <div class="logo"><img src="https://ddragon.leagueoflegends.com/cdn/14.24.1/img/profileicon/4644.png" alt="" class="logo-icon">PROFA <span>GAMES</span></div>
             <div class="nl" id="nav">
                 <a href="#team" class="on" data-p="team">Squad</a>
+                <a href="#dashboard" data-p="dashboard">Dashboard</a>
                 <a href="#cblol" data-p="cblol">CBLOL</a>
                 <a href="#live" data-p="live">Ao Vivo</a>
+                <a href="#chat" data-p="chat">Chat</a>
             </div>
+            <button class="theme-toggle" id="theme-toggle" title="Alternar tema">&#9789;</button>
             <div class="nav-user" id="nav-user"></div>
             <button id="mmb">&#9776;</button>
         </div>
@@ -482,16 +487,25 @@
         document.querySelectorAll('.nl a').forEach(a => a.classList.remove('on'));
         const ln = document.querySelector(`.nl a[data-p="${pn(h)}"]`);
         if (ln) ln.classList.add('on');
-        if (!h || h === 'team')          { clearLive(); renderTeam(); }
-        else if (h.startsWith('live'))   { clearLive(); renderLivePage(h); }
-        else if (h.startsWith('profile/')) renderProfile(parseInt(h.split('/')[1]));
-        else if (h === 'cblol')          { clearLive(); renderCBLOL('upcoming'); }
-        else                             { clearLive(); renderTeam(); }
+        // Page transition
+        app.classList.remove('page-enter'); void app.offsetWidth; app.classList.add('page-enter');
+        if (!h || h === 'team')               { clearLive(); renderTeam(); }
+        else if (h.startsWith('live'))        { clearLive(); renderLivePage(h); }
+        else if (h.startsWith('profile/'))    renderProfile(parseInt(h.split('/')[1]));
+        else if (h.startsWith('compare'))     { clearLive(); renderCompare(h); }
+        else if (h === 'cblol')               { clearLive(); renderCBLOL('upcoming'); }
+        else if (h === 'dashboard')           { clearLive(); renderDashboard(); }
+        else if (h === 'chat')                { clearLive(); renderChat(); }
+        else if (h === 'teambuilder')         { clearLive(); renderTeamBuilder(); }
+        else                                  { clearLive(); renderTeam(); }
     }
     function pn(h) {
-        if (!h || h === 'team' || h.startsWith('profile/')) return 'team';
+        if (!h || h === 'team' || h.startsWith('profile/') || h.startsWith('compare')) return 'team';
         if (h === 'cblol') return 'cblol';
         if (h.startsWith('live')) return 'live';
+        if (h === 'dashboard') return 'dashboard';
+        if (h === 'chat') return 'chat';
+        if (h === 'teambuilder') return 'dashboard';
         return 'team';
     }
 
@@ -521,12 +535,22 @@
             </div>
         </div>
         <div class="section-wrap">
+            <div class="squad-actions">
+                <button class="squad-action-btn" onclick="location.hash='compare'">Comparar Jogadores</button>
+                <button class="squad-action-btn" onclick="location.hash='dashboard'">Dashboard</button>
+            </div>
             <div class="soloq-ranking" id="soloq-ranking">
                 <div class="soloq-header">
                     <h2>Ranking Solo Q</h2>
                     <p>Evolu&ccedil;&atilde;o di&aacute;ria de LP do squad (s&eacute;ries temporais)</p>
                 </div>
                 <div class="soloq-chart" id="soloq-chart"><div class="ld"><div class="sp"></div></div></div>
+            </div>
+        </div>
+        <div class="section-wrap">
+            <div class="tl-section" id="squad-timeline-wrap">
+                <div class="tl-header"><h2>Timeline do Squad</h2><p>Últimas partidas de todos os jogadores</p></div>
+                <div id="squad-timeline"><p style="color:var(--dim);text-align:center;padding:1rem;">Carregando...</p></div>
             </div>
         </div>`;
 
@@ -623,6 +647,8 @@
                 loaded++;
                 // Re-render ranking progressively — each player that arrives updates the chart
                 renderSoloQRanking(rankData, loaded < PLAYERS.length);
+                // Update timeline with what we have so far
+                renderTimeline();
                 // Once all cards are rendered, start background loading for full data
                 if (loaded === PLAYERS.length) {
                     PLAYERS.forEach((_, j) => loadPlayerBackground(j));
@@ -860,7 +886,15 @@
             const sm = [...mt].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0));
             let matchs = '';
             if (sm.length) {
-                matchs = '<div class="sx"><h3>📜 Partidas Recentes</h3>';
+                // Collect unique champs and modes for filter
+                const champSet = new Set(), modeSet = new Set();
+                sm.forEach(m => { const mp=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; if(mp.championId) champSet.add(mp.championId); if(m.info?.gameMode) modeSet.add(m.info.gameMode); });
+                const filterBar = `<div class="match-filters">
+                    <select id="filter-champ" onchange="filterMatches()"><option value="">Campeão</option>${[...champSet].map(c=>`<option value="${c}">${CMAP[c]||c}</option>`).join('')}</select>
+                    <select id="filter-mode" onchange="filterMatches()"><option value="">Modo</option>${[...modeSet].map(m=>`<option value="${m}">${modeName(m)}</option>`).join('')}</select>
+                    <select id="filter-result" onchange="filterMatches()"><option value="">Resultado</option><option value="w">Vitória</option><option value="l">Derrota</option></select>
+                </div>`;
+                matchs = '<div class="sx"><h3>📜 Partidas Recentes</h3>' + filterBar;
                 for (const m of sm) {
                     const mp  = m.info?.participants?.find(x => x.puuid === a.puuid) || {};
                     const tw  = m.info.teams?.find(t => t.teamId === mp.teamId)?.win;
@@ -877,7 +911,7 @@
                     const t100=(m.info?.participants||[]).filter(x=>x.teamId===100);
                     const t200=(m.info?.participants||[]).filter(x=>x.teamId===200);
                     const row = o => `<div class="or ${o.teamId===100?'b':'r'}">${o.puuid===a.puuid?'<b style="color:var(--pri);min-width:10px;">▶</b>':'<span style="min-width:10px;"></span>'}<img src="${champImg(o.championId)}" loading="lazy" onerror="this.style.visibility='hidden'"><span class="on">${o.riotIdGameName||'???'}</span><span class="ok"><b>${o.kills||0}</b>/<span style="color:#ef5350;">${o.deaths||0}</span>/<span style="color:var(--pri);">${o.assists||0}</span></span></div>`;
-                    matchs += `<div class="mc ${cls}">
+                    matchs += `<div class="mc ${cls}" data-champ="${mp.championId}" data-mode="${m.info.gameMode}" data-result="${cls}">
                         <div class="mh"><span>${res}</span><span class="mhi">${fmtDur(dur)} &bull; ${modeName(m.info.gameMode)} &bull; ${fmtAgo(cre)}</span></div>
                         <div class="mb">
                             <div class="mch"><img src="${champImg(mp.championId)}" alt="${cn}" loading="lazy"><div>
@@ -1810,7 +1844,486 @@
     window.musicPrev = function() { musicPlay((musicIdx-1+PLAYLIST.length)%PLAYLIST.length); };
     window.musicVol = function(v) { if (ytPlayer?.setVolume) ytPlayer.setVolume(parseInt(v)); };
 
+    // ======================== THEME TOGGLE ========================
+    function applyTheme(t) {
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('profa_theme', t);
+        const btn = $('theme-toggle');
+        if (btn) btn.innerHTML = t === 'light' ? '&#9728;' : '&#9789;';
+    }
+    $('theme-toggle').addEventListener('click', () => {
+        const cur = localStorage.getItem('profa_theme') || 'dark';
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+    });
+
+    // ======================== LIVE BADGE ========================
+    let liveBadgeTimer = null;
+    async function checkLiveBadge() {
+        try {
+            const data = await esps('https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR');
+            const evs = data?.data?.schedule?.events || [];
+            const badge = document.querySelector('.nl a[data-p="live"]');
+            if (badge) {
+                const existing = badge.querySelector('.live-badge-dot');
+                if (evs.length > 0) {
+                    if (!existing) badge.insertAdjacentHTML('beforeend', ' <span class="live-badge-dot"></span>');
+                } else {
+                    if (existing) existing.remove();
+                }
+            }
+        } catch(_) {}
+    }
+
+    // ======================== COMPARE PLAYERS ========================
+    function renderCompare(h) {
+        const parts = h.split('/');
+        const a = parts[1] !== undefined ? parseInt(parts[1]) : null;
+        const b = parts[2] !== undefined ? parseInt(parts[2]) : null;
+
+        let selectHtml = `<div class="section-wrap-sm">
+            <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+            <div class="compare-hero"><h1>Comparar <span>Jogadores</span></h1><p>Selecione dois jogadores para comparar estatísticas</p></div>
+            <div class="compare-select">
+                <select id="cmp-a" onchange="updateCompare()">
+                    <option value="">Jogador 1</option>
+                    ${PLAYERS.map((p,i) => `<option value="${i}" ${i===a?'selected':''}>${p.name}</option>`).join('')}
+                </select>
+                <span class="compare-vs">VS</span>
+                <select id="cmp-b" onchange="updateCompare()">
+                    <option value="">Jogador 2</option>
+                    ${PLAYERS.map((p,i) => `<option value="${i}" ${i===b?'selected':''}>${p.name}</option>`).join('')}
+                </select>
+            </div>
+            <div id="compare-result"></div>
+        </div>`;
+        app.innerHTML = selectHtml;
+
+        window.updateCompare = function() {
+            const va = $('cmp-a').value, vb = $('cmp-b').value;
+            if (va !== '' && vb !== '' && va !== vb) {
+                location.hash = `compare/${va}/${vb}`;
+            }
+        };
+
+        if (a !== null && b !== null && a !== b) loadCompare(a, b);
+    }
+
+    async function loadCompare(ai, bi) {
+        const res = $('compare-result');
+        if (!res) return;
+        res.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        try {
+            const [da, db] = await Promise.all([loadPlayer(ai), loadPlayer(bi)]);
+            const pa = PLAYERS[ai], pb = PLAYERS[bi];
+            const sa = da.league.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const sb = db.league.find(e=>e.queueType==='RANKED_SOLO_5x5');
+
+            function pStats(d) {
+                const mt = d.matches, a = d.account;
+                let k=0,dd=0,as=0,cs=0,g=0;
+                mt.forEach(m => { const p=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; k+=p.kills||0; dd+=p.deaths||0; as+=p.assists||0; cs+=(p.totalMinionsKilled||0)+(p.neutralMinionsKilled||0); g+=p.goldEarned||0; });
+                const n=mt.length||1;
+                const wins = mt.filter(m => { const p=m.info?.participants?.find(x=>x.puuid===a.puuid); return p?.win; }).length;
+                return { kda:((k+as)/Math.max(dd,1)).toFixed(1), avgK:(k/n).toFixed(1), avgD:(dd/n).toFixed(1), avgA:(as/n).toFixed(1), avgCS:(cs/n)|0, avgGold:((g/n)/1000).toFixed(1), wr: mt.length?((wins/mt.length)*100).toFixed(0):'—', wins, losses:mt.length-wins, games:mt.length };
+            }
+
+            const stA = pStats(da), stB = pStats(db);
+            const icA = playerIcon(ai, da.summoner.profileIconId), icB = playerIcon(bi, db.summoner.profileIconId);
+            const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
+            const rankOrder = {I:3,II:2,III:1,IV:0};
+            const lpA = sa ? (tierOrder[sa.tier]||0)*400+(rankOrder[sa.rank]||0)*100+(sa.leaguePoints||0) : 0;
+            const lpB = sb ? (tierOrder[sb.tier]||0)*400+(rankOrder[sb.rank]||0)*100+(sb.leaguePoints||0) : 0;
+
+            function bar(label, va, vb, unit='', higher=true) {
+                const na=parseFloat(va), nb=parseFloat(vb);
+                const max=Math.max(na,nb,1), pa=((na/max)*100).toFixed(0), ppb=((nb/max)*100).toFixed(0);
+                const wA = higher ? na>=nb : na<=nb, wB = higher ? nb>=na : nb<=na;
+                return `<div class="cmp-row">
+                    <div class="cmp-val ${wA?'cmp-win':''}">${va}${unit}</div>
+                    <div class="cmp-bars"><div class="cmp-bar-wrap"><div class="cmp-bar cmp-bar-a" style="width:${pa}%"></div></div><div class="cmp-label">${label}</div><div class="cmp-bar-wrap"><div class="cmp-bar cmp-bar-b" style="width:${ppb}%"></div></div></div>
+                    <div class="cmp-val ${wB?'cmp-win':''}">${vb}${unit}</div>
+                </div>`;
+            }
+
+            // Top champions
+            function topChamps(d) {
+                return (d.mastery||[]).slice(0,3).map(m => `<img src="${champImg(m.championId)}" title="${CMAP[m.championId]||'?'}" class="cmp-champ-icon">`).join('');
+            }
+
+            res.innerHTML = `
+            <div class="cmp-header">
+                <div class="cmp-player"><img src="${profImg(icA)}" class="cmp-avatar" ${F}><div class="cmp-name">${da.account.gameName||pa.name}</div><div class="cmp-rank ${rankCls(sa?.tier)}">${sa?sa.tier+' '+sa.rank+' — '+sa.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(da)}</div></div>
+                <div class="cmp-vs-big">VS</div>
+                <div class="cmp-player"><img src="${profImg(icB)}" class="cmp-avatar" ${F}><div class="cmp-name">${db.account.gameName||pb.name}</div><div class="cmp-rank ${rankCls(sb?.tier)}">${sb?sb.tier+' '+sb.rank+' — '+sb.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(db)}</div></div>
+            </div>
+            <div class="cmp-stats">
+                ${bar('Elo (LP Total)', lpA, lpB)}
+                ${bar('Win Rate', stA.wr, stB.wr, '%')}
+                ${bar('KDA', stA.kda, stB.kda)}
+                ${bar('Kills/jogo', stA.avgK, stB.avgK)}
+                ${bar('Deaths/jogo', stA.avgD, stB.avgD, '', false)}
+                ${bar('Assists/jogo', stA.avgA, stB.avgA)}
+                ${bar('CS/jogo', stA.avgCS, stB.avgCS)}
+                ${bar('Gold/jogo', stA.avgGold, stB.avgGold, 'K')}
+                ${bar('Partidas', stA.games, stB.games)}
+            </div>`;
+        } catch(e) { res.innerHTML = `<div class="err"><p>Erro: ${e.message}</p></div>`; }
+    }
+
+    // ======================== MATCH FILTER (Profile) ========================
+    window.filterMatches = function() {
+        const champF = $('filter-champ')?.value || '';
+        const modeF = $('filter-mode')?.value || '';
+        const resultF = $('filter-result')?.value || '';
+        document.querySelectorAll('.mc[data-champ]').forEach(card => {
+            const matchChamp = card.dataset.champ || '';
+            const matchMode = card.dataset.mode || '';
+            const matchResult = card.dataset.result || '';
+            let show = true;
+            if (champF && matchChamp !== champF) show = false;
+            if (modeF && matchMode !== modeF) show = false;
+            if (resultF && matchResult !== resultF) show = false;
+            card.style.display = show ? '' : 'none';
+        });
+    };
+
+    // ======================== SQUAD TIMELINE ========================
+    function renderTimeline() {
+        const el = $('squad-timeline');
+        if (!el) return;
+        // Collect all matches from all cached players
+        const allMatches = [];
+        PLAYERS.forEach((p, i) => {
+            const d = cache[i];
+            if (!d?.matches) return;
+            d.matches.forEach(m => {
+                const mp = m.info?.participants?.find(x => x.puuid === d.account.puuid);
+                if (!mp) return;
+                allMatches.push({ player: d.account.gameName||p.name, playerIdx: i, icon: playerIcon(i, d.summoner?.profileIconId), champ: mp.championId, win: mp.win, kills: mp.kills||0, deaths: mp.deaths||0, assists: mp.assists||0, time: m.info.gameCreation, mode: m.info.gameMode, duration: m.info.gameDuration });
+            });
+        });
+        allMatches.sort((a,b) => b.time - a.time);
+        if (!allMatches.length) { el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;">Carregando partidas...</p>'; return; }
+
+        let html = '<div class="tl-list">';
+        for (const m of allMatches.slice(0, 30)) {
+            html += `<div class="tl-item ${m.win?'tl-win':'tl-loss'}" onclick="location.hash='profile/${m.playerIdx}'">
+                <img src="${profImg(m.icon)}" class="tl-avatar" ${F}>
+                <img src="${champImg(m.champ)}" class="tl-champ" onerror="this.style.opacity='0.3'">
+                <div class="tl-info">
+                    <div class="tl-name">${m.player}</div>
+                    <div class="tl-detail">${CMAP[m.champ]||'?'} &bull; ${m.kills}/${m.deaths}/${m.assists} &bull; ${fmtDur(m.duration)}</div>
+                </div>
+                <div class="tl-right">
+                    <span class="tl-result ${m.win?'g':'r'}">${m.win?'V':'D'}</span>
+                    <span class="tl-ago">${fmtAgo(m.time)}</span>
+                </div>
+            </div>`;
+        }
+        html += '</div>';
+        el.innerHTML = html;
+    }
+
+    // ======================== DASHBOARD ========================
+    async function renderDashboard() {
+        app.innerHTML = `<div class="section-wrap">
+            <div class="dash-hero"><h1>Dashboard <span>do Squad</span></h1><p>Visão geral das estatísticas do grupo</p></div>
+            <div class="dash-actions">
+                <button class="dash-btn" onclick="location.hash='compare'">Comparar Jogadores</button>
+                <button class="dash-btn" onclick="location.hash='teambuilder'">Montar Time</button>
+            </div>
+            <div id="dash-content"><div class="ld"><div class="sp"></div></div></div>
+        </div>`;
+
+        // Load all players
+        const allData = [];
+        await Promise.all(PLAYERS.map(async (p, i) => {
+            try {
+                const d = await loadPlayerFast(i);
+                allData[i] = d;
+            } catch(_) { allData[i] = null; }
+        }));
+
+        let totalGames=0, totalWins=0, totalKills=0, totalDeaths=0, totalAssists=0;
+        const eloDistro = {};
+        const champPop = {};
+        const hourMap = new Array(24).fill(0);
+        const playerStats = [];
+
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i];
+            if (!d) return;
+            const solo = d.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            if (solo) eloDistro[solo.tier] = (eloDistro[solo.tier]||0)+1;
+            let pK=0,pD=0,pA=0,pW=0,pG=0;
+            (d.matches||[]).forEach(m => {
+                const mp = m.info?.participants?.find(x=>x.puuid===d.account?.puuid);
+                if (!mp) return;
+                pK+=mp.kills||0; pD+=mp.deaths||0; pA+=mp.assists||0; pG++;
+                if (mp.win) { pW++; totalWins++; }
+                totalKills+=mp.kills||0; totalDeaths+=mp.deaths||0; totalAssists+=mp.assists||0; totalGames++;
+                const cid = mp.championId;
+                champPop[cid] = (champPop[cid]||0)+1;
+                if (m.info.gameCreation) {
+                    const h = new Date(m.info.gameCreation).getHours();
+                    hourMap[h]++;
+                }
+            });
+            playerStats.push({ name:d.account?.gameName||p.name, idx:i, games:pG, wins:pW, kills:pK, deaths:pD, assists:pA, wr:pG?((pW/pG)*100).toFixed(0):0 });
+        });
+
+        const topChamps = Object.entries(champPop).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const eloOrder = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+        const peakHour = hourMap.indexOf(Math.max(...hourMap));
+        const sortedByWR = [...playerStats].filter(s=>s.games>0).sort((a,b)=>b.wr-a.wr);
+        const sortedByGames = [...playerStats].sort((a,b)=>b.games-a.games);
+
+        // Achievements
+        const achievements = computeAchievements(allData);
+
+        $('dash-content').innerHTML = `
+        <div class="dash-grid">
+            <div class="dash-card">
+                <div class="dash-card-title">Partidas do Squad</div>
+                <div class="dash-big">${totalGames}</div>
+                <div class="dash-sub">${totalWins}V ${totalGames-totalWins}D &bull; ${totalGames?((totalWins/totalGames)*100).toFixed(0):0}% WR</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card-title">KDA Geral</div>
+                <div class="dash-big">${totalDeaths?((totalKills+totalAssists)/totalDeaths).toFixed(1):'∞'}</div>
+                <div class="dash-sub">${totalKills}K / ${totalDeaths}D / ${totalAssists}A</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card-title">Horário Pico</div>
+                <div class="dash-big">${peakHour}h</div>
+                <div class="dash-sub">${hourMap[peakHour]} partidas nesse horário</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-card-title">Campeão Favorito</div>
+                <div class="dash-big" style="display:flex;align-items:center;justify-content:center;gap:8px;"><img src="${champImg(topChamps[0]?.[0])}" style="width:32px;height:32px;border-radius:8px;">${CMAP[topChamps[0]?.[0]]||'?'}</div>
+                <div class="dash-sub">${topChamps[0]?.[1]||0} partidas</div>
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Distribuição de Elo</h3>
+            <div class="dash-elo-bar">
+                ${eloOrder.filter(t=>eloDistro[t]).map(t => {
+                    const pct = ((eloDistro[t]/PLAYERS.length)*100).toFixed(0);
+                    return `<div class="dash-elo-seg ${rankCls(t)}" style="flex:${eloDistro[t]}" title="${t}: ${eloDistro[t]}"><span>${t.slice(0,3)} (${eloDistro[t]})</span></div>`;
+                }).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Top Campeões do Squad</h3>
+            <div class="dash-champ-list">
+                ${topChamps.map(([cid,cnt],i) => `<div class="dash-champ-item"><span class="dash-champ-pos">${i+1}</span><img src="${champImg(cid)}" class="dash-champ-img"><span class="dash-champ-name">${CMAP[cid]||'?'}</span><span class="dash-champ-cnt">${cnt} jogos</span></div>`).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Quem mais joga</h3>
+            <div class="dash-rank-list">
+                ${sortedByGames.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${i+1}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val">${s.games} jogos</span><span class="dash-rank-wr">${s.wr}% WR</span></div>`).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Melhor Win Rate</h3>
+            <div class="dash-rank-list">
+                ${sortedByWR.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${i+1}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val" style="color:#4caf50;">${s.wr}%</span><span class="dash-rank-wr">${s.wins}V ${s.losses}D</span></div>`).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Horário de Jogo</h3>
+            <div class="dash-hour-chart">
+                ${hourMap.map((cnt,h) => {const max=Math.max(...hourMap,1); return `<div class="dash-hour-bar" title="${h}h: ${cnt} jogos"><div class="dash-hour-fill" style="height:${(cnt/max)*100}%"></div><span>${h}</span></div>`;}).join('')}
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Conquistas do Squad</h3>
+            <div class="dash-badges">
+                ${achievements.map(a => `<div class="dash-badge ${a.unlocked?'':'dash-badge-locked'}"><span class="dash-badge-icon">${a.icon}</span><div><div class="dash-badge-title">${a.title}</div><div class="dash-badge-desc">${a.desc}</div>${a.player?'<div class="dash-badge-player">'+a.player+'</div>':''}</div></div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // ======================== ACHIEVEMENTS ========================
+    function computeAchievements(allData) {
+        const badges = [];
+        let bestStreak = { name:'', count:0 };
+        let bestKDA = { name:'', val:0 };
+        let mostPentas = { name:'', count:0 };
+        let mostGames = { name:'', count:0 };
+        let bestCS = { name:'', val:0 };
+        let first10 = { name:'', count:0 };
+
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i]; if (!d?.matches?.length) return;
+            const name = d.account?.gameName || p.name;
+            let streak=0, maxStreak=0, k=0, dd=0, a=0, pentas=0, cs=0;
+            const sorted = [...d.matches].sort((a,b)=>(a.info?.gameCreation||0)-(b.info?.gameCreation||0));
+            sorted.forEach(m => {
+                const mp = m.info?.participants?.find(x=>x.puuid===d.account?.puuid); if(!mp) return;
+                if (mp.win) { streak++; maxStreak=Math.max(maxStreak,streak); } else streak=0;
+                k+=mp.kills||0; dd+=mp.deaths||0; a+=mp.assists||0;
+                cs+=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
+                if (mp.pentaKills) pentas+=mp.pentaKills;
+                if ((mp.kills||0)>=10 && (mp.deaths||0)===0) first10.count++;
+            });
+            const n = d.matches.length;
+            const kda = dd>0?(k+a)/dd:k+a;
+            const avgCS = n>0?cs/n:0;
+            if (maxStreak > bestStreak.count) bestStreak = { name, count:maxStreak };
+            if (kda > bestKDA.val) bestKDA = { name, val:kda };
+            if (pentas > mostPentas.count) mostPentas = { name, count:pentas };
+            if (n > mostGames.count) mostGames = { name, count:n };
+            if (avgCS > bestCS.val) bestCS = { name, val:avgCS };
+        });
+
+        badges.push({ icon:'🔥', title:'Maior Winstreak', desc:`${bestStreak.count} vitórias seguidas`, player:bestStreak.name, unlocked:bestStreak.count>=3 });
+        badges.push({ icon:'⚔️', title:'Melhor KDA', desc:`${bestKDA.val.toFixed(1)} KDA`, player:bestKDA.name, unlocked:bestKDA.val>=3 });
+        badges.push({ icon:'💀', title:'Pentakill!', desc:mostPentas.count>0?`${mostPentas.count} pentas`:'Ninguém fez penta ainda', player:mostPentas.name, unlocked:mostPentas.count>0 });
+        badges.push({ icon:'🎮', title:'Viciado', desc:`${mostGames.count} partidas jogadas`, player:mostGames.name, unlocked:mostGames.count>=10 });
+        badges.push({ icon:'🌾', title:'Rei do Farm', desc:`${bestCS.val.toFixed(0)} CS médio`, player:bestCS.name, unlocked:bestCS.val>=150 });
+        badges.push({ icon:'👑', title:'Perfeito 10/0', desc:first10.count>0?'Jogou 10+ kills sem morrer':'Ninguém conseguiu ainda', player:'', unlocked:first10.count>0 });
+
+        // Prediction badges
+        const predKeys = [];
+        for (let k=0; k<localStorage.length; k++) { const key=localStorage.key(k); if (key?.startsWith('pred_')) predKeys.push(key); }
+        badges.push({ icon:'🎯', title:'Vidente', desc:`${predKeys.length} palpites feitos`, player:'', unlocked:predKeys.length>=5 });
+
+        return badges;
+    }
+
+    // ======================== TEAM BUILDER ========================
+    function renderTeamBuilder() {
+        const roles = ['TOP','JNG','MID','ADC','SUP'];
+        app.innerHTML = `<div class="section-wrap-sm">
+            <button class="bb" onclick="location.hash='dashboard'">&larr; Dashboard</button>
+            <div class="tb-hero"><h1>Montar <span>Time</span></h1><p>Monte a composição do squad para Clash ou Flex</p></div>
+            <div class="tb-slots" id="tb-slots">
+                ${roles.map(r => `<div class="tb-slot" data-role="${r}">
+                    <div class="tb-role">${r}</div>
+                    <select class="tb-select" data-role="${r}" onchange="updateTeamBuilder()">
+                        <option value="">Selecionar</option>
+                        ${PLAYERS.map((p,i) => `<option value="${i}">${p.name}</option>`).join('')}
+                    </select>
+                    <div class="tb-player-info" id="tb-info-${r}"></div>
+                </div>`).join('')}
+            </div>
+            <div id="tb-summary"></div>
+        </div>`;
+
+        window.updateTeamBuilder = async function() {
+            const selected = {};
+            document.querySelectorAll('.tb-select').forEach(sel => {
+                if (sel.value) selected[sel.dataset.role] = parseInt(sel.value);
+            });
+
+            // Show player info per slot
+            for (const role of roles) {
+                const el = $(`tb-info-${role}`);
+                const idx = selected[role];
+                if (idx === undefined) { el.innerHTML = ''; continue; }
+                const d = cache[idx] || await loadPlayerFast(idx).catch(()=>null);
+                if (!d) { el.innerHTML = '<span style="color:var(--dim);font-size:.8em;">Indisponível</span>'; continue; }
+                const solo = d.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+                const ic = playerIcon(idx, d.summoner?.profileIconId);
+                el.innerHTML = `<img src="${profImg(ic)}" class="tb-icon" ${F}><span class="${rankCls(solo?.tier)}" style="font-weight:700;font-size:.85em;">${solo?solo.tier+' '+solo.rank:'Unranked'}</span>`;
+            }
+
+            // Summary
+            const sum = $('tb-summary');
+            const filled = Object.keys(selected).length;
+            if (filled < 2) { sum.innerHTML = ''; return; }
+
+            let totalLP = 0, count = 0;
+            for (const [r, idx] of Object.entries(selected)) {
+                const d = cache[idx];
+                const solo = d?.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+                if (solo) {
+                    const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
+                    const rankOrder = {I:3,II:2,III:1,IV:0};
+                    totalLP += (tierOrder[solo.tier]||0)*400+(rankOrder[solo.rank]||0)*100+(solo.leaguePoints||0);
+                    count++;
+                }
+            }
+            const avgLP = count ? (totalLP/count)|0 : 0;
+            const tiers = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+            const avgTier = tiers[Math.min((avgLP/400)|0, 9)] || 'IRON';
+
+            sum.innerHTML = `<div class="tb-summary-box">
+                <h3>Resumo do Time</h3>
+                <div class="tb-summary-stats">
+                    <div><span class="tb-stat-label">Jogadores</span><span class="tb-stat-val">${filled}/5</span></div>
+                    <div><span class="tb-stat-label">Elo Médio</span><span class="tb-stat-val ${rankCls(avgTier)}">${avgTier}</span></div>
+                    <div><span class="tb-stat-label">LP Médio</span><span class="tb-stat-val">${avgLP}</span></div>
+                </div>
+            </div>`;
+        };
+    }
+
+    // ======================== CHAT ========================
+    function renderChat() {
+        const user = getLoggedUser();
+        app.innerHTML = `<div class="section-wrap-sm">
+            <div class="chat-hero"><h1>Chat <span>do Squad</span></h1></div>
+            <div class="chat-box" id="chat-box"></div>
+            ${user ? `<div class="chat-input-wrap">
+                <input type="text" id="chat-input" placeholder="Digite sua mensagem..." maxlength="200" autocomplete="off">
+                <button class="chat-send" onclick="sendChat()">Enviar</button>
+            </div>` : '<div class="chat-login-prompt"><p>Faça login para enviar mensagens</p><button class="cfg-btn" onclick="showLoginModal()">Entrar</button></div>'}
+        </div>`;
+
+        renderChatMessages();
+        // Auto-refresh chat
+        if (window._chatTimer) clearInterval(window._chatTimer);
+        window._chatTimer = setInterval(renderChatMessages, 3000);
+
+        const input = $('chat-input');
+        if (input) input.addEventListener('keydown', e => { if (e.key==='Enter') sendChat(); });
+    }
+
+    function getChatMessages() {
+        try { return JSON.parse(localStorage.getItem('profa_chat')||'[]'); } catch(_) { return []; }
+    }
+
+    function renderChatMessages() {
+        const box = $('chat-box');
+        if (!box) { if(window._chatTimer) clearInterval(window._chatTimer); return; }
+        const msgs = getChatMessages();
+        if (!msgs.length) { box.innerHTML = '<p class="chat-empty">Nenhuma mensagem ainda. Seja o primeiro!</p>'; return; }
+        box.innerHTML = msgs.slice(-50).map(m => {
+            const isMe = getLoggedUser()?.idx === m.idx;
+            return `<div class="chat-msg ${isMe?'chat-me':''}">
+                <div class="chat-msg-head"><span class="chat-msg-name">${m.name}</span><span class="chat-msg-time">${fmtAgo(m.time)}</span></div>
+                <div class="chat-msg-text">${escapeHtml(m.text)}</div>
+            </div>`;
+        }).join('');
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function escapeHtml(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+    window.sendChat = function() {
+        const user = getLoggedUser(); if (!user) return;
+        const input = $('chat-input'); if (!input || !input.value.trim()) return;
+        const msgs = getChatMessages();
+        msgs.push({ idx:user.idx, name:PLAYERS[user.idx]?.name||'???', text:input.value.trim(), time:Date.now() });
+        // Keep last 200 messages
+        while (msgs.length > 200) msgs.shift();
+        localStorage.setItem('profa_chat', JSON.stringify(msgs));
+        input.value = '';
+        renderChatMessages();
+    };
+
     // ======================== INIT ========================
+    // Theme
+    applyTheme(localStorage.getItem('profa_theme') || 'dark');
     // Carrega dados de campeões em background — não bloqueia a renderização
     fetch(`https://ddragon.leagueoflegends.com/cdn/${DVER}/data/en_US/champion.json`)
         .then(r => r.json())
@@ -1818,6 +2331,11 @@
         .catch(() => {});
     updateNavUser();
     nav(location.hash || '#team');
+    // Live badge check every 60s
+    checkLiveBadge();
+    liveBadgeTimer = setInterval(checkLiveBadge, 60000);
+    // PWA Service Worker
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
     })();
     </script>

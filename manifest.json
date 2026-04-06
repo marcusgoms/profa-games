@@ -1,0 +1,16 @@
+{
+    "name": "PROFA GAMES",
+    "short_name": "PROFA",
+    "description": "Squad tracker, CBLOL ao vivo e esports",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0d0d1a",
+    "theme_color": "#00d4ff",
+    "icons": [
+        {
+            "src": "https://ddragon.leagueoflegends.com/cdn/14.24.1/img/profileicon/4644.png",
+            "sizes": "120x120",
+            "type": "image/png"
+        }
+    ]
+}
