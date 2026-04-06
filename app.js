@@ -468,28 +468,54 @@
         return d.toISOString();
     }
 
-    // ======================== DATA LAYER ========================
-    // Stale-while-revalidate: show cached data instantly, refresh in background.
+    // ======================== DATA LAYER (Firebase global + localStorage fallback) ========================
+    // All player data is stored in Firebase so everyone shares the same cache.
+    // Flow: Firebase → memory cache → localStorage (fallback if Firebase unavailable)
+    // Only new matches are fetched from Riot API — existing ones are reused from Firebase.
     const cache = {};
     const CACHE_TTL = 5 * 60 * 1000; // 5 min — data fresher than this skips API entirely
+    const MAX_MATCHES = 50; // Store up to 50 matches per player
 
     function lsGet(key) { try { const d=JSON.parse(localStorage.getItem(key)); return d||null; } catch(_) { return null; } }
-    function lsGetFresh(key) { const d=lsGet(key); return d&&Date.now()-(d._ts||0)<CACHE_TTL?d:null; }
     function lsSet(key, data) { try { localStorage.setItem(key, JSON.stringify({...data, _ts:Date.now()})); } catch(_) {} }
     function isStale(d) { return !d?._ts || Date.now()-d._ts >= CACHE_TTL; }
+
+    // Firebase player data helpers
+    async function fbGetPlayer(i) {
+        if (!db) return null;
+        try {
+            const snap = await db.ref(`players/${i}`).once('value');
+            return snap.val() || null;
+        } catch(_) { return null; }
+    }
+
+    function fbSavePlayer(i, data) {
+        if (!db) return;
+        // Strip internal fields before saving to Firebase
+        const toSave = { ...data };
+        delete toSave._ts;
+        delete toSave._full;
+        delete toSave._matchIds;
+        // Limit matches to MAX_MATCHES
+        if (toSave.matches?.length > MAX_MATCHES) {
+            toSave.matches = toSave.matches.slice(0, MAX_MATCHES);
+        }
+        toSave._updatedAt = Date.now();
+        db.ref(`players/${i}`).set(toSave).catch(e => console.warn('Firebase save error:', e.message));
+    }
 
     // Track background loading/refresh promises so we don't duplicate work
     const bgLoading = {};
     const bgRefresh = {};
 
-    // Fetch fresh fast data from API (always hits network)
+    // Fetch core player data from Riot API (account, summoner, league, match IDs + 1 recent match)
     async function fetchPlayerFast(i) {
         const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
         const account = await riot(`https://${cl}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
         const [summoner, league, matchIds] = await Promise.all([
             riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`),
             rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []),
-            rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=20`, []),
+            rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=${MAX_MATCHES}`, []),
         ]);
         const ids = matchIds || [];
         let recentMatch = null;
@@ -499,46 +525,58 @@
         return { account, summoner, league: league||[], mastery:[], matches: recentMatch?[recentMatch]:[], _matchIds: ids };
     }
 
-    // FAST: returns cached data instantly if available, fetches from API otherwise.
-    // If cached data is stale, starts a background refresh and returns stale data immediately.
+    // FAST: returns cached data instantly (Firebase → localStorage), refreshes in background if stale.
     async function loadPlayerFast(i) {
         // Fresh memory cache — return immediately
         if (cache[i] && !isStale(cache[i])) return cache[i];
 
-        // Any localStorage data (even stale) — return it instantly
+        // Try Firebase first (global cache shared by all users)
+        const fbData = await fbGetPlayer(i);
+        if (fbData) {
+            fbData._ts = fbData._updatedAt || Date.now();
+            cache[i] = fbData;
+            lsSet(`profa_player_${i}`, fbData);
+            // If stale, refresh in background
+            if (isStale(fbData)) refreshPlayer(i);
+            return cache[i];
+        }
+
+        // Fallback to localStorage
         const stored = lsGet(`profa_player_${i}`);
         if (stored) {
             cache[i] = stored;
-            // If stale, kick off background refresh (non-blocking)
             if (isStale(stored)) refreshPlayer(i);
             return cache[i];
         }
 
-        // Nothing cached — must fetch from API
+        // Nothing cached anywhere — must fetch from API
         const data = await fetchPlayerFast(i);
         data._ts = Date.now();
         cache[i] = data;
         lsSet(`profa_player_${i}`, data);
+        fbSavePlayer(i, data);
         return cache[i];
     }
 
-    // Background refresh: fetches fresh data from API and updates cache + UI silently
+    // Background refresh: fetches fresh data, merges with existing matches, saves to Firebase
     function refreshPlayer(i) {
         if (bgRefresh[i]) return bgRefresh[i];
         bgRefresh[i] = (async () => {
             try {
                 const fresh = await fetchPlayerFast(i);
-                // Preserve full data (mastery + extra matches) if we had it
                 const prev = cache[i];
                 fresh._ts = Date.now();
-                if (prev?._full) {
-                    fresh.mastery = prev.mastery;
-                    fresh.matches = [...fresh.matches, ...prev.matches.filter(m => m.metadata?.matchId !== fresh.matches[0]?.metadata?.matchId)];
-                    fresh._full = false; // will be re-completed by background loader
+                // Merge: keep all existing matches + add any new ones from API
+                if (prev?.matches?.length) {
+                    const existingIds = new Set(prev.matches.map(m => m.metadata?.matchId).filter(Boolean));
+                    const brandNew = fresh.matches.filter(m => !existingIds.has(m.metadata?.matchId));
+                    fresh.matches = [...brandNew, ...prev.matches].slice(0, MAX_MATCHES);
+                    if (prev.mastery?.length) fresh.mastery = prev.mastery;
+                    fresh._full = prev._full || false;
                 }
                 cache[i] = fresh;
                 lsSet(`profa_player_${i}`, fresh);
-                // Notify UI about refresh if on team page
+                fbSavePlayer(i, fresh);
                 if (typeof onPlayerRefreshed === 'function') onPlayerRefreshed(i, fresh);
             } catch(_) {}
             delete bgRefresh[i];
@@ -546,7 +584,7 @@
         return bgRefresh[i];
     }
 
-    // BACKGROUND: loads remaining matches + mastery after fast load
+    // BACKGROUND: loads remaining matches (up to 50) + mastery. Only fetches matches not already in cache.
     function loadPlayerBackground(i) {
         if (bgLoading[i]) return bgLoading[i];
         if (cache[i]?._full && !isStale(cache[i])) return Promise.resolve(cache[i]);
@@ -561,18 +599,25 @@
 
             const mastery = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []);
 
-            // Load remaining matches (skip already loaded)
-            const alreadyLoaded = new Set(base.matches.map(m => m.metadata?.matchId));
-            const toLoad = ids.slice(0, 15).filter(mid => !alreadyLoaded.has(mid));
+            // Only fetch matches we don't already have
+            const alreadyLoaded = new Set(base.matches.map(m => m.metadata?.matchId).filter(Boolean));
+            const toLoad = ids.slice(0, MAX_MATCHES).filter(mid => !alreadyLoaded.has(mid));
             const newMatches = [];
+            // Fetch in batches of 5 to avoid rate limits
             for (let b = 0; b < toLoad.length; b += 5) {
                 await Promise.all(toLoad.slice(b, b+5).map(mid =>
                     riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => newMatches.push(d)).catch(() => {})
                 ));
             }
 
-            cache[i] = { ...base, mastery: mastery||[], matches: [...base.matches, ...newMatches], _full: true, _ts: Date.now() };
+            const allMatches = [...base.matches, ...newMatches]
+                .filter((m, idx, arr) => arr.findIndex(x => x.metadata?.matchId === m.metadata?.matchId) === idx)
+                .sort((a, b) => (b.info?.gameCreation||0) - (a.info?.gameCreation||0))
+                .slice(0, MAX_MATCHES);
+
+            cache[i] = { ...base, mastery: mastery||[], matches: allMatches, _full: true, _ts: Date.now() };
             lsSet(`profa_player_${i}`, cache[i]);
+            fbSavePlayer(i, cache[i]);
             delete bgLoading[i];
             return cache[i];
         })();
@@ -582,13 +627,18 @@
     // FULL: returns complete data — waits for background if needed, or starts it
     async function loadPlayer(i) {
         if (cache[i]?._full && !isStale(cache[i])) return cache[i];
-        // Return full cached data even if stale for instant display
-        const c = lsGet(`profa_player_${i}`);
-        if (c?._full) {
-            cache[i] = c;
-            // Trigger background refresh if stale
-            if (isStale(c)) { refreshPlayer(i); loadPlayerBackground(i); }
-            return c;
+        // Try Firebase/localStorage for full cached data
+        if (!cache[i]) {
+            const fbData = await fbGetPlayer(i);
+            if (fbData) { fbData._ts = fbData._updatedAt || Date.now(); cache[i] = fbData; lsSet(`profa_player_${i}`, fbData); }
+        }
+        if (!cache[i]) {
+            const c = lsGet(`profa_player_${i}`);
+            if (c) cache[i] = c;
+        }
+        if (cache[i]?._full) {
+            if (isStale(cache[i])) { refreshPlayer(i); loadPlayerBackground(i); }
+            return cache[i];
         }
         return loadPlayerBackground(i);
     }
