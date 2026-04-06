@@ -794,34 +794,66 @@
 
         // Load ALL players in parallel.
         // Each player updates its card + ranking chart as soon as it resolves.
-        PLAYERS.forEach((p, i) => {
+        const failedPlayers = [];
+
+        function tryLoadPlayer(i) {
             const card = document.querySelector(`[data-i="${i}"]`);
             if (!card) { loaded++; return; }
 
             loadPlayerFast(i).then(d => {
                 const rd = renderCard(i, d);
-                if (rd) rankData.push(rd);
+                if (rd) {
+                    const ex = rankData.findIndex(r => r.idx === i);
+                    if (ex >= 0) rankData[ex] = rd; else rankData.push(rd);
+                }
+                // Remove from failed list if was there
+                const fi = failedPlayers.indexOf(i);
+                if (fi >= 0) failedPlayers.splice(fi, 1);
             }).catch(err => {
                 const isAuth = err.message?.includes('403') || err.message?.includes('401');
                 const isRate = err.message?.includes('429');
                 card.innerHTML = `<div class="pch">
                     <div class="pci" style="display:flex;align-items:center;justify-content:center;background:var(--surf);font-size:1.5em;color:var(--dim);">?</div>
-                    <div><div class="pcn">${p.name} <span class="t">#${p.tag}</span></div>
-                    <div class="cl" style="color:#ef5350;">${isAuth?'API Key expirada':isRate?'Rate limit — aguarde':'Indisponível'}</div></div>
+                    <div><div class="pcn">${PLAYERS[i].name} <span class="t">#${PLAYERS[i].tag}</span></div>
+                    <div class="cl" style="color:#ef5350;">${isAuth?'API Key expirada':isRate?'Rate limit — aguarde':'Tentando novamente...'}</div></div>
                 </div>
                 ${isAuth?'<div style="margin-top:8px;"><button class="api-key-btn" onclick="showApiKeyModal()">Atualizar API Key</button></div>':''}`;
+                // Mark for retry (unless auth error — no point retrying with bad key)
+                if (!isAuth && !failedPlayers.includes(i)) failedPlayers.push(i);
             }).finally(() => {
                 loaded++;
-                // Re-render ranking progressively — each player that arrives updates the chart
                 renderSoloQRanking(rankData, loaded < PLAYERS.length);
-                // Update timeline with what we have so far
                 renderTimeline();
-                // Once all cards are rendered, start background loading for full data
                 if (loaded === PLAYERS.length) {
                     PLAYERS.forEach((_, j) => loadPlayerBackground(j));
+                    // Start retry loop for failed players
+                    startRetryLoop();
                 }
             });
-        });
+        }
+
+        // Retry failed players every 15s until all succeed or page changes
+        let retryTimer = null;
+        function startRetryLoop() {
+            if (retryTimer) clearInterval(retryTimer);
+            if (!failedPlayers.length) return;
+            retryTimer = setInterval(() => {
+                // Stop if we navigated away from team page
+                if (!document.getElementById('squad-grid')) { clearInterval(retryTimer); retryTimer = null; return; }
+                if (!failedPlayers.length) { clearInterval(retryTimer); retryTimer = null; return; }
+                // Retry each failed player
+                const toRetry = [...failedPlayers];
+                toRetry.forEach(i => {
+                    // Clear stale cache so it tries again
+                    delete cache[i];
+                    delete bgRefresh[i];
+                    delete bgLoading[i];
+                    tryLoadPlayer(i);
+                });
+            }, 15000);
+        }
+
+        PLAYERS.forEach((_, i) => tryLoadPlayer(i));
     }
 
     function renderSoloQRanking(data, stillLoading) {
