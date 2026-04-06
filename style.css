@@ -61,6 +61,16 @@ a { text-decoration: none; color: inherit; }
 .pv { animation: fi .3s ease; }
 @keyframes fi { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 .pb { position: relative; padding: 28px; border-radius: 16px; margin-bottom: 20px; background: linear-gradient(135deg, #0f1a2e, #1a1a2e 50%, #0d0d1a); overflow: hidden; }
+.pb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Zed_0.jpg') center/cover no-repeat;
+    opacity: 0.05;
+    filter: saturate(0.3);
+    pointer-events: none;
+    border-radius: 16px;
+}
 .pbg { position: absolute; inset: 0; opacity: 0.15; background: radial-gradient(ellipse at 30% 50%, rgba(0,212,255,0.3), transparent 60%); }
 .pbi { position: relative; z-index: 1; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 .pbi .pi { width: 80px; height: 80px; border-radius: 14px; border: 3px solid var(--pri); overflow: hidden; flex-shrink: 0; background: var(--card); }
@@ -228,7 +238,16 @@ a { text-decoration: none; color: inherit; }
 .rt tr:first-child td { font-weight: 700; color: var(--pri); }
 
 /* ==================== LIVE PAGE ==================== */
-.live-page-hero { text-align: center; padding: 36px 20px 24px; }
+.live-page-hero { text-align: center; padding: 36px 20px 24px; position: relative; overflow: hidden; }
+.live-page-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ekko_0.jpg') center 20%/cover no-repeat;
+    opacity: 0.06;
+    filter: saturate(0.4) blur(1px);
+    pointer-events: none;
+}
 .live-page-hero h1 { font-size: 2.2em; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 12px; }
 .live-page-hero h1 span { background: linear-gradient(135deg, var(--pri), var(--acc)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .live-page-hero p { color: var(--dim); margin-top: 8px; }
@@ -405,12 +424,7 @@ a { text-decoration: none; color: inherit; }
 .soloq-wr { font-size: 0.75em; color: var(--dim); text-align: right; min-width: 70px; line-height: 1.3; flex-shrink: 0; }
 .soloq-wr span { font-size: 0.9em; }
 
-/* SOLO Q EVOLUTION CHART */
-.soloq-evo { margin-top: 24px; }
-.soloq-evo h3 { font-size: 1.1em; font-weight: 700; margin: 0 0 12px 0; color: var(--txt); }
-.soloq-evo h3::before { content: '📈 '; }
-.soloq-evo-chart { background: rgba(255,255,255,0.02); border-radius: 12px; padding: 16px; border: 1px solid rgba(255,255,255,0.04); }
-.soloq-svg { width: 100%; height: auto; }
+/* SOLO Q EVOLUTION CHART (styles moved to new section below) */
 
 /* API KEY BUTTON */
 .api-key-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid rgba(233,69,96,0.3); background: rgba(233,69,96,0.1); color: var(--acc); font-size: 0.72em; font-weight: 600; cursor: pointer; transition: all 0.2s; }
@@ -442,8 +456,225 @@ a { text-decoration: none; color: inherit; }
 .mp-track:hover { background: rgba(255,255,255,0.04); color: var(--txt); }
 .mp-track.on { color: var(--pri); font-weight: 700; background: rgba(0,212,255,0.08); }
 
+/* ==================== LOL BACKGROUND IMAGES ==================== */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background: url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg') center/cover no-repeat;
+    opacity: 0.04;
+    filter: blur(2px) saturate(0.5);
+    pointer-events: none;
+}
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, var(--bg) 0%, rgba(13,13,26,0.85) 30%, rgba(13,13,26,0.92) 70%, var(--bg) 100%);
+    pointer-events: none;
+}
+.squad-hero-splash {
+    position: absolute;
+    inset: 0;
+    background: url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_0.jpg') center 20%/cover no-repeat;
+    opacity: 0.1;
+    filter: saturate(0.6);
+    pointer-events: none;
+    z-index: 0;
+}
+.cblol-hero-bg::before {
+    background:
+        url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/LeeSin_0.jpg') center/cover no-repeat !important;
+    opacity: 0.07;
+    filter: saturate(0.4);
+}
+.soloq-ranking {
+    position: relative;
+    overflow: hidden;
+}
+.soloq-ranking::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Thresh_0.jpg') center/cover no-repeat;
+    opacity: 0.04;
+    filter: blur(1px) saturate(0.4);
+    pointer-events: none;
+    border-radius: 16px;
+}
+
+/* ==================== NOOB CARD (MALARIC / AMON) ==================== */
+.pc-noob {
+    background: linear-gradient(135deg, #2a1a1a 0%, #1a1a2e 40%, #1a0a0a 100%) !important;
+    border: 2px solid rgba(233,69,96,0.35) !important;
+    position: relative;
+    overflow: hidden;
+    animation: noobGlow 3s ease-in-out infinite;
+}
+.pc-noob::before {
+    content: '💀 AMON 💀';
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #ef5350, #e91e63);
+    color: #fff;
+    font-size: 0.6em;
+    font-weight: 900;
+    padding: 3px 16px;
+    border-radius: 0 0 8px 8px;
+    letter-spacing: 2px;
+    z-index: 2;
+}
+.pc-noob::after {
+    content: '🤡' !important;
+    font-size: 3em !important;
+    opacity: 0.08 !important;
+    position: absolute !important;
+    bottom: 4px !important;
+    right: 10px !important;
+    top: auto !important;
+    transform: none !important;
+    pointer-events: none;
+}
+@keyframes noobGlow {
+    0%, 100% { box-shadow: 0 0 12px rgba(233,69,96,0.15); }
+    50% { box-shadow: 0 0 25px rgba(233,69,96,0.3), 0 0 50px rgba(233,69,96,0.1); }
+}
+.pci-noob {
+    border-color: rgba(233,69,96,0.5) !important;
+    position: relative;
+}
+.noob-ring {
+    position: absolute;
+    inset: -4px;
+    border: 2px dashed rgba(233,69,96,0.4);
+    border-radius: 12px;
+    animation: noobSpin 8s linear infinite;
+    pointer-events: none;
+    z-index: 1;
+}
+@keyframes noobSpin { to { transform: rotate(360deg); } }
+.noob-badge {
+    background: linear-gradient(90deg, rgba(233,69,96,0.15), rgba(233,69,96,0.08));
+    color: #ef5350;
+    font-size: 0.65em;
+    font-weight: 800;
+    text-align: center;
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border: 1px dashed rgba(233,69,96,0.25);
+}
+.noob-crown { margin-right: 4px; }
+.noob-footer {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: rgba(233,69,96,0.06);
+    border-radius: 8px;
+    border: 1px dashed rgba(233,69,96,0.12);
+}
+.noob-quote {
+    display: block;
+    font-style: italic;
+    font-size: 0.72em;
+    color: #ef5350;
+    text-align: center;
+    margin-bottom: 6px;
+    opacity: 0.8;
+}
+.noob-stats-fun {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    font-size: 0.62em;
+    color: var(--dim);
+    font-weight: 600;
+}
+
+/* Noob legend card in ranking */
+.noob-legend {
+    border-color: rgba(233,69,96,0.3) !important;
+    background: linear-gradient(135deg, #2a1a1a, var(--card)) !important;
+}
+
+/* ==================== SOLOQ LINE CHART LEGEND ==================== */
+.soloq-legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.soloq-legend-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+.soloq-legend-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    border-color: rgba(0,212,255,0.2);
+}
+.soloq-lc-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.soloq-lc-medal { font-size: 1.1em; font-weight: 900; min-width: 24px; }
+.soloq-lc-icon { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
+.soloq-lc-name { font-weight: 700; font-size: 0.88em; }
+.soloq-lc-tier { font-size: 0.7em; font-weight: 600; text-transform: uppercase; }
+.soloq-lc-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.85em;
+}
+.soloq-lc-color {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    opacity: 0.7;
+}
+
+/* ==================== UPDATED EVOLUTION CHART ==================== */
+.soloq-evo { margin-top: 20px; }
+.soloq-evo h3 { font-size: 1.1em; font-weight: 700; margin: 0 0 12px 0; color: var(--txt); }
+.soloq-evo h3::before { content: '📈 '; }
+.soloq-evo-chart {
+    background: rgba(0,0,0,0.2);
+    border-radius: 14px;
+    padding: 20px 12px;
+    border: 1px solid rgba(255,255,255,0.05);
+    overflow-x: auto;
+}
+.soloq-svg { width: 100%; height: auto; min-width: 500px; }
+
 /* FOOTER */
-.ft { margin-top: auto; padding: 24px 20px; text-align: center; color: var(--dim); font-size: 0.8em; border-top: 1px solid rgba(255,255,255,0.04); }
+.ft { margin-top: auto; padding: 24px 20px; text-align: center; color: var(--dim); font-size: 0.8em; border-top: 1px solid rgba(255,255,255,0.04); position: relative; }
+.ft::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg') center bottom/cover no-repeat;
+    opacity: 0.03;
+    filter: saturate(0.4);
+    pointer-events: none;
+}
 .ft-icons { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; opacity: 0.4; }
 .ft-icon { width: 20px; height: 20px; border-radius: 50%; }
 
@@ -473,8 +704,6 @@ a { text-decoration: none; color: inherit; }
     .music-btn{bottom:12px;right:12px;padding:6px 12px}
     .music-title{display:none}
     .music-panel{right:12px;bottom:56px;width:240px}
-    .soloq-row{flex-wrap:wrap;gap:8px}
-    .soloq-label{min-width:140px}
-    .soloq-bar-wrap{min-width:100%;order:3}
-    .soloq-wr{order:2;min-width:auto}
+    .soloq-legend-grid{grid-template-columns:1fr 1fr}
+    .soloq-evo-chart{padding:12px 6px}
 }

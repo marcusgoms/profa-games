@@ -44,6 +44,9 @@
         { name:'tume',        tag:'br1',   region:'BR1' },
         { name:'Bruvel',      tag:'BTC',   region:'BR1' },
         { name:'Matraca IV',  tag:'kash',  region:'BR1' },
+        { name:'BOONSKT',     tag:'br1',   region:'BR1' },
+        { name:'Nick',        tag:'LSD21', region:'BR1' },
+        { name:'Malaric',     tag:'PR1',   region:'BR1', special:'noob' },
     ];
     const RIOT_KEY    = window.PROFA_CONFIG?.riotKey    || localStorage.getItem('lol_key')     || 'RGAPI-16e48557-eb13-41e8-9caa-6d30b83932bb';
     const ESPORTS_KEY = window.PROFA_CONFIG?.esportsKey || localStorage.getItem('esports_key') || '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
@@ -352,6 +355,7 @@
         app.innerHTML = `
         <div class="squad-hero">
             <div class="squad-hero-bg"></div>
+            <div class="squad-hero-splash"></div>
             <div class="squad-hero-inner">
                 <img src="https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/4644.png" alt="" class="hero-emblem">
                 <h1>O <span>Squad</span></h1>
@@ -360,14 +364,14 @@
         </div>
         <div class="section-wrap">
             <div class="tg" id="squad-grid">
-                ${PLAYERS.map((p,i) => `<div class="pc" data-i="${i}" onclick="location.hash='profile/${i}'"><div class="ld"><div class="sp"></div></div></div>`).join('')}
+                ${PLAYERS.map((p,i) => `<div class="pc ${p.special==='noob'?'pc-noob':''}" data-i="${i}" onclick="location.hash='profile/${i}'"><div class="ld"><div class="sp"></div></div></div>`).join('')}
             </div>
         </div>
         <div class="section-wrap">
             <div class="soloq-ranking" id="soloq-ranking">
                 <div class="soloq-header">
                     <h2>Ranking Solo Q</h2>
-                    <p>Pontos de Liga (LP) do squad</p>
+                    <p>Evolu&ccedil;&atilde;o di&aacute;ria de LP do squad (s&eacute;ries temporais)</p>
                 </div>
                 <div class="soloq-chart" id="soloq-chart"><div class="ld"><div class="sp"></div></div></div>
             </div>
@@ -392,12 +396,26 @@
                 const rChId = rmp?.championId;
                 const rWin  = rmp?.win;
 
+                const isNoob = p.special === 'noob';
+                const noobBadge = isNoob ? `<div class="noob-badge">AMON 🤡 O NOOB DO SQUAD</div>` : '';
+                const noobTitle = isNoob ? `<span class="noob-crown">👑💀</span>` : '';
+                const noobFooter = isNoob ? `<div class="noob-footer">
+                    <span class="noob-quote">"Eu juro que tava lagando"</span>
+                    <div class="noob-stats-fun">
+                        <span>🏆 Rei dos 0/10</span>
+                        <span>🎯 Farm? Nunca ouvi falar</span>
+                    </div>
+                </div>` : '';
+
                 card.innerHTML = `
+                ${noobBadge}
                 <div class="pch">
-                    <div class="pci"><img src="${profImg(ic)}" alt="" ${F}></div>
+                    <div class="pci ${isNoob?'pci-noob':''}">${isNoob?'<div class="noob-ring"></div>':''}
+                        <img src="${profImg(ic)}" alt="" ${F}>
+                    </div>
                     <div>
-                        <div class="pcn">${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
-                        <div class="cl">Nível ${lv}</div>
+                        <div class="pcn">${noobTitle}${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
+                        <div class="cl">Nível ${lv}${isNoob?' — AMON (Hardstuck)':''}</div>
                     </div>
                 </div>
                 ${solo
@@ -407,7 +425,8 @@
                     <img src="${champImg(rChId)}" style="width:22px;height:22px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
                     <span class="dot ${rWin?'g':'r'}"></span>
                     <span>${CMAP[rChId]||'?'} &bull; ${ago}</span>
-                </div>` : ago ? `<div class="lr"><span class="dot g"></span><span>${ago}</span></div>` : ''}`;
+                </div>` : ago ? `<div class="lr"><span class="dot g"></span><span>${ago}</span></div>` : ''}
+                ${noobFooter}`;
 
                 // Collect ranked data for Solo Q ranking chart
                 if (solo) {
@@ -447,34 +466,8 @@
         if (!data.length) { el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:2rem;">Nenhum jogador posicionado na Solo Q</p>'; return; }
 
         data.sort((a,b) => b.totalLP - a.totalLP);
-        const maxLP = data[0].totalLP || 1;
         const tierColors = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
         const medals = ['🥇','🥈','🥉'];
-
-        let html = '<div class="soloq-bars">';
-        data.forEach((d, i) => {
-            const pct = Math.max(8, Math.round((d.totalLP / maxLP) * 100));
-            const wr = ((d.wins/(d.wins+d.losses))*100).toFixed(0);
-            const color = tierColors[d.tier] || 'var(--pri)';
-            const medal = i < 3 ? `<span class="soloq-medal">${medals[i]}</span>` : `<span class="soloq-pos">${i+1}º</span>`;
-            html += `<div class="soloq-row" onclick="location.hash='profile/${d.idx}'">
-                <div class="soloq-label">
-                    ${medal}
-                    <img src="${profImg(d.icon)}" alt="" class="soloq-icon" ${F}>
-                    <div class="soloq-info">
-                        <span class="soloq-name">${d.name}</span>
-                        <span class="soloq-tier ${rankCls(d.tier)}">${d.tier} ${d.rank}</span>
-                    </div>
-                </div>
-                <div class="soloq-bar-wrap">
-                    <div class="soloq-bar" style="width:${pct}%;background:linear-gradient(90deg,${color}88,${color});">
-                        <span class="soloq-lp">${d.lp} LP</span>
-                    </div>
-                </div>
-                <div class="soloq-wr">${wr}% WR<br><span>${d.wins}V ${d.losses}D</span></div>
-            </div>`;
-        });
-        html += '</div>';
 
         // Save snapshot for history tracking
         const histKey = 'soloq_history';
@@ -485,85 +478,149 @@
         data.forEach(d => { history[today][d.name] = d.totalLP; });
         localStorage.setItem(histKey, JSON.stringify(history));
 
-        // Build evolution mini-chart if we have history
         const dates = Object.keys(history).sort();
-        if (dates.length > 1) {
-            const names = data.map(d => d.name);
-            html += `<div class="soloq-evo">
-                <h3>Evolução de LP</h3>
-                <div class="soloq-evo-chart" id="soloq-evo-chart"></div>
+
+        // Legend cards (compact)
+        let legendHtml = '<div class="soloq-legend-grid">';
+        data.forEach((d, i) => {
+            const wr = ((d.wins/(d.wins+d.losses))*100).toFixed(0);
+            const color = tierColors[d.tier] || 'var(--pri)';
+            const medal = i < 3 ? medals[i] : `${i+1}º`;
+            const isNoob = PLAYERS[d.idx]?.special === 'noob';
+            legendHtml += `<div class="soloq-legend-card ${isNoob?'noob-legend':''}" onclick="location.hash='profile/${d.idx}'">
+                <div class="soloq-lc-top">
+                    <span class="soloq-lc-medal">${medal}</span>
+                    <img src="${profImg(d.icon)}" alt="" class="soloq-lc-icon" ${F}>
+                    <div>
+                        <div class="soloq-lc-name">${d.name}${isNoob?' 🤡':''}</div>
+                        <div class="soloq-lc-tier ${rankCls(d.tier)}">${d.tier} ${d.rank}</div>
+                    </div>
+                </div>
+                <div class="soloq-lc-stats">
+                    <span style="color:${color};font-weight:900;">${d.lp} LP</span>
+                    <span style="color:var(--dim);font-size:.8em;">${wr}% WR</span>
+                    <span style="color:var(--dim);font-size:.75em;">${d.wins}V ${d.losses}D</span>
+                </div>
+                <div class="soloq-lc-color" style="background:${color};"></div>
             </div>`;
-        }
+        });
+        legendHtml += '</div>';
+
+        // Build chart
+        let html = legendHtml;
+        html += `<div class="soloq-evo">
+            <h3>Evolução de LP (dia a dia)</h3>
+            <div class="soloq-evo-chart" id="soloq-evo-chart"></div>
+        </div>`;
 
         el.innerHTML = html;
-
-        // Render evolution SVG chart if history exists
-        if (dates.length > 1) {
-            renderLPEvolution(dates, history, data);
-        }
+        renderLPEvolution(dates, history, data);
     }
 
     function renderLPEvolution(dates, history, data) {
         const chartEl = $('soloq-evo-chart');
         if (!chartEl) return;
 
-        const W = 600, H = 250, PAD = 50, PADL = 60, PADR = 20, PADT = 20, PADB = 40;
-        const cw = W - PADL - PADR, ch = H - PADT - PADB;
         const tierColors = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
+
+        // If only 1 date, show a message
+        if (dates.length < 2) {
+            chartEl.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--dim);">
+                <p style="font-size:1.2em;margin-bottom:8px;">📊 Dados do dia registrados!</p>
+                <p style="font-size:.85em;">Volte amanhã para ver a evolução no gráfico de linhas.</p>
+                <p style="font-size:.75em;margin-top:8px;color:var(--pri);">Hoje: ${dates[0]}</p>
+            </div>`;
+            return;
+        }
+
+        const W = 800, H = 380, PADL = 65, PADR = 90, PADT = 25, PADB = 50;
+        const cw = W - PADL - PADR, ch = H - PADT - PADB;
 
         // Collect all LP values for y-axis range
         let allVals = [];
         data.forEach(d => {
             dates.forEach(dt => { if (history[dt]?.[d.name] !== undefined) allVals.push(history[dt][d.name]); });
         });
-        const minY = Math.min(...allVals), maxY = Math.max(...allVals);
+        const minY = Math.min(...allVals) - 20, maxY = Math.max(...allVals) + 20;
         const rangeY = maxY - minY || 100;
 
         const xStep = dates.length > 1 ? cw / (dates.length - 1) : cw;
         const scaleY = v => PADT + ch - ((v - minY) / rangeY) * ch;
         const scaleX = i => PADL + i * xStep;
 
-        let svg = `<svg viewBox="0 0 ${W} ${H}" class="soloq-svg">`;
+        let svg = `<svg viewBox="0 0 ${W} ${H}" class="soloq-svg" xmlns="http://www.w3.org/2000/svg">`;
 
-        // Grid lines
-        const gridCount = 4;
+        // Defs for gradients
+        svg += `<defs>`;
+        data.forEach((d, idx) => {
+            const color = tierColors[d.tier] || '#00d4ff';
+            svg += `<linearGradient id="grad${idx}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+            </linearGradient>`;
+        });
+        svg += `</defs>`;
+
+        // Background grid
+        const gridCount = 5;
         for (let i = 0; i <= gridCount; i++) {
             const y = PADT + (ch / gridCount) * i;
             const val = Math.round(maxY - (rangeY / gridCount) * i);
-            svg += `<line x1="${PADL}" y1="${y}" x2="${W-PADR}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
-            svg += `<text x="${PADL-8}" y="${y+4}" fill="var(--dim)" font-size="10" text-anchor="end">${val}</text>`;
+            svg += `<line x1="${PADL}" y1="${y}" x2="${W-PADR}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
+            svg += `<text x="${PADL-10}" y="${y+4}" fill="#8892b0" font-size="10" text-anchor="end" font-family="system-ui">${val}</text>`;
         }
 
-        // Date labels
+        // Vertical grid + date labels
         dates.forEach((dt, i) => {
             const x = scaleX(i);
-            const label = dt.slice(5); // MM-DD
-            svg += `<text x="${x}" y="${H-8}" fill="var(--dim)" font-size="10" text-anchor="middle">${label}</text>`;
+            svg += `<line x1="${x}" y1="${PADT}" x2="${x}" y2="${H-PADB}" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>`;
+            const parts = dt.split('-');
+            const label = `${parts[2]}/${parts[1]}`;
+            svg += `<text x="${x}" y="${H-12}" fill="#8892b0" font-size="10" text-anchor="middle" font-family="system-ui">${label}</text>`;
         });
 
-        // Lines per player
-        data.forEach(d => {
-            const color = tierColors[d.tier] || 'var(--pri)';
+        // Area fills + lines per player
+        data.forEach((d, idx) => {
+            const color = tierColors[d.tier] || '#00d4ff';
             let points = [];
             dates.forEach((dt, i) => {
                 if (history[dt]?.[d.name] !== undefined) {
-                    points.push({ x: scaleX(i), y: scaleY(history[dt][d.name]) });
+                    points.push({ x: scaleX(i), y: scaleY(history[dt][d.name]), val: history[dt][d.name] });
                 }
             });
+
             if (points.length > 1) {
-                const path = points.map((p, i) => `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-                svg += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+                // Area fill
+                const areaPath = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)} ` +
+                    points.slice(1).map(p => `L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') +
+                    ` L${points[points.length-1].x.toFixed(1)},${(H-PADB).toFixed(1)} L${points[0].x.toFixed(1)},${(H-PADB).toFixed(1)} Z`;
+                svg += `<path d="${areaPath}" fill="url(#grad${idx})" opacity="0.4"/>`;
+
+                // Line
+                const isNoob = PLAYERS[d.idx]?.special === 'noob';
+                const strokeW = isNoob ? '3.5' : '2.5';
+                const linePath = points.map((p, i) => `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                svg += `<path d="${linePath}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
             }
-            // Dots
+
+            // Dots with tooltips
             points.forEach(p => {
-                svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${color}" stroke="var(--bg)" stroke-width="2"/>`;
+                svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg)" stroke-width="2.5" opacity="0.95"/>`;
             });
+
             // Label at the end
             if (points.length) {
                 const last = points[points.length - 1];
-                svg += `<text x="${last.x + 6}" y="${last.y + 4}" fill="${color}" font-size="11" font-weight="700">${d.name}</text>`;
+                const isNoob = PLAYERS[d.idx]?.special === 'noob';
+                const suffix = isNoob ? ' 🤡' : '';
+                svg += `<text x="${last.x + 8}" y="${last.y - 6}" fill="${color}" font-size="11" font-weight="800" font-family="system-ui">${d.name}${suffix}</text>`;
+                svg += `<text x="${last.x + 8}" y="${last.y + 8}" fill="#8892b0" font-size="9" font-family="system-ui">${last.val} LP</text>`;
             }
         });
+
+        // Axis lines
+        svg += `<line x1="${PADL}" y1="${PADT}" x2="${PADL}" y2="${H-PADB}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+        svg += `<line x1="${PADL}" y1="${H-PADB}" x2="${W-PADR}" y2="${H-PADB}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
 
         svg += '</svg>';
         chartEl.innerHTML = svg;
@@ -1456,9 +1513,12 @@
         ytPlayer = new YT.Player('yt-player', {
             height: '1', width: '1',
             videoId: PLAYLIST[musicIdx].id,
-            playerVars: { autoplay:0, controls:0, disablekb:1, fs:0, modestbranding:1, rel:0 },
+            playerVars: { autoplay:1, controls:0, disablekb:1, fs:0, modestbranding:1, rel:0 },
             events: {
-                onReady: () => { ytPlayer.setVolume(MUSIC_VOL); },
+                onReady: () => {
+                    ytPlayer.setVolume(MUSIC_VOL);
+                    ytPlayer.playVideo();
+                },
                 onStateChange: (e) => {
                     if (e.data === YT.PlayerState.ENDED) musicNext();
                     musicPlaying = e.data === YT.PlayerState.PLAYING;
@@ -1467,6 +1527,18 @@
             }
         });
     };
+    // Autoplay on first user interaction (browsers block autoplay without interaction)
+    function tryAutoplay() {
+        if (ytPlayer?.playVideo && !musicPlaying) {
+            ytPlayer.playVideo();
+        }
+        document.removeEventListener('click', tryAutoplay);
+        document.removeEventListener('keydown', tryAutoplay);
+        document.removeEventListener('scroll', tryAutoplay);
+    }
+    document.addEventListener('click', tryAutoplay);
+    document.addEventListener('keydown', tryAutoplay);
+    document.addEventListener('scroll', tryAutoplay);
 
     function updateMusicUI() {
         const playBtn = document.getElementById('mp-play');
