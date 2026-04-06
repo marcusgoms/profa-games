@@ -311,51 +311,73 @@
     function lsGet(key) { try { const d=JSON.parse(localStorage.getItem(key)); return d&&Date.now()-d._ts<CACHE_TTL?d:null; } catch(_) { return null; } }
     function lsSet(key, data) { try { localStorage.setItem(key, JSON.stringify({...data, _ts:Date.now()})); } catch(_) {} }
 
-    // FAST: only account + summoner + league (3 calls) — for team page cards
+    // Track background loading promises so we don't duplicate work
+    const bgLoading = {};
+
+    // FAST: account + summoner + league + 1 recent match (5 calls) — for team page cards
     async function loadPlayerFast(i) {
         if (cache[i]) return cache[i];
         const c = lsGet(`profa_player_${i}`);
         if (c) { cache[i] = c; return c; }
 
         const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
-        const account  = await riot(`https://${cl}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
-        const [summoner, league] = await Promise.all([
+        const account = await riot(`https://${cl}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
+        const [summoner, league, matchIds] = await Promise.all([
             riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`),
             rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []),
+            rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=20`, []),
         ]);
-        cache[i] = { account, summoner, league: league||[], mastery:[], matches:[] };
+
+        // Load only the most recent match for the card preview
+        const ids = matchIds || [];
+        let recentMatch = null;
+        if (ids.length) {
+            recentMatch = await rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${ids[0]}`, null);
+        }
+
+        cache[i] = { account, summoner, league: league||[], mastery:[], matches: recentMatch?[recentMatch]:[], _matchIds: ids };
         return cache[i];
     }
 
-    // FULL: loads everything — for profile page (lazy, called on demand)
+    // BACKGROUND: loads remaining matches + mastery after fast load
+    function loadPlayerBackground(i) {
+        if (bgLoading[i]) return bgLoading[i];
+        if (cache[i]?._full) return Promise.resolve(cache[i]);
+
+        bgLoading[i] = (async () => {
+            const base = cache[i] || await loadPlayerFast(i);
+            if (base._full) return base;
+
+            const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
+            const puuid = base.account.puuid;
+            const ids = base._matchIds || [];
+
+            const mastery = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []);
+
+            // Load remaining matches (skip first if already loaded)
+            const alreadyLoaded = new Set(base.matches.map(m => m.metadata?.matchId));
+            const toLoad = ids.slice(0, 15).filter(mid => !alreadyLoaded.has(mid));
+            const newMatches = [];
+            for (let b = 0; b < toLoad.length; b += 5) {
+                await Promise.all(toLoad.slice(b, b+5).map(mid =>
+                    riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => newMatches.push(d)).catch(() => {})
+                ));
+            }
+
+            cache[i] = { ...base, mastery: mastery||[], matches: [...base.matches, ...newMatches], _full: true };
+            lsSet(`profa_player_${i}`, cache[i]);
+            delete bgLoading[i];
+            return cache[i];
+        })();
+        return bgLoading[i];
+    }
+
+    // FULL: returns complete data — waits for background if needed, or starts it
     async function loadPlayer(i) {
-        // If already fully loaded (has matches), return
-        if (cache[i]?.matches?.length) return cache[i];
+        if (cache[i]?._full) return cache[i];
         const c = lsGet(`profa_player_${i}`);
-        if (c?.matches?.length) { cache[i] = c; return c; }
-
-        // Start from fast data if we have it
-        const base = cache[i] || await loadPlayerFast(i);
-        const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
-        const puuid = base.account.puuid;
-
-        const [mastery, matchIds] = await Promise.all([
-            rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []),
-            rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20`, []),
-        ]);
-
-        const matches = [];
-        const toLoad = (matchIds||[]).slice(0, 15);
-        // Load matches in parallel batches of 5
-        for (let b = 0; b < toLoad.length; b += 5) {
-            await Promise.all(toLoad.slice(b, b+5).map(mid =>
-                riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => matches.push(d)).catch(() => {})
-            ));
-        }
-
-        cache[i] = { ...base, mastery: mastery||[], matches };
-        lsSet(`profa_player_${i}`, cache[i]);
-        return cache[i];
+        if (c?._full) { cache[i] = c; return c; }
+        return loadPlayerBackground(i);
     }
 
     // ======================== ROUTER ========================
@@ -502,6 +524,10 @@
                 loaded++;
                 // Re-render ranking progressively — each player that arrives updates the chart
                 renderSoloQRanking(rankData, loaded < PLAYERS.length);
+                // Once all cards are rendered, start background loading for full data
+                if (loaded === PLAYERS.length) {
+                    PLAYERS.forEach((_, j) => loadPlayerBackground(j));
+                }
             });
         });
     }
