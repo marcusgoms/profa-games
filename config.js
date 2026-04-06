@@ -10,10 +10,25 @@
  * 6. Atualize a variável abaixo
  */
 
+// ======================== FIREBASE ========================
+// Crie um projeto gratuito em https://console.firebase.google.com/
+// 1. Criar projeto > Ativar Realtime Database (modo teste)
+// 2. Copiar config do projeto (Configurações > Geral > Seus apps > Web)
+// 3. Colar os valores abaixo
+window.PROFA_FIREBASE = {
+    apiKey: "AIzaSyBS3bV_L0aqDjHcEIjNVKNur8Nh9xGE4rs",
+    authDomain: "profa-games.firebaseapp.com",
+    databaseURL: "https://profa-games-default-rtdb.firebaseio.com",
+    projectId: "profa-games",
+    storageBucket: "profa-games.firebasestorage.app",
+    messagingSenderId: "957862939799",
+    appId: "1:957862939799:web:fa2914ab076d5bf6c8add2"
+};
+
 window.PROFA_CONFIG = {
     // Riot Games API - obtenha em https://developer.riotgames.com/
     riotKey: localStorage.getItem('lol_key') || 'RGAPI-16e48557-eb13-41e8-9caa-6d30b83932bb',
-    
+
     // LoL Esports API - obtenha em https://lolesports.com (F12 > Network > esports-api > x-api-key)
     esportsKey: localStorage.getItem('esports_key') || '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z',
     

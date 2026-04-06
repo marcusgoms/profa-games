@@ -15,8 +15,25 @@
     ];
     const RIOT_KEY    = window.PROFA_CONFIG?.riotKey    || localStorage.getItem('lol_key')     || 'RGAPI-16e48557-eb13-41e8-9caa-6d30b83932bb';
     const ESPORTS_KEY = window.PROFA_CONFIG?.esportsKey || localStorage.getItem('esports_key') || '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
+    const KEY_SAVED_AT = parseInt(localStorage.getItem('lol_key_ts') || '0');
+    const KEY_TTL = 24 * 60 * 60 * 1000; // 24h
     const CBLOL_ID    = '98767991332355509';
     const DVER        = '14.24.1';
+
+    // ======================== FIREBASE ========================
+    let db = null;
+    try {
+        const fbCfg = window.PROFA_FIREBASE;
+        if (fbCfg && fbCfg.apiKey && !fbCfg.apiKey.includes('placeholder')) {
+            firebase.initializeApp(fbCfg);
+            db = firebase.database();
+            console.log('✓ Firebase conectado');
+        } else {
+            console.warn('Firebase não configurado — usando localStorage como fallback');
+        }
+    } catch(e) {
+        console.warn('Firebase erro:', e.message, '— usando localStorage');
+    }
 
     // ======================== AUTH / LOGIN ========================
     // Each player has a simple pin (4 digits). Stored hashed in localStorage on first setup.
@@ -207,32 +224,77 @@
         const modal = document.createElement('div');
         modal.id = 'apikey-modal';
         modal.className = 'modal-overlay';
+        const left = keyTimeLeft();
+        const statusText = apiExpired ? '<span style="color:#ef5350;font-weight:700;">Expirada</span>'
+            : left !== null ? `<span style="color:${left < 2*3600000 ? '#ffd740' : '#4caf50'};">${fmtKeyTime(left)}</span>`
+            : '<span style="color:var(--dim);">Status desconhecido</span>';
+
         modal.innerHTML = `
-            <div class="modal-box" style="max-width:480px;">
+            <div class="modal-box" style="max-width:500px;">
                 <button class="modal-close" onclick="document.getElementById('apikey-modal').remove()">&times;</button>
                 <div class="modal-header">
-                    <h2>Atualizar API Key</h2>
-                    <p>A chave da Riot expira a cada 24h</p>
+                    <h2>Riot API Key</h2>
+                    <p>A chave expira a cada <b>24 horas</b>. Status atual: ${statusText}</p>
                 </div>
                 <div class="modal-body">
-                    <div style="margin-bottom:16px;">
-                        <label style="font-size:.8em;color:var(--dim);font-weight:600;">Riot API Key</label>
-                        <p style="font-size:.7em;color:var(--dim);margin:4px 0 8px;">Pegue em <a href="https://developer.riotgames.com/" target="_blank" style="color:var(--pri);">developer.riotgames.com</a></p>
-                        <input id="apikey-riot" type="text" placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value="${RIOT_KEY}" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--surf);color:var(--txt);font-size:.85em;font-family:monospace;">
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:.8em;color:var(--dim);font-weight:600;">Como obter a chave:</label>
+                        <ol style="font-size:.75em;color:var(--dim);margin:6px 0 12px;padding-left:20px;line-height:1.7;">
+                            <li>Acesse <a href="https://developer.riotgames.com/" target="_blank" style="color:var(--pri);">developer.riotgames.com</a></li>
+                            <li>Faça login com sua conta Riot</li>
+                            <li>Copie a <b>Development API Key</b> (regenere se expirada)</li>
+                            <li>Cole abaixo e salve</li>
+                        </ol>
                     </div>
-                    <button onclick="saveApiKey()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--pri),#0098b3);color:#fff;font-size:1em;font-weight:700;cursor:pointer;">Salvar e Recarregar</button>
+                    <div style="margin-bottom:16px;">
+                        <input id="apikey-riot" type="text" placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value="${RIOT_KEY}" style="width:100%;padding:12px 14px;border-radius:8px;border:2px solid ${apiExpired?'#ef5350':'rgba(255,255,255,0.1)'};background:var(--surf);color:var(--txt);font-size:.85em;font-family:monospace;" spellcheck="false" autocomplete="off">
+                        <p id="apikey-error" style="color:#ef5350;font-size:.75em;margin-top:6px;display:none;"></p>
+                    </div>
+                    <button id="apikey-save-btn" onclick="saveApiKey()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--pri),#0098b3);color:#fff;font-size:1em;font-weight:700;cursor:pointer;">Validar e Salvar</button>
+                    <p style="font-size:.65em;color:var(--dim);margin-top:10px;text-align:center;">Mesmo com a chave expirada, dados em cache continuam sendo exibidos.</p>
                 </div>
             </div>`;
         document.body.appendChild(modal);
         modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        // Auto-focus + select the input
+        setTimeout(() => {
+            const inp = document.getElementById('apikey-riot');
+            if (inp) { inp.focus(); inp.select(); }
+        }, 100);
+        // Enter to save
+        document.getElementById('apikey-riot')?.addEventListener('keydown', e => { if (e.key === 'Enter') saveApiKey(); });
     };
 
-    window.saveApiKey = function() {
+    window.saveApiKey = async function() {
         const key = document.getElementById('apikey-riot')?.value?.trim();
-        if (key) {
-            localStorage.setItem('lol_key', key);
-            window.location.reload();
+        const errEl = document.getElementById('apikey-error');
+        const btn = document.getElementById('apikey-save-btn');
+        if (!key) { if (errEl) { errEl.textContent = 'Cole a chave acima'; errEl.style.display = 'block'; } return; }
+        if (!key.startsWith('RGAPI-')) { if (errEl) { errEl.textContent = 'A chave deve começar com RGAPI-'; errEl.style.display = 'block'; } return; }
+
+        // Validate the key with a lightweight API call
+        if (btn) { btn.textContent = 'Validando...'; btn.disabled = true; }
+        try {
+            const r = await fetch('https://br1.api.riotgames.com/lol/status/v4/platform-data', {
+                headers: { 'X-Riot-Token': key }
+            });
+            if (r.status === 401 || r.status === 403) {
+                if (errEl) { errEl.textContent = 'Chave inválida ou expirada. Gere uma nova em developer.riotgames.com'; errEl.style.display = 'block'; }
+                if (btn) { btn.textContent = 'Validar e Salvar'; btn.disabled = false; }
+                return;
+            }
+            if (!r.ok && r.status !== 429) {
+                if (errEl) { errEl.textContent = `Erro ao validar (HTTP ${r.status}). Tente novamente.`; errEl.style.display = 'block'; }
+                if (btn) { btn.textContent = 'Validar e Salvar'; btn.disabled = false; }
+                return;
+            }
+        } catch(e) {
+            // Network error — save anyway, user might be offline
         }
+
+        localStorage.setItem('lol_key', key);
+        localStorage.setItem('lol_key_ts', String(Date.now()));
+        window.location.reload();
     };
 
     // ======================== UTILS ========================
@@ -275,13 +337,94 @@
     // ======================== API ========================
     let apiExpired = false;
 
-    function showApiBanner() {
-        if (document.getElementById('api-banner')) return;
-        const banner = document.createElement('div');
+    function keyTimeLeft() {
+        if (!KEY_SAVED_AT) return null;
+        const left = KEY_TTL - (Date.now() - KEY_SAVED_AT);
+        return left > 0 ? left : 0;
+    }
+
+    function fmtKeyTime(ms) {
+        if (ms === null) return 'desconhecido';
+        if (ms <= 0) return 'expirada';
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        return h > 0 ? `${h}h ${m}min restantes` : `${m}min restantes`;
+    }
+
+    function showApiBanner(msg) {
+        let banner = document.getElementById('api-banner');
+        const text = msg || 'API Key expirada — dados em cache sendo exibidos';
+        if (banner) { banner.querySelector('.api-banner-text').textContent = text; return; }
+        banner = document.createElement('div');
         banner.id = 'api-banner';
         banner.className = 'api-banner';
-        banner.innerHTML = `<span>⚠️ API Key expirada — os dados podem estar desatualizados</span><button onclick="showApiKeyModal()">Atualizar Chave</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--dim);font-size:1.2em;cursor:pointer;padding:0 4px;">&times;</button>`;
+        banner.innerHTML = `<span class="api-banner-text">${text}</span><button onclick="showApiKeyModal()">Atualizar Chave</button>`;
         document.body.prepend(banner);
+    }
+
+    function hideApiBanner() {
+        const b = document.getElementById('api-banner');
+        if (b) b.remove();
+    }
+
+    // Show a small key status indicator in the nav
+    function updateKeyStatus() {
+        let el = document.getElementById('key-status');
+        const left = keyTimeLeft();
+        if (apiExpired || left === 0) {
+            if (!el) {
+                el = document.createElement('span');
+                el.id = 'key-status';
+                el.style.cssText = 'font-size:.65em;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:8px;white-space:nowrap;';
+                document.querySelector('.nav-in')?.appendChild(el);
+                el.onclick = () => showApiKeyModal();
+            }
+            el.style.background = '#ef5350';
+            el.style.color = '#fff';
+            el.textContent = 'Key expirada';
+        } else if (left !== null && left < 2 * 3600000) {
+            // Less than 2h left — warn
+            if (!el) {
+                el = document.createElement('span');
+                el.id = 'key-status';
+                el.style.cssText = 'font-size:.65em;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:8px;white-space:nowrap;';
+                document.querySelector('.nav-in')?.appendChild(el);
+                el.onclick = () => showApiKeyModal();
+            }
+            el.style.background = '#ffd740';
+            el.style.color = '#000';
+            el.textContent = fmtKeyTime(left);
+        } else if (el) {
+            el.remove();
+        }
+    }
+
+    // Proactive key health check — lightweight call on load
+    async function checkKeyHealth() {
+        // If key timestamp says it's expired, don't even try
+        const left = keyTimeLeft();
+        if (left === 0 && KEY_SAVED_AT > 0) {
+            apiExpired = true;
+            showApiBanner('API Key expirada (24h) — usando dados em cache');
+            updateKeyStatus();
+            return;
+        }
+        try {
+            const r = await fetch('https://br1.api.riotgames.com/lol/status/v4/platform-data', {
+                headers: { 'X-Riot-Token': RIOT_KEY }
+            });
+            if (r.status === 401 || r.status === 403) {
+                apiExpired = true;
+                showApiBanner('API Key inválida ou expirada — usando dados em cache');
+                updateKeyStatus();
+            } else if (r.ok) {
+                apiExpired = false;
+                hideApiBanner();
+                updateKeyStatus();
+            }
+        } catch(_) {
+            // Network error — don't flag as expired
+        }
     }
 
     // Simple fetch with retry on 429. Shows banner on auth errors.
@@ -295,6 +438,7 @@
         if (r.status === 401 || r.status === 403) {
             apiExpired = true;
             showApiBanner();
+            updateKeyStatus();
         }
         if (!r.ok) throw new Error(`Riot ${r.status}`);
         return r.json();
@@ -470,7 +614,6 @@
         else if (h.startsWith('compare'))     { clearLive(); renderCompare(h); }
         else if (h === 'cblol')               { clearLive(); renderCBLOL('upcoming'); }
         else if (h === 'dashboard')           { clearLive(); renderDashboard(); }
-        else if (h === 'chat')                { clearLive(); renderChat(); }
         else if (h === 'teambuilder')         { clearLive(); renderTeamBuilder(); }
         else                                  { clearLive(); renderTeam(); }
     }
@@ -479,7 +622,6 @@
         if (h === 'cblol') return 'cblol';
         if (h.startsWith('live')) return 'live';
         if (h === 'dashboard') return 'dashboard';
-        if (h === 'chat') return 'chat';
         if (h === 'teambuilder') return 'dashboard';
         return 'team';
     }
@@ -1147,30 +1289,85 @@
         }
     }
 
-    // ======================== PREDICTIONS ========================
-    // Predictions are keyed per user: pred_{userIdx}_{matchId}
-    // Legacy (no user) keys: pred_{matchId}
-    function pk(mid, userIdx) {
+    // ======================== PREDICTIONS (Firebase + localStorage fallback) ========================
+    // Local cache of predictions loaded from Firebase
+    const _predCache = {};
+
+    function predLocalKey(mid, userIdx) {
         if (userIdx !== undefined && userIdx !== null) return `pred_${userIdx}_${mid}`;
         const user = getLoggedUser();
         return user ? `pred_${user.idx}_${mid}` : `pred_${mid}`;
     }
+
     function getPred(mid, userIdx) {
-        try { return JSON.parse(localStorage.getItem(pk(mid, userIdx))||'null'); } catch(_) { return null; }
+        // Check memory cache first (populated by Firebase listener)
+        const ui = (userIdx !== undefined && userIdx !== null) ? userIdx : getLoggedUser()?.idx;
+        if (ui !== undefined && _predCache[mid]?.[ui]) return _predCache[mid][ui];
+        // Fallback to localStorage
+        try { return JSON.parse(localStorage.getItem(predLocalKey(mid, userIdx))||'null'); } catch(_) { return null; }
     }
-    // Get prediction for any user (for ranking)
+
     function getPredForUser(mid, userIdx) {
         return getPred(mid, userIdx);
     }
+
+    // Fetch all predictions for a match from Firebase (for ranking)
+    async function getAllPredictions() {
+        if (!db) {
+            // Fallback: read from localStorage for all players
+            const all = {};
+            for (let i = 0; i < PLAYERS.length; i++) {
+                for (let j = 0; j < localStorage.length; j++) {
+                    const k = localStorage.key(j);
+                    if (k && k.startsWith(`pred_${i}_`)) {
+                        const mid = k.replace(`pred_${i}_`, '');
+                        if (!all[mid]) all[mid] = {};
+                        try { all[mid][i] = JSON.parse(localStorage.getItem(k)); } catch(_) {}
+                    }
+                }
+            }
+            return all;
+        }
+        try {
+            const snap = await db.ref('predictions').once('value');
+            const data = snap.val() || {};
+            // data shape: { matchId: { userIdx: predObj } }
+            // Merge into local cache
+            for (const [mid, users] of Object.entries(data)) {
+                _predCache[mid] = users;
+            }
+            return data;
+        } catch(e) {
+            console.warn('Firebase predictions read error:', e.message);
+            return {};
+        }
+    }
+
     window.savePred = function(mid) {
         const user = getLoggedUser();
         if (!user) { showLoginModal(); return; }
         const w=$(`pw-${mid}`), sa=$(`psa-${mid}`), sb=$(`psb-${mid}`);
         if (!w) return;
-        localStorage.setItem(pk(mid), JSON.stringify({winner:w.value,scoreA:sa?+sa.value:null,scoreB:sb?+sb.value:null,time:Date.now()}));
+        const pred = {winner:w.value, scoreA:sa?+sa.value:null, scoreB:sb?+sb.value:null, time:Date.now()};
+
+        // Save to localStorage (always, as backup)
+        localStorage.setItem(predLocalKey(mid), JSON.stringify(pred));
+
+        // Save to Firebase
+        if (db) {
+            const safeMid = mid.replace(/[.#$/\[\]]/g, '_');
+            db.ref(`predictions/${safeMid}/${user.idx}`).set(pred)
+                .catch(e => console.warn('Firebase pred save error:', e.message));
+        }
+
+        // Update local cache
+        if (!_predCache[mid]) _predCache[mid] = {};
+        _predCache[mid][user.idx] = pred;
+
         const btn=document.querySelector(`[onclick="savePred('${mid}')"]`);
         if (btn) { btn.textContent='Salvo!'; setTimeout(()=>btn.textContent='Salvar Palpite',1500); }
     };
+
     function predResult(mid, tA, tB, ac) {
         const sp=getPred(mid); if (!sp) return '<div class="pr pd">Sem palpite</div>';
         const gw=sp.winner===ac.winnerCode;
@@ -1273,12 +1470,16 @@
 
     // inlineObjs and inlinePlayers removed — CBLOL sub-tab now uses buildLiveFrame
 
-    // ======================== RANKING ========================
+    // ======================== RANKING (Firebase-synced) ========================
     async function loadRanking() {
         const cc = $('cc');
         const sc = PLAYERS.map((p,i) => ({name:p.name,pts:0,ex:0,wn:0,wr:0,tot:0,idx:i}));
+
+        // Load all predictions from Firebase (or localStorage fallback)
+        const allPreds = await getAllPredictions();
+
         try {
-            let evs=[], pageToken='', first=true;
+            let evs=[], pageToken='';
             do {
                 let u=`https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL_ID}`;
                 if (pageToken) u+=`&pageToken=${encodeURIComponent(pageToken)}`;
@@ -1286,19 +1487,20 @@
                 if (!data?.data?.schedule) break;
                 evs.push(...(data.data.schedule.events||[]).filter(e=>e.state==='completed'));
                 pageToken=data.data.schedule.pages?.older||'';
-                first=false;
             } while (pageToken && evs.length<200);
 
             for (const ev of evs) {
                 const mid=ev.id||ev.match?.id||ev.slug||'';
+                const safeMid = mid.replace(/[.#$/\[\]]/g, '_');
                 const ts=ev.match?.teams||[]; if (ts.length<2) continue;
                 const w=(ts[0].result?.outcome==='win')?ts[0]:(ts[1].result?.outcome==='win')?ts[1]:null;
                 if (!w) continue;
                 const wc=w.code||w.name;
                 const sa=ts[0].result?.gameWins||0, sb=ts[1].result?.gameWins||0;
-                // Check each player's prediction individually
+                // Check predictions from Firebase data or fallback
+                const matchPreds = allPreds[safeMid] || allPreds[mid] || {};
                 for (const s of sc) {
-                    const sp = getPredForUser(mid, s.idx);
+                    const sp = matchPreds[s.idx] || getPredForUser(mid, s.idx);
                     if (!sp) continue;
                     s.tot++;
                     const gw=sp.winner===wc, gs=sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===sa&&sp.scoreB===sb;
@@ -1312,12 +1514,14 @@
         const rk=[...sc].sort((a,b) => b.pts-a.pts||a.name.localeCompare(b.name));
         const podium = rk.slice(0,3);
         const rest = rk.slice(3);
+        const syncStatus = db ? '<span style="color:#4caf50;">Online</span>' : '<span style="color:#ffd740;">Local</span>';
         cc.innerHTML = `
             <div class="rank-header">
                 <h3>Ranking de Palpites</h3>
                 <div class="rank-legend">
                     <span><span class="rank-dot exact"></span> Exato +35</span>
                     <span><span class="rank-dot win"></span> Vencedor +10</span>
+                    <span style="font-size:.7em;opacity:.7;">${syncStatus}</span>
                 </div>
             </div>
             ${podium.length ? `<div class="podium">
@@ -1346,8 +1550,7 @@
                     <span class="rank-pts">${s.pts} pts</span>
                 </div>`).join('')}
             </div>` : ''}
-            <p style="margin-top:16px;font-size:.75em;color:var(--dim);text-align:center;">Clique no jogador para ver o perfil</p>
-            <p class="local-notice" style="margin-top:8px;">Palpites e pontuação ficam salvos neste navegador</p>`;
+            <p style="margin-top:16px;font-size:.75em;color:var(--dim);text-align:center;">Clique no jogador para ver o perfil</p>`;
     }
 
     // ======================== LIVE PAGE (standalone) ========================
@@ -2243,59 +2446,7 @@
         };
     }
 
-    // ======================== CHAT ========================
-    function renderChat() {
-        const user = getLoggedUser();
-        app.innerHTML = `<div class="section-wrap-sm">
-            <div class="chat-hero"><h1>Chat <span>do Squad</span></h1><p class="local-notice">As mensagens ficam salvas neste navegador</p></div>
-            <div class="chat-box" id="chat-box"></div>
-            ${user ? `<div class="chat-input-wrap">
-                <input type="text" id="chat-input" placeholder="Digite sua mensagem..." maxlength="200" autocomplete="off">
-                <button class="chat-send" onclick="sendChat()">Enviar</button>
-            </div>` : '<div class="chat-login-prompt"><p>Faça login para enviar mensagens</p><button class="cfg-btn" onclick="showLoginModal()">Entrar</button></div>'}
-        </div>`;
-
-        renderChatMessages();
-        // Auto-refresh chat
-        if (window._chatTimer) clearInterval(window._chatTimer);
-        window._chatTimer = setInterval(renderChatMessages, 3000);
-
-        const input = $('chat-input');
-        if (input) input.addEventListener('keydown', e => { if (e.key==='Enter') sendChat(); });
-    }
-
-    function getChatMessages() {
-        try { return JSON.parse(localStorage.getItem('profa_chat')||'[]'); } catch(_) { return []; }
-    }
-
-    function renderChatMessages() {
-        const box = $('chat-box');
-        if (!box) { if(window._chatTimer) clearInterval(window._chatTimer); return; }
-        const msgs = getChatMessages();
-        if (!msgs.length) { box.innerHTML = '<p class="chat-empty">Nenhuma mensagem ainda. Seja o primeiro!</p>'; return; }
-        box.innerHTML = msgs.slice(-50).map(m => {
-            const isMe = getLoggedUser()?.idx === m.idx;
-            return `<div class="chat-msg ${isMe?'chat-me':''}">
-                <div class="chat-msg-head"><span class="chat-msg-name">${m.name}</span><span class="chat-msg-time">${fmtAgo(m.time)}</span></div>
-                <div class="chat-msg-text">${escapeHtml(m.text)}</div>
-            </div>`;
-        }).join('');
-        box.scrollTop = box.scrollHeight;
-    }
-
     function escapeHtml(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
-
-    window.sendChat = function() {
-        const user = getLoggedUser(); if (!user) return;
-        const input = $('chat-input'); if (!input || !input.value.trim()) return;
-        const msgs = getChatMessages();
-        msgs.push({ idx:user.idx, name:PLAYERS[user.idx]?.name||'???', text:input.value.trim(), time:Date.now() });
-        // Keep last 200 messages
-        while (msgs.length > 200) msgs.shift();
-        localStorage.setItem('profa_chat', JSON.stringify(msgs));
-        input.value = '';
-        renderChatMessages();
-    };
 
     // ======================== INIT ========================
     // Theme
@@ -2307,6 +2458,11 @@
         .catch(() => {});
     updateNavUser();
     nav(location.hash || '#team');
+    // Check API key health on load (non-blocking)
+    checkKeyHealth();
+    updateKeyStatus();
+    // Refresh key status every minute
+    setInterval(updateKeyStatus, 60000);
     // Live badge check every 60s
     checkLiveBadge();
     liveBadgeTimer = setInterval(checkLiveBadge, 60000);
