@@ -451,21 +451,15 @@
         </div>`;
 
         const rankData = [];
-        const loadingStatus = $('soloq-chart');
-        if (loadingStatus) loadingStatus.innerHTML = `<div class="ld"><div class="sp"></div><p style="color:var(--dim);font-size:.85em;margin-top:8px;">Carregando jogadores (0/${PLAYERS.length})…</p></div>`;
+        let loaded = 0;
 
-        // Load players sequentially to respect rate limits
-        for (let i = 0; i < PLAYERS.length; i++) {
-            const p = PLAYERS[i];
+        // Load ALL players in parallel — rate limiter queue handles throttling.
+        // Each player updates its card + ranking chart as soon as it resolves.
+        PLAYERS.forEach((p, i) => {
             const card = document.querySelector(`[data-i="${i}"]`);
-            if (!card) continue;
+            if (!card) { loaded++; return; }
 
-            // Update loading progress
-            const statusEl = loadingStatus?.querySelector('p');
-            if (statusEl) statusEl.textContent = `Carregando jogadores (${i}/${PLAYERS.length})… ${p.name}`;
-
-            try {
-                const d  = await loadPlayer(i);
+            loadPlayer(i).then(d => {
                 const s  = d.summoner, ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
                 const solo = d.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
                 const wr   = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
@@ -526,7 +520,7 @@
                         icon: ic
                     });
                 }
-            } catch(err) {
+            }).catch(err => {
                 const isAuth = err.message?.includes('403') || err.message?.includes('401');
                 const isRate = err.message?.includes('429');
                 card.innerHTML = `<div class="pch">
@@ -535,19 +529,21 @@
                     <div class="cl" style="color:#ef5350;">${isAuth?'API Key expirada':isRate?'Rate limit — aguarde':'Indisponível'}</div></div>
                 </div>
                 ${isAuth?'<div style="margin-top:8px;"><button class="api-key-btn" onclick="showApiKeyModal()">Atualizar API Key</button></div>':''}`;
-            }
-        }
-
-        // All players loaded, render ranking
-        renderSoloQRanking(rankData);
+            }).finally(() => {
+                loaded++;
+                // Re-render ranking progressively — each player that arrives updates the chart
+                renderSoloQRanking(rankData, loaded < PLAYERS.length);
+            });
+        });
     }
 
-    function renderSoloQRanking(data) {
+    function renderSoloQRanking(data, stillLoading) {
         const el = $('soloq-chart');
         if (!el) return;
-        if (!data.length) { el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:2rem;">Nenhum jogador posicionado na Solo Q</p>'; return; }
+        if (!data.length && !stillLoading) { el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:2rem;">Nenhum jogador posicionado na Solo Q</p>'; return; }
+        if (!data.length && stillLoading) { return; } // wait for first player
 
-        data.sort((a,b) => b.totalLP - a.totalLP);
+        const sorted = [...data].sort((a,b) => b.totalLP - a.totalLP);
         const tierColors = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
         const medals = ['🥇','🥈','🥉'];
 
@@ -557,14 +553,14 @@
         let history = {};
         try { history = JSON.parse(localStorage.getItem(histKey)||'{}'); } catch(_) {}
         if (!history[today]) history[today] = {};
-        data.forEach(d => { history[today][d.name] = d.totalLP; });
+        sorted.forEach(d => { history[today][d.name] = d.totalLP; });
         localStorage.setItem(histKey, JSON.stringify(history));
 
         const dates = Object.keys(history).sort();
 
         // Legend cards (compact)
         let legendHtml = '<div class="soloq-legend-grid">';
-        data.forEach((d, i) => {
+        sorted.forEach((d, i) => {
             const wr = ((d.wins/(d.wins+d.losses))*100).toFixed(0);
             const color = tierColors[d.tier] || 'var(--pri)';
             const medal = i < 3 ? medals[i] : `${i+1}º`;
@@ -588,15 +584,20 @@
         });
         legendHtml += '</div>';
 
+        // Loading indicator
+        const loadingHtml = stillLoading
+            ? `<div class="soloq-loading"><div class="sp" style="width:18px;height:18px;border-width:2px;"></div><span>Carregando mais jogadores…</span></div>`
+            : '';
+
         // Build chart
-        let html = legendHtml;
+        let html = legendHtml + loadingHtml;
         html += `<div class="soloq-evo">
             <h3>Evolução de LP (dia a dia)</h3>
             <div class="soloq-evo-chart" id="soloq-evo-chart"></div>
         </div>`;
 
         el.innerHTML = html;
-        renderLPEvolution(dates, history, data);
+        renderLPEvolution(dates, history, sorted);
     }
 
     function renderLPEvolution(dates, history, data) {
