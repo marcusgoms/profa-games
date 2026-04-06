@@ -267,63 +267,17 @@
         return (carry > 0 ? String(carry) : '') + arr.join('');
     }
 
-    // ======================== API (Rate Limited — Concurrent) ========================
-    // Riot Dev Key limits: 20 req/1s, 100 req/2min
-    const riotQueue = [];
-    const riotTimestamps = [];
-    let riotInFlight = 0;
-    const RIOT_MAX_PER_SEC = 18;
-    const RIOT_MAX_PER_2MIN = 90;
-    const RIOT_CONCURRENCY = 8;      // max simultaneous fetches
-    const RIOT_MAX_RETRIES = 4;
-
-    function riotCanSend() {
-        const now = Date.now();
-        while (riotTimestamps.length && riotTimestamps[0] < now - 120000) riotTimestamps.shift();
-        const last1s = riotTimestamps.filter(t => t > now - 1000).length;
-        return last1s < RIOT_MAX_PER_SEC && riotTimestamps.length < RIOT_MAX_PER_2MIN && riotInFlight < RIOT_CONCURRENCY;
-    }
-
-    function drainRiotQueue() {
-        while (riotQueue.length && riotCanSend()) {
-            const job = riotQueue.shift();
-            riotTimestamps.push(Date.now());
-            riotInFlight++;
-            fireRiotRequest(job);
+    // ======================== API ========================
+    // Simple fetch with retry on 429. Rate limiting handled by keeping calls minimal.
+    async function riot(url, retries=3) {
+        const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
+        if (r.status === 429 && retries > 0) {
+            const wait = (parseInt(r.headers.get('Retry-After') || '2') + 1) * 1000;
+            await new Promise(res => setTimeout(res, wait));
+            return riot(url, retries - 1);
         }
-        // Schedule next drain if there are pending jobs
-        if (riotQueue.length) setTimeout(drainRiotQueue, 120);
-    }
-
-    async function fireRiotRequest({ url, resolve, reject, retries }) {
-        try {
-            const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
-            if (r.status === 429) {
-                const wait = (parseInt(r.headers.get('Retry-After') || '2') + 1) * 1000;
-                if (retries < RIOT_MAX_RETRIES) {
-                    riotQueue.unshift({ url, resolve, reject, retries: retries + 1 });
-                    await new Promise(r => setTimeout(r, wait));
-                } else { reject(new Error('Riot 429 (rate limit)')); }
-            } else if (!r.ok) {
-                reject(new Error(`Riot ${r.status}`));
-            } else {
-                resolve(await r.json());
-            }
-        } catch(e) {
-            if (retries < RIOT_MAX_RETRIES) {
-                riotQueue.push({ url, resolve, reject, retries: retries + 1 });
-            } else { reject(e); }
-        } finally {
-            riotInFlight--;
-            drainRiotQueue();
-        }
-    }
-
-    function riot(url) {
-        return new Promise((resolve, reject) => {
-            riotQueue.push({ url, resolve, reject, retries: 0 });
-            drainRiotQueue();
-        });
+        if (!r.ok) throw new Error(`Riot ${r.status}`);
+        return r.json();
     }
     async function rots(u, fb=null) { try { return await riot(u); } catch(_) { return fb; } }
 
@@ -350,47 +304,57 @@
         return d.toISOString();
     }
 
-    // ======================== DATA LAYER (with localStorage cache) ========================
+    // ======================== DATA LAYER ========================
     const cache = {};
-    const CACHE_TTL = 5 * 60 * 1000; // 5 min cache in localStorage
+    const CACHE_TTL = 5 * 60 * 1000; // 5 min
 
-    function getCachedPlayer(i) {
-        try {
-            const raw = localStorage.getItem(`profa_player_${i}`);
-            if (!raw) return null;
-            const data = JSON.parse(raw);
-            if (Date.now() - data._ts > CACHE_TTL) { localStorage.removeItem(`profa_player_${i}`); return null; }
-            return data;
-        } catch(_) { return null; }
-    }
-    function setCachedPlayer(i, data) {
-        try { localStorage.setItem(`profa_player_${i}`, JSON.stringify({ ...data, _ts: Date.now() })); } catch(_) {}
-    }
+    function lsGet(key) { try { const d=JSON.parse(localStorage.getItem(key)); return d&&Date.now()-d._ts<CACHE_TTL?d:null; } catch(_) { return null; } }
+    function lsSet(key, data) { try { localStorage.setItem(key, JSON.stringify({...data, _ts:Date.now()})); } catch(_) {} }
 
-    async function loadPlayer(i) {
+    // FAST: only account + summoner + league (3 calls) — for team page cards
+    async function loadPlayerFast(i) {
         if (cache[i]) return cache[i];
-        const cached = getCachedPlayer(i);
-        if (cached) { cache[i] = cached; return cached; }
+        const c = lsGet(`profa_player_${i}`);
+        if (c) { cache[i] = c; return c; }
 
-        const p = PLAYERS[i], c = clust(p.region), pl = plat(p.region);
-        const account  = await riot(`https://${c}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
-        const summoner = await riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`);
-        const league   = await rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []) || [];
-        const mastery  = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}/top?count=5`, []) || [];
-        const matchIds = await rots(`https://${c}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=20`, []) || [];
+        const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
+        const account  = await riot(`https://${cl}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
+        const [summoner, league] = await Promise.all([
+            riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`),
+            rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []),
+        ]);
+        cache[i] = { account, summoner, league: league||[], mastery:[], matches:[] };
+        return cache[i];
+    }
 
-        // Load matches in batches of 3 to respect rate limits, load up to 15
+    // FULL: loads everything — for profile page (lazy, called on demand)
+    async function loadPlayer(i) {
+        // If already fully loaded (has matches), return
+        if (cache[i]?.matches?.length) return cache[i];
+        const c = lsGet(`profa_player_${i}`);
+        if (c?.matches?.length) { cache[i] = c; return c; }
+
+        // Start from fast data if we have it
+        const base = cache[i] || await loadPlayerFast(i);
+        const p = PLAYERS[i], cl = clust(p.region), pl = plat(p.region);
+        const puuid = base.account.puuid;
+
+        const [mastery, matchIds] = await Promise.all([
+            rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []),
+            rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20`, []),
+        ]);
+
         const matches = [];
-        const toLoad = matchIds.slice(0, 15);
-        for (let b = 0; b < toLoad.length; b += 3) {
-            const batch = toLoad.slice(b, b + 3);
-            await Promise.all(batch.map(mid =>
-                riot(`https://${c}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => matches.push(d)).catch(() => {})
+        const toLoad = (matchIds||[]).slice(0, 15);
+        // Load matches in parallel batches of 5
+        for (let b = 0; b < toLoad.length; b += 5) {
+            await Promise.all(toLoad.slice(b, b+5).map(mid =>
+                riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => matches.push(d)).catch(() => {})
             ));
         }
 
-        cache[i] = { account, summoner, league, mastery, matches };
-        setCachedPlayer(i, cache[i]);
+        cache[i] = { ...base, mastery: mastery||[], matches };
+        lsSet(`profa_player_${i}`, cache[i]);
         return cache[i];
     }
 
@@ -464,7 +428,7 @@
             const card = document.querySelector(`[data-i="${i}"]`);
             if (!card) { loaded++; return; }
 
-            loadPlayer(i).then(d => {
+            loadPlayerFast(i).then(d => {
                 const s  = d.summoner, ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
                 const solo = d.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
                 const wr   = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
