@@ -5,1196 +5,617 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PROFA GAMES</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-    /* ============ SPA SPECIFIC ============ */
-    #app {
-        padding-top: 62px;
-        min-height: 100vh;
-        display: flex; flex-direction: column;
-    }
-    #app-content {
-        flex: 1; max-width: 1100px; width: 100%; margin: 0 auto; padding: 24px;
-    }
-
-    /* ============ TEAM GRID ============ */
-    .hero-banner {
-        position: relative; text-align: center; padding: 50px 20px 30px;
-        background: radial-gradient(ellipse at 20% 50%, rgba(0,212,255,0.08) 0%, transparent 50%),
-                    radial-gradient(ellipse at 80% 50%, rgba(233,69,96,0.08) 0%, transparent 50%);
-        margin-bottom: 0;
-    }
-    .hero-banner h1 { font-size: 2.8em; font-weight: 800; margin-bottom: 8px; }
-    .hero-banner p { color: var(--text-dim); font-size: 1.1em; }
-
-    .section-header {
-        display: flex; justify-content: space-between; align-items: center;
-        margin: 28px 0 16px; padding-bottom: 8px;
-        border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-    .section-header h2 { font-size: 1.4em; }
-
-    .team-grid {
-        display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;
-        margin-bottom: 32px;
-    }
-    .player-card {
-        background: var(--bg-card); border-radius: 14px; padding: 18px;
-        border: 1px solid rgba(255,255,255,0.04); cursor: pointer;
-        transition: transform 0.25s, box-shadow 0.25s; position: relative; overflow: hidden;
-    }
-    .player-card:hover {
-        transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,212,255,0.12);
-    }
-    .player-card::after {
-        content: '→'; position: absolute; top: 14px; right: 16px;
-        font-size: 1.2em; color: var(--text-dim); opacity: 0;
-        transition: opacity 0.2s, transform 0.2s;
-    }
-    .player-card:hover::after { opacity: 1; transform: translateX(4px); }
-
-    .pc-header {
-        display: flex; align-items: center; gap: 14px; margin-bottom: 14px;
-    }
-    .pc-icon {
-        width: 52px; height: 52px; border-radius: 10px; flex-shrink: 0;
-        border: 2px solid rgba(0,212,255,0.3); overflow: hidden; background: var(--bg-surface);
-    }
-    .pc-icon img { width: 100%; height: 100%; object-fit: cover; }
-    .pc-name { font-size: 1.15em; font-weight: 700; line-height: 1.1; }
-    .pc-name .pc-tag { color: var(--text-dim); font-weight: 400; font-size: 0.6em; }
-    .pc-level { font-size: 0.75em; color: var(--text-dim); }
-
-    .pc-rank {
-        display: flex; align-items: center; gap: 10px;
-        padding: 10px 12px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 10px;
-    }
-    .pc-tier { font-weight: 800; font-size: 1em; }
-    .pc-lp { font-size: 0.8em; color: var(--primary); }
-    .pc-wr { font-size: 0.75em; color: var(--text-dim); margin-left: auto; }
-
-    .pc-no-rank {
-        text-align: center; padding: 8px; color: var(--text-dim);
-        font-size: 0.85em; margin-bottom: 10px;
-    }
-
-    .pc-last-game {
-        font-size: 0.75em; color: var(--text-dim);
-        display: flex; align-items: center; gap: 5px;
-    }
-    .pc-last-game .dot {
-        width: 6px; height: 6px; border-radius: 50%;
-    }
-    .pc-last-game .dot.green { background: #4caf50; }
-    .pc-last-game .dot.gold { background: #c89b3c; }
-
-    .pc-loader {
-        display: flex; align-items: center; justify-content: center; min-height: 80px;
-    }
-
-    /* ============ PROFILE VIEW ============ */
-    .profile-view { animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-    .pv-banner {
-        position: relative; padding: 28px; border-radius: 16px; margin-bottom: 20px;
-        background: linear-gradient(135deg, #0f1a2e 0%, #1a1a2e 50%, #0d0d1a 100%);
-        overflow: hidden;
-    }
-    .pv-bg { position: absolute; inset: 0; opacity: 0.15;
-        background: radial-gradient(ellipse at 30% 50%, rgba(0,212,255,0.3) 0%, transparent 60%);
-    }
-    .pv-inner { position: relative; z-index: 1; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-    .pv-icon {
-        width: 80px; height: 80px; border-radius: 14px; border: 3px solid var(--primary);
-        overflow: hidden; flex-shrink: 0; background: var(--bg-card);
-    }
-    .pv-icon img { width: 100%; height: 100%; object-fit: cover; }
-    .pv-name { font-size: 2em; font-weight: 800; line-height: 1.1; }
-    .pv-name .pv-tag { color: var(--text-dim); font-weight: 400; font-size: 0.5em; }
-    .pv-region {
-        display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
-        background: rgba(0,212,255,0.15); color: var(--primary);
-        padding: 3px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 700;
-    }
-
-    .pv-stats {
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-        gap: 10px; margin-bottom: 20px;
-    }
-    .pv-stat {
-        background: var(--bg-card); border-radius: 10px; padding: 14px; text-align: center;
-        border: 1px solid rgba(255,255,255,0.04);
-    }
-    .pv-stat .ps-label { font-size: 0.65em; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
-    .pv-stat .ps-value { font-size: 1.8em; font-weight: 800; color: var(--primary); }
-    .pv-stat .ps-sub { font-size: 0.7em; color: var(--text-dim); margin-top: 2px; }
-
-    .pv-section {
-        margin-bottom: 24px;
-    }
-    .pv-section h3 {
-        font-size: 1.15em; margin-bottom: 12px; color: var(--text);
-        display: flex; align-items: center; gap: 8px;
-        padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .pv-mastery {
-        display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;
-    }
-    .pv-mastery-item {
-        background: var(--bg-card); border-radius: 10px; padding: 14px 10px;
-        text-align: center; border: 1px solid rgba(255,255,255,0.04); position: relative;
-    }
-    .pv-mastery-item img { width: 48px; height: 48px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.06); }
-    .pv-mastery-item .pvm-name { font-size: 0.8em; font-weight: 600; margin-top: 6px; }
-    .pv-mastery-item .pvm-lvl {
-        position: absolute; top: 4px; right: 4px;
-        background: var(--accent); color: #fff; font-size: 0.55em;
-        padding: 2px 5px; border-radius: 4px; font-weight: 800;
-    }
-    .pv-mastery-item .pvm-pts { font-size: 0.7em; color: var(--text-dim); margin-top: 2px; }
-
-    /* MATCH CARDS */
-    .pv-match {
-        border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
-        border: 1px solid rgba(255,255,255,0.04); position: relative; overflow: hidden;
-    }
-    .pv-match.win { background: rgba(76,175,80,0.06); }
-    .pv-match.loss { background: rgba(239,83,80,0.06); }
-    .pv-match::before {
-        content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-    }
-    .pv-match.win::before { background: #4caf50; }
-    .pv-match.loss::before { background: #ef5350; }
-
-    .pv-match-header {
-        display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
-    }
-    .pv-match-result { font-size: 0.7em; font-weight: 800; text-transform: uppercase; }
-    .pv-match.win .pv-match-result { color: #4caf50; }
-    .pv-match.loss .pv-match-result { color: #ef5350; }
-    .pv-match-info { font-size: 0.75em; color: var(--text-dim); }
-
-    .pv-match-body { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
-
-    .pv-match-champ {
-        display: flex; align-items: center; gap: 8px; min-width: 0;
-    }
-    .pv-match-champ img { width: 44px; height: 44px; border-radius: 8px; }
-    .pv-match-champ .pmc-name { font-size: 0.85em; font-weight: 600; }
-    .pv-match-champ .pmc-kda { font-size: 0.8em; }
-    .pv-match-champ .pmc-kda .pmc-k { color: var(--text); font-weight: 700; }
-    .pv-match-champ .pmc-kda .pmc-d { color: var(--text-dim); }
-    .pv-match-champ .pmc-kda .pmc-a { color: var(--primary); }
-    .pv-match-champ .pmc-cs { font-size: 0.7em; color: var(--text-dim); }
-
-    .pv-match-items { display: flex; gap: 3px; flex-wrap: wrap; }
-    .pv-match-items img {
-        width: 24px; height: 24px; border-radius: 4px;
-        border: 1px solid rgba(255,255,255,0.08);
-    }
-
-    .pv-match-meta {
-        margin-left: auto; text-align: right; font-size: 0.75em; color: var(--text-dim);
-    }
-    .pv-match-meta .pmm-mode { color: var(--text); font-weight: 600; }
-
-    /* OPPONENTS */
-    .pv-opponents {
-        margin-top: 8px; padding-top: 8px;
-        border-top: 1px solid rgba(255,255,255,0.04);
-    }
-    .pv-oponents h4 {
-        font-size: 0.8em; color: var(--text-dim); margin-bottom: 6px;
-    }
-    .pv-opponent-row {
-        display: flex; align-items: center; gap: 8px; padding: 3px 0;
-        font-size: 0.75em;
-    }
-    .pv-opponent-row img { width: 24px; height: 24px; border-radius: 4px; }
-    .pv-opponent-row .pvor-team {
-        width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-    }
-    .pv-opponent-row .pvor-team.blue { background: var(--primary); }
-    .pv-opponent-row .pvor-team.red { background: var(--accent); }
-
-    /* ============ CBLOL VIEW ============ */
-    .cblol-view { animation: fadeIn 0.3s ease; }
-    .cblol-header {
-        text-align: center; padding: 30px 20px 20px; margin-bottom: 0;
-        background: linear-gradient(135deg, #1a0a3e 0%, #0d0d1a 100%);
-        border-radius: 16px; margin-bottom: 24px;
-    }
-    .cblol-header h1 { font-size: 2.2em; margin-bottom: 4px; }
-    .cblol-header p { color: var(--text-dim); font-size: 0.9em; }
-
-    .cblol-tabs {
-        display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
-    }
-    .cblol-tab {
-        background: var(--bg-card); border: 1px solid rgba(255,255,255,0.06);
-        color: var(--text-dim); padding: 8px 18px; border-radius: 8px;
-        font-size: 0.85em; font-weight: 600; cursor: pointer; transition: all 0.2s;
-    }
-    .cblol-tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
-    .cblol-tab.active { color: var(--primary); background: rgba(0,212,255,0.1); border-color: rgba(0,212,255,0.2); }
-
-    .cblol-match {
-        background: var(--bg-card); border-radius: 14px; padding: 18px; margin-bottom: 12px;
-        border: 1px solid rgba(255,255,255,0.04);
-    }
-    .cm-header {
-        font-size: 0.7em; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; font-weight: 600;
-    }
-    .cm-teams { display: flex; align-items: center; gap: 16px; justify-content: center; margin-bottom: 14px; }
-    .cm-team { text-align: center; flex: 1; }
-    .cm-team img { width: 48px; height: 48px; object-fit: contain; margin-bottom: 6px; }
-    .cm-team .cm-name { font-size: 0.9em; font-weight: 700; }
-    .cm-vs { font-size: 1.2em; font-weight: 800; color: var(--text-dim); }
-
-    .cm-result {
-        display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 14px;
-        font-size: 1.5em; font-weight: 800;
-    }
-    .cm-winner { color: #4caf50; }
-    .cm-loser { color: var(--text-dim); }
-
-    .cm-prediction {
-        display: flex; align-items: center; justify-content: center; gap: 12px;
-        padding: 12px; background: rgba(0,0,0,0.2); border-radius: 10px;
-    }
-    .cm-prediction label { font-size: 0.8em; color: var(--text-dim); }
-    .cm-prediction select, .cm-prediction input {
-        padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
-        background: var(--bg-surface); color: var(--text); font-size: 0.85em;
-    }
-    .cm-prediction .cm-save {
-        padding: 6px 16px; border-radius: 6px; border: none;
-        background: var(--primary); color: var(--bg-dark); font-weight: 700;
-        font-size: 0.85em; cursor: pointer;
-    }
-
-    .cm-prediction-result {
-        text-align: center; padding: 8px; border-radius: 8px; margin-top: 10px;
-        font-size: 0.85em;
-    }
-    .cm-prediction-result.correct { background: rgba(76,175,80,0.1); color: #4caf50; }
-    .cm-prediction-result.wrong { background: rgba(239,83,80,0.1); color: #ef5350; }
-    .cm-prediction-result.pending { background: rgba(255,255,255,0.04); color: var(--text-dim); }
-
-    /* RANKING TABLE */
-    .ranking-table {
-        width: 100%; border-collapse: collapse;
-        background: var(--bg-card); border-radius: 12px; overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.04);
-    }
-    .ranking-table th {
-        padding: 12px 14px; text-align: left; font-size: 0.7em;
-        color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;
-        background: rgba(0,0,0,0.2); font-weight: 600;
-    }
-    .ranking-table td {
-        padding: 12px 14px; border-top: 1px solid rgba(255,255,255,0.04);
-        font-size: 0.9em;
-    }
-    .ranking-table tr:first-child td { font-weight: 700; color: var(--primary); }
-
-    /* ============ ARCADE VIEW ============ */
-    .arcade-view { animation: fadeIn 0.3s ease; }
-    .arcade-header { text-align: center; padding: 30px 20px; margin-bottom: 24px; }
-    .arcade-header h1 { font-size: 2em; margin-bottom: 4px; }
-    .arcade-game-grid {
-        display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;
-    }
-    .arcade-game-link {
-        display: block; padding: 24px 18px; background: var(--bg-card);
-        border-radius: 12px; border: 1px solid rgba(255,255,255,0.04);
-        text-align: center; transition: transform 0.2s, box-shadow 0.2s;
-        text-decoration: none; color: var(--text);
-    }
-    .arcade-game-link:hover {
-        transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,212,255,0.1);
-    }
-    .arcade-game-link .agl-icon { font-size: 2.5em; margin-bottom: 8px; }
-    .arcade-game-link .agl-name { font-weight: 700; margin-bottom: 4px; }
-    .arcade-game-link .agl-desc { font-size: 0.8em; color: var(--text-dim); }
-
-    /* BACK BUTTON */
-    .back-btn {
-        display: inline-flex; align-items: center; gap: 6px;
-        color: var(--text-dim); text-decoration: none; font-size: 0.9em;
-        padding: 8px 16px; border-radius: 8px; margin-bottom: 20px;
-        transition: color 0.2s, background 0.2s;
-        border: 1px solid rgba(255,255,255,0.06);
-        background: var(--bg-card); cursor: pointer;
-    }
-    .back-btn:hover { color: var(--primary); background: rgba(0,212,255,0.05); }
-
-    /* FOOTER */
-    .spa-footer {
-        margin-top: auto; padding: 20px; text-align: center;
-        color: var(--text-dim); font-size: 0.8em;
-        border-top: 1px solid rgba(255,255,255,0.04);
-    }
-
-    /* NAV ACTIVE STATE (handled by JS) */
-
-    /* LOADER */
-    .loader {
-        display: flex; flex-direction: column; align-items: center;
-        justify-content: center; padding: 60px 20px; gap: 12px;
-    }
-    .spinner {
-        width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.08);
-        border-top-color: var(--primary); border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-
-    .error-box {
-        text-align: center; padding: 40px 20px;
-        color: var(--text-dim); font-size: 0.9em;
-    }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-
-    /* RESPONSIVE */
-    @media (max-width: 760px) {
-        .team-grid { grid-template-columns: 1fr; }
-        .pv-inner { flex-direction: column; text-align: center; }
-        .pv-stats { grid-template-columns: repeat(2, 1fr); }
-        .pv-match-body { flex-direction: column; }
-        .pv-match-meta { text-align: left; margin-left: 0; }
-        .cm-teams { flex-direction: column; gap: 10px; }
-        .arcade-game-grid { grid-template-columns: 1fr; }
-        .pv-name { font-size: 1.6em; }
-        .cblol-header h1 { font-size: 1.6em; }
-    }
-    </style>
+    <script src="config.js"></script>
 </head>
 <body>
     <nav id="main-nav">
-        <div class="nav-inner">
-            <a href="index.html" class="logo">PROFA <span>GAMES</span></a>
-            <div class="nav-links">
-                <a href="#team" class="nav-link active" data-page="team">Time</a>
-                <a href="#cblol" class="nav-link" data-page="cblol">CBLOL</a>
-                <a href="#arcade" class="nav-link" data-page="arcade">Arcade</a>
+        <div class="nav-in">
+            <div class="logo">PROFA <span>GAMES</span></div>
+            <div class="nl" id="nav">
+                <a href="#team" class="on" data-p="team">Time</a>
+                <a href="#cblol" data-p="cblol">CBLOL</a>
+                <a href="#arcade" data-p="arcade">Arcade</a>
             </div>
-            <button id="mobile-menu-btn" aria-label="Menu">&#9776;</button>
+            <button id="mmb">&#9776;</button>
         </div>
     </nav>
-
     <div id="app">
-        <div id="app-content"></div>
+        <div id="appc"></div>
     </div>
+    <footer class="ft">PROFA GAMES &copy; 2026 &mdash; Riot Games API + LoL Esports API. N&atilde;o endossado pela Riot.</footer>
 
-    <footer class="spa-footer">
-        <p>PROFA GAMES &copy; 2026 — Dados da Riot Games API + LoL Esports API. N&atilde;o endossado pela Riot Games.</p>
-    </footer>
-
-    <script src="hub.js"></script>
     <script>
-(async () => {
+    (async() => {
     'use strict';
 
-    /* ============================================================
-       CONFIG
-    ============================================================ */
-
-    // PLAYERS: adicione/remova membros aqui
+    // ======================== CONFIG ========================
     const PLAYERS = [
-        { name: 'PROF',       tag: 'ANON',      region: 'BR1' },
-        { name: 'loadt',      tag: '9753',      region: 'BR1' },
-        { name: 'Spring Boot', tag: 'Getss',     region: 'BR1' },
-        { name: 'tume',       tag: 'br1',       region: 'BR1' },
-        { name: 'Bruvel',     tag: 'BTC',       region: 'BR1' },
-        { name: 'Matraca IV', tag: 'kash',      region: 'BR1' }
+        { name:'PROF',           tag:'ANON',  region:'BR1' },
+        { name:'loadt',          tag:'9753',  region:'BR1' },
+        { name:'Spring Boot',    tag:'Getss', region:'BR1' },
+        { name:'tume',           tag:'br1',   region:'BR1' },
+        { name:'Bruvel',         tag:'BTC',   region:'BR1' },
+        { name:'Matraca IV',     tag:'kash',  region:'BR1' },
     ];
+    const RIOT_KEY = window.PROFA_CONFIG?.riotKey || localStorage.getItem('lol_key') || 'RGAPI-ac93dba2-2144-4534-a0e6-c1b8d864d0ec';
+    const ESPORTS_KEY = window.PROFA_CONFIG?.esportsKey || localStorage.getItem('esports_key') || '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
+    const CBLOL = '98767991332355509';
+    const DVER = '14.24.1';
 
-    const RIOT_API = localStorage.getItem('lol_key') || 'RGAPI-ac93dba2-2144-4534-a0e6-c1b8d864d0ec';
-    const PANDASCORE_TOKEN = localStorage.getItem('pandascore_key') || 'uis6MzuhDthgDwK1vD9q6XIHNZqzKe6B7yngsyPvDXCeRh8Uyw9M';
-    const D_VER = '14.24.1';
-
-    /* ============================================================
-       HELPERS
-    ============================================================ */
-
+    // ======================== UTILS ========================
     const $ = id => document.getElementById(id);
-    const app = $('app-content');
+    const app = $('appc');
+    const plat = r => ({BR1:'br1',NA1:'na1',EUW1:'euw1',EUN1:'eun1',KR:'kr',TR1:'tr1',LA1:'la1',LA2:'la2',OC1:'oc1'})[r]||'br1';
+    const cluster = r => (['NA1','BR1','LA1','LA2','OC1'].includes(r))?'americas':(['EUW1','EUN1'].includes(r))?'europe':'asia';
+    const fmtDur = s => s ? `${(s/60)|0}min` : '?';
+    const fmtAgo = ts => { if(!ts) return ''; const d=(Date.now()-ts)/1000; return d<3600?`${(d/60)|0}min atr&aacute;s`:d<86400?`${(d/3600)|0}h atr&aacute;s`:`${(d/86400)|0}d atr&aacute;s`; };
+    const fmtGold = g => (g/1000).toFixed(1)+'K';
+    const fmtTime = s => `${(s/60)|0}min`;
+    const champImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${CMAP[id]||'Teemo'}.png`;
+    const itemImg = id => id ? `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/item/${id}.png` : '';
+    const spellImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/spell/${id}.png`;
+    const profImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/${id}.png`;
+    const modeName = m => ({CLASSIC:"Summoner's Rift",ARAM:'ARAM',TUTORIAL:'Tutorial'})[m]||m||'Normal';
+    const rankCls = t => t ? `rank-${t.toLowerCase()}` : '';
 
-    function fmtDur(s) { return s ? `${(s/60)|0}min` : '?'; }
-    function fmtAgo(ts) {
-        if (!ts) return '';
-        const d = (Date.now() - ts) / 1000;
-        if (d < 3600) return `${(d/60)|0}min atr&aacute;s`;
-        if (d < 86400) return `${(d/3600)|0}h atr&aacute;s`;
-        return `${(d/86400)|0}d atr&aacute;s`;
-    }
+    const dragonEmoji = d => ({ocean:'🌊',infernal:'🔥',cloud:'💨',mountain:'⛰️',elder:'🐲',hextech:'⚡',chemtech:'☣️'})[d]||'🔥';
+    const profFallback = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%2316213e%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%238892b0%22 font-size=%2250%22>?</text></svg>`;
+    const F = `onerror="this.onerror=null;this.src='${profFallback}"`;
 
-    function champImg(id) {
-        const c = CMAP[id];
-        return `https://ddragon.leagueoflegends.com/cdn/${D_VER}/img/champion/${c||'Teemo'}.png`;
-    }
-    function itemImg(id) {
-        if (!id) return '';
-        return `https://ddragon.leagueoflegends.com/cdn/${D_VER}/img/item/${id}.png`;
-    }
-    function profImg(id) {
-        return `https://ddragon.leagueoflegends.com/cdn/${D_VER}/img/profileicon/${id}.png`;
-    }
-    function spellImg(id) {
-        return `https://ddragon.leagueoflegends.com/cdn/${D_VER}/img/spell/${id}.png`;
-    }
+    let CMAP = {}; // champion key->name
 
-    function modeName(m) {
-        return ({CLASSIC:"Summoner's Rift",ARAM:'ARAM',TUTORIAL:'Tutorial'})[m] || m || 'Normal';
-    }
-
-    function rankCls(tier) {
-        return tier ? `rank-${tier.toLowerCase()}` : '';
-    }
-
-    function platform(region) {
-        return ({BR1:'br1',NA1:'na1',EUW1:'euw1',EUN1:'eun1',KR:'kr',JP1:'jp1',TR1:'tr1',LA1:'la1',LA2:'la2',OC1:'oc1'})[region] || 'br1';
-    }
-    function cluster(region) {
-        const r = (region||'').toUpperCase();
-        if (['NA1','BR1','LA1','LA2','OC1'].includes(r)) return 'americas';
-        if (['EUW1','EUN1'].includes(r)) return 'europe';
-        return 'asia';
-    }
-
-    /* ============================================================
-       DATA LOADERS
-    ============================================================ */
-
-    let CMAP = {}; // champion key->name map
-
-    async function loadCDragon() {
-        try {
-            const d = await fetch(`https://ddragon.leagueoflegends.com/cdn/${D_VER}/data/en_US/champion.json`).then(r=>r.json());
-            for (const [k,v] of Object.entries(d.data)) CMAP[v.key] = k;
-        } catch(_) {}
-    }
-
+    // ======================== API ========================
     async function riot(url) {
-        const res = await fetch(url, { headers: { 'X-Riot-Token': RIOT_API } });
-        if (!res.ok) { const t = await res.text().catch(()=>''); throw new Error(`${res.status}: ${t}`); }
-        return res.json();
+        const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
+        if (!r.ok) throw new Error(`${r.status}: ${await r.text().catch(()=>'')}`);
+        return r.json();
     }
-    async function riotSilent(url, fb = null) {
-        try { return await riot(url); } catch(_) { return fb; }
+    async function rots(u, fb=null) { try { return await riot(u); } catch(_) { return fb; } }
+
+    async function esp(url) {
+        const full = url.startsWith('http') ? url : `https://esports-api.lolesports.com/persisted/gw${url}`;
+        const r = await fetch(full, { headers:{ 'x-api-key': ESPORTS_KEY } });
+        if (!r.ok) throw new Error(`Esports ${r.status}: ${await r.text().catch(()=>'')}`);
+        return r.json();
+    }
+    async function esps(u, fb=null) { try { return await esp(u); } catch(_) { return fb; } }
+
+    async function live(u) {
+        const full = u.startsWith('http') ? u : `https://feed.lolesports.com/livestats/v1${u}`;
+        const r = await fetch(full, { headers:{ 'x-api-key': ESPORTS_KEY } });
+        if (!r.ok) return null;
+        return r.json();
     }
 
-    async function pandascore(path) {
-        const res = await fetch(`https://api.pandascore.co${path}&token=${PANDASCORE_TOKEN}`);
-        if (!res.ok) throw new Error(`PandaScore ${res.status}`);
-        return res.json();
-    }
-    async function pandascoreSilent(path, fb = null) {
-        try { return await pandascore(path); } catch(_) { return fb; }
-    }
+    // ======================== DATA LAYER ========================
+    const cache = {};
 
-    // Cache per player
-    const pcache = {};
+    async function loadPlayer(i) {
+        if (cache[i]) return cache[i];
+        const p = PLAYERS[i];
+        const c = cluster(p.region), pl = plat(p.region);
 
-    async function loadPlayer(idx) {
-        if (pcache[idx]) return pcache[idx];
+        const account = await riot(`https://${c}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
+        const summoner = await riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`);
+        const league = await rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []) || [];
+        const mastery = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}/top?count=5`, []) || [];
+        const matchIds = await rots(`https://${c}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=20`, []) || [];
 
-        const p = PLAYERS[idx];
-        const c = cluster(p.region);
-        const pl = platform(p.region);
-
-        const account = await riot(
-            `https://${c}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`
-        );
-        const puuid = account.puuid;
-
-        const summoner = await riot(
-            `https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${puuid}`
-        );
-
-        const league = await riotSilent(
-            `https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`, []
-        );
-
-        const mastery = await riotSilent(
-            `https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []
-        );
-
-        const matchIds = await riotSilent(
-            `https://${c}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20`, []
-        );
-
-        // Fetch first 8 matches
         const matches = [];
         const n = Math.min(matchIds.length, 8);
         await Promise.all(matchIds.slice(0, n).map(mid =>
-            riot(`https://${c}.api.riotgames.com/lol/match/v5/matches/${mid}`)
-                .then(d => matches.push(d)).catch(() => {})
+            riot(`https://${c}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => matches.push(d)).catch(() => {})
         ));
 
-        const data = { account, summoner, league: league||[], mastery: mastery||[], matches };
-        pcache[idx] = data;
+        const data = { account, summoner, league, mastery, matches };
+        cache[i] = data;
         return data;
     }
 
-    /* ============================================================
-       ROUTER
-    ============================================================ */
+    // ======================== ROUTER ========================
+    let liveTimer = null;
+    function clearLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer=null; } }
 
-    function navigate(hash) {
-        const h = hash.replace(/^#/, '');
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        const activeLink = document.querySelector(`.nav-link[data-page="${activeNav(h)}"]`);
-        if (activeLink) activeLink.classList.add('active');
+    function nav(hash) {
+        const h = hash.replace(/^#/,'');
+        document.querySelectorAll('.nl a').forEach(a => a.classList.remove('on'));
+        const ln = document.querySelector(`.nl a[data-p="${pn(h)}"]`);
+        if (ln) ln.classList.add('on');
+        clearLive();
 
-        if (!h || h === 'team') renderTeam();
-        else if (h.startsWith('profile/')) renderProfile(h.split('/')[1]);
-        else if (h === 'cblol') renderCBLOL();
-        else if (h === 'arcade') renderArcade();
+        if (!h || h==='team') renderTeam();
+        else if (h.startsWith('profile/')) renderProfile(parseInt(h.split('/')[1]));
+        else if (h==='cblol') renderCBLOL('upcoming');
+        else if (h==='arcade') renderArcade();
         else renderTeam();
     }
-
-    function activeNav(h) {
-        if (!h || h === 'team') return 'team';
-        if (h.startsWith('profile/')) return 'team';
-        if (h === 'cblol') return 'cblol';
-        if (h === 'arcade') return 'arcade';
+    function pn(h) {
+        if (!h||h==='team'||h.startsWith('profile/')) return 'team';
+        if (h==='cblol') return 'cblol';
+        if (h==='arcade') return 'arcade';
         return 'team';
     }
-
-    window.addEventListener('hashchange', () => navigate(location.hash));
+    window.addEventListener('hashchange', () => nav(location.hash));
     document.addEventListener('click', e => {
-        const link = e.target.closest('a[href^="#"]');
-        if (link) {
-            e.preventDefault();
-            location.hash = link.getAttribute('href').slice(1);
-        }
+        if (e.target.closest('a[href^="#"]')) { e.preventDefault(); location.hash=e.target.closest('a').getAttribute('href').slice(1); }
     });
+    // Mobile menu
+    $('mmb').addEventListener('click', () => $('nav').classList.toggle('open'));
+    $('nav').addEventListener('click', () => $('nav').classList.remove('open'));
 
-    /* ============================================================
-       RENDER: TEAM
-    ============================================================ */
-
-    function renderTeam() {
+    // ======================== TEAM ========================
+    async function renderTeam() {
         app.innerHTML = `
-            <div class="hero-banner">
-                <h1>PROFA <span style="background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">GAMES</span></h1>
-                <p>Hub do squad — perfis, ranked e palpites CBLOL</p>
-            </div>
-            <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
-                <div class="section-header">
-                    <h2>O Squad</h2>
-                </div>
-                <div class="team-grid" id="team-grid">
-                    ${PLAYERS.map((p, i) => `
-                        <div class="player-card" data-idx="${i}" onclick="location.hash='profile/${i}'">
-                            <div class="pc-loader"><div class="spinner"></div></div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
+        <div class="hero"><h1>PROFA <span style="background:linear-gradient(135deg,var(--pri),var(--acc));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">GAMES</span></h1><p>Hub do squad &mdash; perfis, ranked e palpites CBLOL</p></div>
+        <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
+            <div class="sh"><h2>O Squad</h2></div>
+            <div class="tg">${PLAYERS.map((p,i) => `<div class="pc" data-i="${i}" onclick="location.hash='profile/${i}'"><div class="ld"><div class="sp"></div></div></div>`).join('')}</div>
+        </div>`;
 
-        // Load each player card
-        PLAYERS.forEach((p, i) => {
-            loadPlayer(i).then(data => {
-                const card = document.querySelector(`[data-idx="${i}"]`);
-                if (!card) return;
-
-                const s = data.summoner;
-                const iconId = s.profileIconId || 5885;
-                const lvl = s.summonerLevel || '?';
-
-                const solo = data.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
-                let rankHTML = '';
-                if (solo) {
-                    const wr = ((solo.wins/(solo.wins+solo.losses))*100)|0;
-                    rankHTML = `
-                        <div class="pc-rank">
-                            <span class="pc-tier ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}</span>
-                            <span class="pc-lp">${solo.leaguePoints} LP</span>
-                            <span class="pc-wr">${wr}% WR</span>
-                        </div>
-                    `;
-                } else {
-                    rankHTML = `<div class="pc-no-rank">Sem ranked — clique para ver detalhes</div>`;
-                }
-
-                // Last match time
-                let lastGame = '';
-                if (data.matches.length > 0) {
-                    const lastTs = data.matches[0].info.gameCreation;
-                    lastGame = `<div class="pc-last-game"><span class="dot green"></span> Última partida ${fmtAgo(lastTs)}</div>`;
-                }
-
+        PLAYERS.forEach(async (p, i) => {
+            const card = document.querySelector(`[data-i="${i}"]`);
+            if (!card) return;
+            try {
+                const d = await loadPlayer(i);
+                const s = d.summoner, ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
+                const solo = d.league.find(e => e.queueType==='RANKED_SOLO_5x5');
+                const wr = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
+                const ago = d.matches[0] ? fmtAgo(d.matches[0].info.gameCreation) : '';
                 card.innerHTML = `
-                    <div class="pc-header">
-                        <div class="pc-icon"><img src="${profImg(iconId)}" alt=""></div>
-                        <div>
-                            <div class="pc-name">${data.account.gameName || p.name} <span class="pc-tag">#${data.account.tagLine || p.tag}</span></div>
-                            <div class="pc-level">Nível ${lvl}</div>
-                        </div>
-                    </div>
-                    ${rankHTML}
-                    ${lastGame}
-                `;
-            }).catch(() => {
-                const card = document.querySelector(`[data-idx="${i}"]`);
-                if (!card) return;
-                card.innerHTML = `
-                    <div class="pc-header">
-                        <div class="pc-icon" style="display:flex;align-items:center;justify-content:center;font-size:1.5em;background:var(--bg-surface);">?</div>
-                        <div>
-                            <div class="pc-name">${p.name} <span class="pc-tag">#${p.tag}</span></div>
-                            <div class="pc-level">Dados indisponíveis</div>
-                        </div>
-                    </div>
-                    <div class="pc-no-rank">API key expirada ou erro de conexão</div>
-                `;
-            });
+                <div class="pch">
+                    <div class="pci"><img src="${profImg(ic)}" alt="" ${F}'"></div>
+                    <div><div class="pcn">${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
+                    <div class="cl">N&iacute;vel ${lv}</div></div>
+                </div>
+                ${solo ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>` : `<div class="pn">Sem ranked</div>`}
+                ${ago ? `<div class="lr"><span class="dot g"></span> &Uacute;ltima partida ${ago}</div>` : ''}`;
+            } catch(_) {
+                card.innerHTML = `<div class="pch"><div class="pci" style="display:flex;align-items:center;justify-content:center;background:var(--surf);">?</div><div><div class="pcn">${p.name} <span class="t">#${p.tag}</span></div><div class="cl">Dados indispon&iacute;veis</div></div></div>`;
+            }
         });
     }
 
-    /* ============================================================
-       RENDER: PROFILE
-    ============================================================ */
-
+    // ======================== PROFILE ========================
     function renderProfile(idx) {
-        const player = PLAYERS[idx];
-        if (!player) { navigate('#team'); return; }
+        const p = PLAYERS[idx];
+        if (!p) { location.hash='team'; return; }
+        app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;">
+            <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+            <div class="pv"><div class="ld"><div class="sp"></div><p>Carregando ${p.name}...</p></div></div></div>`;
 
-        app.innerHTML = `
-            <div style="max-width:900px;margin:0 auto;padding:0 16px;">
-                <button class="back-btn" onclick="location.hash='team'">← Voltar ao Time</button>
-                <div class="profile-view">
-                    <div class="loader"><div class="spinner"></div><p>Carregando ${player.name}#${player.tag}...</p></div>
-                </div>
-            </div>
-        `;
+        loadPlayer(idx).then(d => {
+            const {account:a,summoner:s,league:le,mastery:ma,matches:mt} = d;
+            const ic = s.profileIconId||5885, lv = s.summonerLevel||'?';
+            const solo = le.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const flex2 = le.find(e=>e.queueType==='RANKED_FLEX_SR');
+            let tv=0,td=0; le.forEach(e=>{tv+=e.wins||0;td+=e.losses||0;});
+            const tg=tv+td, wr2=tg>0?((tv/tg)*100).toFixed(1):'&mdash;';
+            let tk=0,tkd=0,ta=0,tcs=0;
+            mt.forEach(m=>{const mp=m.info?.participants.find(x=>x.puuid===a.puuid)||{};tk+=mp.kills||0;tkd+=mp.deaths||0;ta+=mp.assists||0;tcs+=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);});
+            const kda = mt.length>0?((tk+ta)/Math.max(tkd,1)).toFixed(1):'&mdash;';
+            const acs = mt.length>0?(tcs/mt.length)|0:0;
 
-        loadPlayer(parseInt(idx)).then(data => {
-            const p = player;
-            const acc = data.account;
-            const s = data.summoner;
-            const league = data.league;
-            const mastery = data.mastery;
-            const matches = data.matches;
+            let stats = `<div class="ps">
+                <div class="pst"><div class="sm">N&iacute;vel</div><div class="sv">${lv}</div></div>
+                <div class="pst"><div class="sm">Partidas</div><div class="sv">${tg}</div><div class="ss">${tv}V ${td}D</div></div>
+                <div class="pst"><div class="sm">Win Rate</div><div class="sv">${wr2}%</div></div>
+                <div class="pst"><div class="sm">KDA</div><div class="sv">${kda}</div><div class="ss">${tk}K ${tkd}D ${ta}A</div></div>
+                <div class="pst"><div class="sm">CS M&eacute;dio</div><div class="sv">${acs}</div></div>
+            </div>`;
 
-            const iconId = s.profileIconId || 5885;
-            const lvl = s.summonerLevel || '?';
-
-            // Stats
-            const solo = league.find(e => e.queueType === 'RANKED_SOLO_5x5');
-            const flex = league.find(e => e.queueType === 'RANKED_FLEX_SR');
-            let totalV = 0, totalD = 0;
-            league.forEach(e => { totalV += e.wins||0; totalD += e.losses||0; });
-            const totalG = totalV + totalD;
-            const wr = totalG > 0 ? ((totalV/totalG)*100).toFixed(1) : '—';
-
-            // KDA from matches
-            let tk = 0, td = 0, ta = 0, tcs = 0;
-            matches.forEach(m => {
-                const mp = m.info?.participants.find(pp => pp.puuid === acc.puuid) || {};
-                tk += mp.kills || 0; td += mp.deaths || 0; ta += mp.assists || 0;
-                tcs += (mp.totalMinionsKilled||0) + (mp.neutralMinionsKilled||0);
-            });
-            const kda = matches.length > 0 ? ((tk+ta)/Math.max(td,1)).toFixed(1) : '—';
-            const avgCS = matches.length > 0 ? (tcs / matches.length)|0 : 0;
-
-            let statsHTML = `
-                <div class="pv-stats">
-                    <div class="pv-stat"><div class="ps-label">Nível</div><div class="ps-value">${lvl}</div></div>
-                    <div class="pv-stat"><div class="ps-label">Partidas</div><div class="ps-value">${totalG}</div><div class="ps-sub">${totalV}V ${totalD}D</div></div>
-                    <div class="pv-stat"><div class="ps-label">Win Rate</div><div class="ps-value">${wr}%</div></div>
-                    <div class="pv-stat"><div class="ps-label">KDA Média</div><div class="ps-value">${kda}</div><div class="ps-sub">${tk}K ${td}D ${ta}A</div></div>
-                    <div class="pv-stat"><div class="ps-label">CS Médio</div><div class="ps-value">${avgCS}</div></div>
-                </div>
-            `;
-
-            // Rank section
-            let rankHTML = '';
-            if (league.length > 0) {
-                const qNames = {'RANKED_SOLO_5x5':'Solo/Duo','RANKED_FLEX_SR':'Flex 5v5'};
-                rankHTML += '<div class="pv-section"><h3>🏆 Ranked</h3>';
-                for (const e of league) {
-                    const q = qNames[e.queueType] || e.queueType;
-                    const wr2 = ((e.wins/(e.wins+e.losses))*100).toFixed(0);
-                    rankHTML += `
-                        <div style="background:var(--bg-card);border-radius:10px;padding:14px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.04);">
-                            <div style="font-size:0.75em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">${q}</div>
-                            <div class="${rankCls(e.tier)}" style="font-size:1.4em;font-weight:900;">${e.tier} ${e.rank} — ${e.leaguePoints} LP</div>
-                            <div style="font-size:0.85em;color:var(--text-dim);">${e.wins}V ${e.losses}D (${wr2}% WR)</div>
-                            ${e.hotStreak?'<span style="font-size:0.75em;color:#ef5350;">🔥 Hot Streak</span> ':''}
-                            ${e.veteran?'<span style="font-size:0.75em;color:#c89b3c;">Veterano</span> ':''}
-                            ${e.freshBlood?'<span style="font-size:0.75em;color:#4caf50;">Fresh Blood</span>':''}
-                        </div>
-                    `;
+            // Ranked
+            let ranked = '';
+            if (le.length) {
+                const qn = {'RANKED_SOLO_5x5':'Solo/Duo','RANKED_FLEX_SR':'Flex 5v5'};
+                ranked = '<div class="sx"><h3>🏆 Ranked</h3>';
+                for (const e of le) {
+                    const w2 = ((e.wins/(e.wins+e.losses))*100).toFixed(0);
+                    ranked += `<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.04);">
+                        <div style="font-size:.75em;color:var(--dim);text-transform:uppercase;font-weight:600;">${qn[e.queueType]||e.queueType}</div>
+                        <div class="${rankCls(e.tier)}" style="font-size:1.4em;font-weight:900;">${e.tier} ${e.rank} &mdash; ${e.leaguePoints} LP</div>
+                        <div style="font-size:.85em;color:var(--dim);">${e.wins}V ${e.losses}D (${w2}% WR)</div>
+                        ${e.hotStreak?'<span style="font-size:.75em;color:#ef5350;">🔥 Hot Streak</span> ':''}${e.veteran?'<span style="font-size:.75em;color:#c89b3c;">Veterano</span>':''}</div>`;
                 }
-                rankHTML += '</div>';
+                ranked += '</div>';
             }
 
             // Mastery
-            let masteryHTML = '';
-            if (mastery.length > 0) {
-                masteryHTML = '<div class="pv-section"><h3>⭐ Maestria</h3><div class="pv-mastery">';
-                for (const m of mastery) {
-                    masteryHTML += `
-                        <div class="pv-mastery-item">
-                            <span class="pvm-lvl">M${m.championLevel}</span>
-                            <img src="${champImg(m.championId)}" alt="" loading="lazy">
-                            <div class="pvm-name">${CMAP[m.championId]||'?'}</div>
-                            <div class="pvm-pts">${(m.championPoints||0).toLocaleString()} pts</div>
-                        </div>
-                    `;
+            let mas = '';
+            if (ma.length) {
+                mas = '<div class="sx"><h3>⭐ Maestria</h3><div class="mg">';
+                for (const m of ma) {
+                    mas += `<div class="mi"><span class="ml">M${m.championLevel}</span><img src="${champImg(m.championId)}" alt="" onerror="this.style.opacity='0.3'"><div class="mn">${CMAP[m.championId]||'?'}</div><div class="mp">${(m.championPoints||0).toLocaleString()} pts</div></div>`;
                 }
-                masteryHTML += '</div></div>';
+                mas += '</div></div>';
             }
 
-            // Matches
-            let matchesHTML = '';
-            if (matches.length > 0) {
-                matchesHTML = '<div class="pv-section"><h3>📜 Partidas Recentes</h3>';
-                for (const m of matches) {
-                    const mp = m.info?.participants.find(pp => pp.puuid === acc.puuid) || {};
-                    const teamWin = m.info.teams?.find(t => t.teamId === mp.teamId)?.win;
-                    const dur = m.info.gameDuration;
-                    const created = m.info.gameCreation;
-                    const k = mp.kills||0, dd = mp.deaths||0, a = mp.assists||0;
-                    const cs = (mp.totalMinionsKilled||0) + (mp.neutralMinionsKilled||0);
-                    const champName = CMAP[mp.championId] || `#${mp.championId}`;
-                    const lvl2 = mp.champLevel || '';
+            // Matches (most recent first)
+            let matchs = '';
+            const sm = [...mt].reverse();
+            if (sm.length) {
+                matchs = '<div class="sx"><h3>📜 Partidas Recentes</h3>';
+                for (const m of sm) {
+                    const mp = m.info?.participants.find(x=>x.puuid===a.puuid)||{};
+                    const tw = m.info.teams?.find(t=>t.teamId===mp.teamId)?.win;
+                    const dur = m.info.gameDuration, cre = m.info.gameCreation;
+                    const k=mp.kills||0, dd=mp.deaths||0, as2=mp.assists||0;
+                    const cs2=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
+                    const cn = CMAP[mp.championId]||`#${mp.championId}`, cl2=mp.champLevel||'';
+                    let items='';
+                    for(let j=0;j<=6;j++){if(mp['item'+j]) items+=`<img src="${itemImg(mp['item'+j])}" alt="" loading="lazy">`;}
+                    let sums='';
+                    if(mp.summoner1Id) sums+=`<img src="${spellImg(mp.summoner1Id)}" style="width:20px;height:20px;border-radius:4px;" loading="lazy">`;
+                    if(mp.summoner2Id) sums+=`<img src="${spellImg(mp.summoner2Id)}" style="width:20px;height:20px;border-radius:4px;" loading="lazy">`;
+                    const c = tw?'w':'l', res=tw?'VIT&Oacute;RIA':'DERROTA';
 
-                    let items = '';
-                    for (let i = 0; i <= 6; i++) { if (mp['item'+i]) items += `<img src="${itemImg(mp['item'+i])}" alt="" loading="lazy">`; }
-
-                    let summoners = '';
-                    if (mp.summoner1Id) summoners += `<img src="${spellImg(mp.summoner1Id)}" alt="" loading="lazy" style="width:20px;height:20px;border-radius:4px;">`;
-                    if (mp.summoner2Id) summoners += `<img src="${spellImg(mp.summoner2Id)}" alt="" loading="lazy" style="width:20px;height:20px;border-radius:4px;">`;
-
-                    const cls = teamWin ? 'win' : 'loss';
-                    const res = teamWin ? 'VITÓRIA' : 'DERROTA';
-
-                    // Opponents
-                    let oppHTML = '';
-                    const teamId = mp.teamId;
-                    const others = (m.info?.participants||[]).filter(pp => pp.puuid !== acc.puuid);
-                    const sameTeam = others.filter(pp => pp.teamId === teamId);
-                    const otherTeam = others.filter(pp => pp.teamId !== teamId);
-
-                    oppHTML += '<div class="pv-opponents"><h4>👥 Oponentes</h4>';
-                    const allOpp = [...otherTeam, ...sameTeam]; // show enemy team first
-                    for (const op of allOpp) {
-                        const isAlly = op.teamId === teamId;
-                        oppHTML += `
-                            <div class="pv-opponent-row">
-                                <span class="pvor-team ${isAlly ? 'blue' : 'red'}"></span>
-                                <img src="${champImg(op.championId)}" alt="" loading="lazy">
-                                <span>${op.riotIdGameName || ''}</span>
-                                <span style="color:var(--text-dim);margin-left:auto;">${op.kills||0}/${op.deaths||0}/${op.assists||0}</span>
-                            </div>
-                        `;
-                    }
-                    oppHTML += '</div>';
-
-                    matchesHTML += `
-                        <div class="pv-match ${cls}">
-                            <div class="pv-match-header">
-                                <span class="pv-match-result">${res}</span>
-                                <span class="pv-match-info">${fmtDur(dur)} · ${modeName(m.info.gameMode)} · ${fmtAgo(created)}</span>
-                            </div>
-                            <div class="pv-match-body">
-                                <div class="pv-match-champ">
-                                    <img src="${champImg(mp.championId)}" alt="${champName}" loading="lazy">
-                                    <div>
-                                        <div class="pmc-name">${champName} Nv.${lvl2}</div>
-                                        <div class="pmc-kda"><span class="pmc-k">${k}</span>/<span class="pmc-d">${dd}</span>/<span class="pmc-a">${a}</span> KDA</div>
-                                        <div class="pmc-cs">${cs} CS · Visão ${mp.visionScore||0} · ${(mp.goldEarned||0) > 0 ? (mp.goldEarned/1000).toFixed(1)+'K' : '0'} ouro</div>
-                                        <div style="margin-top:3px;">${summoners}</div>
-                                    </div>
-                                </div>
-                                <div class="pv-match-items">${items}</div>
-                            </div>
-                            ${oppHTML}
+                    // Teams
+                    const t100=(m.info?.participants||[]).filter(x=>x.teamId===100);
+                    const t200=(m.info?.participants||[]).filter(x=>x.teamId===200);
+                    const row = (o,lbl='') => {
+                        const cn2=CMAP[o.championId]||`#${o.championId}`;
+                        return `<div class="or ${o.teamId===100?'b':'r'}">${lbl?'<b>'+lbl+'</b>':'<span style="width:14px;"></span>'}<img src="${champImg(o.championId)}" loading="lazy" onerror="this.style.visibility='hidden'"><span class="on">${o.riotIdGameName||'???'}</span><span class="ok"><b>${o.kills||0}</b>/<span style="color:#ef5350;">${o.deaths||0}</span>/<span style="color:var(--pri);">${o.assists||0}</span></span></div>`;
+                    };
+                    matchs += `<div class="mc ${c}">
+                        <div class="mh"><span class="${c==='w'?'':'l'}">${res}</span><span class="mhi">${fmtDur(dur)} &middot; ${modeName(m.info.gameMode)} &middot; ${fmtAgo(cre)}</span></div>
+                        <div class="mb">
+                            <div class="mch"><img src="${champImg(mp.championId)}" alt="${cn}" loading="lazy"><div>
+                                <div class="mcn">${cn} Nv.${cl2}</div>
+                                <div class="kda"><b>${k}</b>/<span style="color:#ef5350;">${dd}</span>/<span style="color:var(--pri);">${as2}</span> KDA</div>
+                                <div class="csm">${cs2} CS &middot; Vis&atilde;o ${mp.visionScore||0} &middot; ${mp.goldEarned>0?(mp.goldEarned/1000).toFixed(1)+'K':0} ouro</div>
+                                ${sums}
+                            </div></div>
+                            <div class="mii">${items}</div>
                         </div>
-                    `;
+                        <div class="os"><div class="tsr">
+                            <div><div class="th"><span class="td b"></span> AZUL (100) ${mp.teamId===100?'&larr; Seu time':''}</div>${t100.map(x=>row(x,x.puuid===a.puuid?'&rarr;':'')).join('')}</div>
+                            <div><div class="th"><span class="td r"></span> VERMELHA (200) ${mp.teamId===200?'&larr; Seu time':''}</div>${t200.map(x=>row(x,x.puuid===a.puuid?'&rarr;':'')).join('')}</div>
+                        </div></div>
+                    </div>`;
                 }
-                matchesHTML += '</div>';
+                matchs += '</div>';
             }
 
-            // Solo rank badge for banner
-            let rankBadge = '';
-            if (solo) {
-                rankBadge = `<span class="pv-region">${solo.tier} ${solo.rank} — ${solo.leaguePoints} LP</span>`;
-            } else {
-                rankBadge = '<span class="pv-region">Não posicionado em ranked solo</span>';
-            }
+            const rb = solo ? `<span class="prg">${solo.tier} ${solo.rank} &mdash; ${solo.leaguePoints} LP</span>` : `<span class="prg">N&atilde;o posicionado</span>`;
 
-            app.innerHTML = `
-                <div style="max-width:900px;margin:0 auto;padding:0 16px;">
-                    <button class="back-btn" onclick="location.hash='team'">← Voltar ao Time</button>
-                    <div class="profile-view">
-                        <div class="pv-banner">
-                            <div class="pv-bg"></div>
-                            <div class="pv-inner">
-                                <div class="pv-icon"><img src="${profImg(iconId)}" alt=""></div>
-                                <div>
-                                    <div class="pv-name">${acc.gameName || p.name} <span class="pv-tag">#${acc.tagLine || p.tag}</span></div>
-                                    <span class="pv-region">${p.region}</span>
-                                    ${rankBadge}
-                                </div>
-                            </div>
-                        </div>
-
-                        ${statsHTML}
-                        ${rankHTML}
-                        ${masteryHTML}
-                        ${matchesHTML}
-                    </div>
+            app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;">
+                <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+                <div class="pv">
+                    <div class="pb"><div class="pbg"></div><div class="pbi">
+                        <div class="pi"><img src="${profImg(ic)}" alt="" ${F}'"></div>
+                        <div><div class="pn2">${a.gameName||p.name} <span class="t">#${a.tagLine||p.tag}</span></div>
+                        <span class="prg">${p.region}</span>${rb}</div>
+                    </div></div>
+                    ${stats}${ranked}${mas}${matchs}
                 </div>
-            `;
-
+            </div>`;
         }).catch(err => {
-            app.innerHTML = `
-                <div style="max-width:900px;margin:0 auto;padding:0 16px;">
-                    <button class="back-btn" onclick="location.hash='team'">← Voltar ao Time</button>
-                    <div class="error-box">
-                        <p style="font-size:2em;margin-bottom:12px;">❌</p>
-                        <p style="font-size:1.2em;margin-bottom:8px;">Erro ao carregar perfil</p>
-                        <p style="max-width:400px;margin:0 auto;">${err.message}<br><br>API key pode ter expirado. Atualize no localStorage.</p>
-                        <button onclick="renderProfile(${idx})" style="margin-top:16px;padding:10px 22px;border-radius:8px;background:var(--primary);color:var(--bg-dark);font-weight:600;border:none;cursor:pointer;">Tentar Novamente</button>
-                    </div>
-                </div>
-            `;
+            app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;"><button class="bb" onclick="location.hash='team'">&larr; Voltar</button><div class="err"><p style="font-size:2em;margin-bottom:12px;">❌</p><p style="font-size:1.2em;margin-bottom:8px;">Erro ao carregar perfil</p><p>${err.message}</p><button onclick="renderProfile(${idx})" style="margin-top:16px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar Novamente</button></div></div>`;
         });
     }
 
-    /* ============================================================
-       RENDER: CBLOL
-    ============================================================ */
+    // ======================== CBLOL ========================
+    const tabs = [
+        {k:'upcoming',l:'Próximas'}, {k:'running',l:'Ao Vivo'}, {k:'closed',l:'Finalizadas'}, {k:'ranking',l:'Ranking'}
+    ];
 
-    function renderCBLOL() {
-        app.innerHTML = `
-            <div style="max-width:900px;margin:0 auto;padding:0 16px;">
-                <div class="cblol-view">
-                    <div class="cblol-header">
-                        <h1>CBLOL</h1>
-                        <p>Acompanhe, palpite e dispute com o squad</p>
-                        <p style="margin-top:6px;font-size:0.75em;color:var(--text-dim);">Powered by PandaScore</p>
-                    </div>
-                    <div class="cblol-tabs">
-                        <button class="cblol-tab active" data-tab="upcoming">Próximas</button>
-                        <button class="cblol-tab" data-tab="live">Ao Vivo</button>
-                        <button class="cblol-tab" data-tab="closed">Finalizadas</button>
-                        <button class="cblol-tab" data-tab="ranking">Ranking</button>
-                    </div>
-                    <div id="cblol-content">
-                        <div class="loader"><div class="spinner"></div><p>Carregando CBLOL...</p></div>
-                    </div>
-                </div>
+    function renderCBLOL(tab) {
+        tab = tab || 'upcoming';
+        app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;">
+            <div class="cv">
+                <div class="ch2"><h1>CBLOL</h1><p>Acompanhe, palpite e dispute com o squad</p><p style="margin-top:6px;font-size:.75em;color:var(--dim);">Powered by LoL Esports API</p></div>
+                <div class="ct">${tabs.map(t=>`<button class="ctb ${t.k===tab?'on':''}" data-t="${t.k}">${t.l}</button>`).join('')}</div>
+                <div id="cc"><div class="ld"><div class="sp"></div></div></div>
             </div>
-        `;
+        </div>`;
 
-        document.querySelectorAll('.cblol-tab').forEach(btn => {
+        document.querySelectorAll('.ctb').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.cblol-tab').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const t = btn.dataset.tab;
-                if (t === 'upcoming') loadMatches('upcoming');
-                else if (t === 'live') loadMatches('running');
-                else if (t === 'closed') loadMatches('closed');
-                else renderRanking();
+                document.querySelectorAll('.ctb').forEach(b=>b.classList.remove('on'));
+                btn.classList.add('on');
+                const t = btn.dataset.t;
+                if (t==='upcoming') loadSchedule('upcoming');
+                else if (t==='running') loadLive();
+                else if (t==='closed') loadSchedule('closed');
+                else { clearLive(); loadRanking(); }
             });
         });
 
-        loadMatches('upcoming');
+        if (tab==='running') loadLive();
+        else if (tab==='closed') loadSchedule('closed');
+        else if (tab==='ranking') loadRanking();
+        else loadSchedule('upcoming');
     }
 
-    async function loadMatches(type) {
-        const content = $('cblol-content');
-        content.innerHTML = '<div class="loader"><div class="spinner"></div><p>Carregando partidas...</p></div>';
+    async function loadSchedule(type) {
+        clearLive();
+        const cc = $('cc');
+        cc.innerHTML = '<div class="ld"><div class="sp"></div></div>';
 
+        const isClosed = type==='closed';
         try {
-            // Find CBLOL league
-            let leagueId = null;
-            const leagues = await pandascore('/lol/leagues?filter[name]=CBLOL');
-            if (leagues && leagues.length > 0) leagueId = leagues[0].id;
+            let events = [], cursor='', first=true;
+            do {
+                let u = `https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL}`;
+                if (!first && isClosed) u += '&old=true';
+                if (cursor) u += `&cursor=${cursor}`;
+                const data = await esp(u);
+                if (!data?.data?.schedule) break;
+                const ev = data.data.schedule.events||[];
+                events.push(...ev);
+                cursor = data.data.schedule.pages?.older||'';
+                first = false;
+            } while (cursor && (isClosed?events.length<100:false));
 
-            let path = `/lol/matches/${type}?`;
-            if (leagueId) path += `filter[league_id]=${leagueId}&`;
-            path += `page[size]=50`;
+            events = events.filter(e => isClosed?(e.state==='completed'):(e.state==='unstarted'));
 
-            const matches = await pandascore(path);
+            if (!events.length) { cc.innerHTML='<div class="err"><p>Nenhuma partida encontrada</p></div>'; return; }
 
-            if (!matches || matches.length === 0) {
-                content.innerHTML = `<div class="error-box"><p>Nenhuma partida ${type==='upcoming'?'próxima encontrada — fora de temporada?':type==='running'?'ao vivo agora':`finalizada encontrada (${type})`}</p></div>`;
+            let html = '';
+            for (const ev of (isClosed?events:events.reverse())) {
+                const m = ev.match||{}, ts = m.teams||[];
+                if (ts.length<2) continue;
+                const tA=ts[0], tB=ts[1];
+                const cA=tA.code||tA.name||'A', cB=tB.code||tB.name||'B';
+                const nA=tA.name||cA, nB=tB.name||cB;
+                const rA=tA.result||{}, rB=tB.result||{};
+                const sA=rA.gameWins||0, sB=rB.gameWins||0;
+                const wA=rA.outcome==='win', wB=rB.outcome==='win';
+                const winner=wA?tA:wB?tB:null;
+                const mid = ev.id||m.id||ev.slug||'';
+                const dt = ev.startTime ? new Date(ev.startTime) : null;
+                const bn = ev.blockName||'';
+
+                if (isClosed) {
+                    const ac = {winnerCode:winner?(winner.code||winner.name):'',a:sA,b:sB};
+                    html += `<div class="lg">
+                        <div class="lgh">${dt?dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'})+' &middot; ':''}${dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} &middot; ${bn} &middot; Finalizada</div>
+                        <div class="lgp"><div class="lgt"><img src="${tA.image||''}"><div class="ln">${cA}</div></div><div class="lvs">vs</div><div class="lgt"><img src="${tB.image||''}"><div class="ln">${cB}</div></div></div>
+                        <div class="lrs"><span class="${wA?'lrw':'lrl'}">${sA}</span><span>&mdash;</span><span class="${wB?'lrw':'lrl'}">${sB}</span></div>
+                        ${(rA.kills||rA.towers)?renderObjs({a:{k:rA.kills,t:rA.towers,br:rA.barons,d:rA.dragons,i:rA.inhibitors},b:{k:rB.kills,t:rB.towers,br:rB.barons,d:rB.dragons,i:rB.inhibitors}}):''}
+                        ${predResult(mid,{code:cA},{code:cB},ac)}
+                    </div>`;
+                } else {
+                    // Determine best of
+                    const mo = m.strategy?.type||'';
+                    const bo = mo.includes('bestOf') ? parseInt(mo.replace('bestOf','')) : 3;
+                    const gn = m.games?.length||0;
+                    const bst = gn>0?`MD${gn}`:bo?`M${bo}`:'';
+                    const sp = getPred(mid);
+
+                    html += `<div class="lg">
+                        <div class="lgh">${dt?dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'})+' &middot; ':''}${dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} &middot; ${bn}${bst?' &middot; '+bst:''}</div>
+                        <div class="lgp"><div class="lgt"><img src="${tA.image||''}"><div class="ln">${cA}</div></div><div class="lvs">vs</div><div class="lgt"><img src="${tB.image||''}"><div class="ln">${cB}</div></div></div>
+                        <div class="prd">
+                            <div><label style="font-size:.7em;color:var(--dim);display:block;">Vencedor (10 pts)</label>
+                            <select id="pw-${mid}"><option value="${cA}" ${sp?.winner&&sp?.winner===cA?'selected':''}>${cA}</option><option value="${cB}" ${sp?.winner&&sp?.winner===cB?'selected':''}>${cB}</option></select></div>
+                            <div><label style="font-size:.7em;color:var(--dim);display:block;">Placar exato (25 pts)</label>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                            <select id="psa-${mid}" style="width:45px;">${Array.from({length:bo||3},(_,i)=>`<option value="${i}" ${sp?.scoreA===i?'selected':''}>${i}</option>`).join('')}</select>
+                            <span style="font-weight:800;">&mdash;</span>
+                            <select id="psb-${mid}" style="width:45px;">${Array.from({length:bo||3},(_,i)=>`<option value="${i}" ${sp?.scoreB===i?'selected':''}>${i}</option>`).join('')}</select>
+                            </div></div>
+                            <button class="sv" onclick="savePred('${mid}')">Salvar</button>
+                        </div>
+                        ${sp?predPreview(sp,cA,cB):''}
+                    </div>`;
+                }
+            }
+            cc.innerHTML = html || '<div class="err"><p>Nenhuma partida encontrada.</p></div>';
+        } catch(e) {
+            cc.innerHTML = `<div class="err"><p>Erro: ${e.message}</p><button onclick="loadSchedule('${type}')" style="margin-top:12px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
+        }
+    }
+
+    // ======================== PREDICTIONS ========================
+    const pk = mid => `pred_${mid}`;
+    function getPred(mid) { try { return JSON.parse(localStorage.getItem(pk(mid))||'null'); } catch(_) { return null; } }
+    function savePred(mid) {
+        const w = $(`pw-${mid}`), sa=$(`psa-${mid}`), sb=$(`psb-${mid}`);
+        if (!w) return;
+        localStorage.setItem(pk(mid), JSON.stringify({winner:w.value,scoreA:sa?.value!=null?+sa.value:null,scoreB:sb?.value!=null?+sb.value:null,time:Date.now()}));
+        const btn = document.querySelector(`[onclick="savePred('${mid}')"]`);
+        if (btn) { btn.textContent='✓'; setTimeout(()=>btn.textContent='Salvar',1500); }
+    }
+    function predPreview(sp,a,b) { return `<div class="pr pd">Salvo: ${sp.winner} ${sp.scoreA!=null?'('+sp.scoreA+'—'+sp.scoreB+')':''}</div>`; }
+    function predResult(mid,tA,tB,ac) {
+        const sp = getPred(mid);
+        if (!sp) return '<div class="pr pd">Sem palpite</div>';
+        const gw = sp.winner===ac.winnerCode;
+        const gs = sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===ac.a&&sp.scoreB===ac.b;
+        if (gs) return `<div class="pr ex">✓ PERFEITO! +35 pts &middot; ${sp.scoreA}—${sp.scoreB}</div>`;
+        if (gw) return `<div class="pr ok">✓ Acertou o vencedor! (+10 pts)</div>`;
+        return `<div class="pr no">✗ Errou! Palpite: ${sp.winner}</div>`;
+    }
+
+    // ======================== LIVE GAMES ========================
+    async function loadLive() {
+        const cc = $('cc');
+        try {
+            const data = await esp('https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR');
+            const evs = data?.data?.schedule?.events||[];
+
+            if (!evs.length) {
+                cc.innerHTML = '<div class="err"><p style="font-size:1.2em;margin-bottom:8px;">Nenhum jogo ao vivo</p><button onclick="loadLive()" style="margin-top:8px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Verificar</button></div>';
                 return;
             }
 
+            // CBLOL first
+            evs.sort((a,b) => (a.league?.id===CBLOL?0:1)-(b.league?.id===CBLOL?0:1));
+
             let html = '';
-            for (const m of matches) {
-                const opp = m.opponents || [];
-                if (opp.length < 2) continue;
-
-                const tA = opp[0]?.opponent;
-                const tB = opp[1]?.opponent;
-                if (!tA || !tB) continue;
-
-                const matchId = m.id || m.slug || '';
-                const date = m.begin_at ? new Date(m.begin_at) : null;
-                const status = m.status || 'unknown';
-                const nbGames = m.number_of_games || 0;
-                const winnerId = m.winner_id;
-                const results = m.results || [];
-                const detailed_stats = m.detailed_stats || [];
-
-                // Get game wins
-                const winsA = detailed_stats?.[0]?.game_wins || (tA.wins || 0);
-                const winsB = detailed_stats?.[1]?.game_wins || (tB.wins || 0);
-                const scoreA = detailed_stats?.[0]?.score ?? winsA;
-                const scoreB = detailed_stats?.[1]?.score ?? winsB;
-                const winnerTeam = winnerId === tA.id ? tA : winnerId === tB.id ? tB : null;
-
-                const imgA = tA.image_url || '';
-                const imgB = tB.image_url || '';
-                const nameA = tA.name || tA.acronym || 'Time A';
-                const nameB = tB.name || tB.acronym || 'Time B';
-                const codeA = tA.acronym || tA.slug || nameA;
-                const codeB = tB.acronym || tB.slug || nameB;
-                const slug = tA.slug || '';
-
-                // Only show LoL CBLOL
-                if (slug && !slug.toLowerCase().includes('cblol') && !slug.toLowerCase().includes('brazil')) {
-                    // Check both teams
-                    const slugB = tB.slug || '';
-                    if (!slugB.toLowerCase().includes('cblol') && !slugB.toLowerCase().includes('brazil')) continue;
-                }
-
-                if (status === 'finished' || status === 'complete') {
-                    html += `
-                        <div class="cblol-match">
-                            <div class="cm-header">${date ? date.toLocaleDateString('pt-BR') : ''} · Finalizada${nbGames > 1 ? ` · Melhor de ${nbGames}` : ''}</div>
-                            <div class="cm-teams">
-                                <div class="cm-team">
-                                    <img src="${imgA}" alt="${nameA}">
-                                    <div class="cm-name">${codeA}</div>
-                                </div>
-                                <div class="cm-vs">vs</div>
-                                <div class="cm-team">
-                                    <img src="${imgB}" alt="${nameB}">
-                                    <div class="cm-name">${codeB}</div>
-                                </div>
-                            </div>
-                            <div class="cm-result">
-                                <span class="${winnerTeam===tA?'cm-winner':'cm-loser'}">${scoreA}</span>
-                                <span>—</span>
-                                <span class="${winnerTeam===tB?'cm-winner':'cm-loser'}">${scoreB}</span>
-                            </div>
-                            ${renderPredictionResult(matchId, {code:codeA}, {code:codeB}, winnerTeam)}
-                        </div>
-                    `;
-                } else if (status === 'running' || status === 'in_progress') {
-                    html += `
-                        <div class="cblol-match">
-                            <div class="cm-header">🔴 AO VIVO</div>
-                            <div class="cm-teams">
-                                <div class="cm-team">
-                                    <img src="${imgA}" alt="${nameA}">
-                                    <div class="cm-name">${codeA}</div>
-                                </div>
-                                <div class="cm-vs">vs</div>
-                                <div class="cm-team">
-                                    <img src="${imgB}" alt="${nameB}">
-                                    <div class="cm-name">${codeB}</div>
-                                </div>
-                            </div>
-                            <div class="cm-result">
-                                <span class="cm-winner">${scoreA}</span>
-                                <span>—</span>
-                                <span class="cm-winner">${scoreB}</span>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    const savedPred = getPrediction(matchId);
-                    html += `
-                        <div class="cblol-match">
-                            <div class="cm-header">${date ? date.toLocaleDateString('pt-BR') + ' às ' + date.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : 'Em breve'}</div>
-                            <div class="cm-teams">
-                                <div class="cm-team">
-                                    <img src="${imgA}" alt="${nameA}">
-                                    <div class="cm-name">${codeA}</div>
-                                </div>
-                                <div class="cm-vs">vs</div>
-                                <div class="cm-team">
-                                    <img src="${imgB}" alt="${nameB}">
-                                    <div class="cm-name">${codeB}</div>
-                                </div>
-                            </div>
-                            <div class="cm-prediction">
-                                <label>Palpite:</label>
-                                <select id="pred-${matchId}">
-                                    <option value="${codeA}" ${savedPred?.winner===codeA?'selected':''}>${codeA}</option>
-                                    <option value="${codeB}" ${savedPred?.winner===codeB?'selected':''}>${codeB}</option>
-                                </select>
-                                <input type="number" id="pred-score-${matchId}" placeholder="Placar" min="0" max="5" value="${savedPred?.score || ''}" style="width:70px;">
-                                <button class="cm-save" onclick="savePred('${matchId}')">Salvar</button>
-                            </div>
-                        </div>
-                    `;
-                }
+            for (const ev of evs) {
+                const m=ev.match||{}, ts=m.teams||[];
+                if (ts.length<2) continue;
+                const gid = ev.id||m.id||'';
+                const ln = ev.league?.name||ev.blockName||'';
+                const li = ev.league?.image||'';
+                html += `<div class="lg" id="lg-${gid}" data-gid="${gid}" data-ts="${ev.startTime||''}">
+                    <div class="lgh"><span class="ldot"></span> AO VIVO${li?`<img src="${li}" style="width:18px;height:18px;object-fit:contain;margin-left:6px;vertical-align:middle;">`:''}${ln?' &middot; '+ln:''}</div>
+                    <div class="ldet" onclick="togLive('${gid}','${ev.startTime}')">
+                        <div class="lgp"><div class="lgt"><img src="${ts[0].image||''}"><div class="ln">${ts[0].code}</div></div><div class="lvs">vs</div><div class="lgt"><img src="${ts[1].image||''}"><div class="ln">${ts[1].code}</div></div></div>
+                        <div class="lrs"><span class="lrw">${ts[0].result?.gameWins||0}</span><span>&mdash;</span><span class="lrw">${ts[1].result?.gameWins||0}</span></div>
+                        <div style="text-align:center;font-size:.7em;color:var(--dim);margin-top:4px;">▼ Clique para ver detalhes</div>
+                    </div>
+                    <div id="lp-${gid}" class="ldp" style="display:none;"></div>
+                </div>`;
             }
-
-            content.innerHTML = html || '<div class="error-box"><p>Nenhuma partida CBLOL encontrada nesta categoria.</p></div>';
+            cc.innerHTML = html;
+            liveTimer = setInterval(refreshLive, 30000);
         } catch(e) {
-            content.innerHTML = `<div class="error-box"><p>Erro ao carregar CBLOL: ${e.message}</p><button onclick="loadMatches('${type}')" style="margin-top:12px;padding:10px 22px;border-radius:8px;background:var(--primary);color:var(--bg-dark);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
+            cc.innerHTML = `<div class="err"><p>Erro: ${e.message}</p><button onclick="loadLive()" style="margin-top:12px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
         }
     }
 
-    /* ============================================================
-       PREDICTIONS
-    ============================================================ */
+    window.togLive = async (gid, ts) => {
+        const p = $(`lp-${gid}`);
+        if (!p) return;
+        if (p.style.display !== 'none') { p.style.display='none'; return; }
+        p.style.display = 'block';
+        p.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        await fetchLive(gid, ts, p);
+        const el = document.querySelector(`[data-gid="${gid}"] .ldet div:last-child`);
+        if (el) el.textContent = '▲ Clique para recolher';
+    };
 
-    function getPredKey(mid) { return `pred_${mid}`; }
-
-    function getPrediction(mid) {
-        try { return JSON.parse(localStorage.getItem(getPredKey(mid)) || 'null'); } catch(_) { return null; }
+    async function refreshLive() {
+        document.querySelectorAll('.ldp[style*="block"]').forEach(p => {
+            const lg = p.closest('.lg');
+            if (lg) fetchLive(lg.dataset.gid, lg.dataset.ts, p);
+        });
     }
-    function savePred(mid) {
-        const sel = document.getElementById(`pred-${mid}`);
-        const score = document.getElementById(`pred-score-${mid}`);
-        if (!sel || !score) return;
-        localStorage.setItem(getPredKey(mid), JSON.stringify({
-            winner: sel.value,
-            score: score.value,
-            time: Date.now()
-        }));
-        // Visual feedback
-        const btn = document.querySelector(`[onclick="savePred('${mid}')"]`);
-        if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = 'Salvar', 1500); }
+
+    async function fetchLive(gid, ts, p) {
+        if (!p) p = $(`lp-${gid}`);
+        if (!p) return;
+        try {
+            const data = await live(`/window/${gid}`);
+            if (!data) { p.innerHTML='<div class="err"><p>Dados indispon&iacute;veis</p></div>'; return; }
+            const fr = data?.data?.frames||[];
+            if (!fr.length) { p.innerHTML='<div class="err"><p>Aguardando dados...</p></div>'; return; }
+            const lf = fr[fr.length-1];
+            const gm = data?.data?.gameMetadata||{};
+            const bm = gm?.blueTeamMetadata||{}, rm = gm?.redTeamMetadata||{};
+            const bt = lf.blueTeam||{participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
+            const rt = lf.redTeam||{participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
+            const gs = lf.gameState||'in_game', gt = lf.gameTime||0;
+            const gp = getGP(bt.totalGold, rt.totalGold);
+
+            p.innerHTML = `<div>
+                <div style="font-size:.7em;color:var(--dim);text-align:center;margin-bottom:6px;">${fmtTime(gt)} &middot; ${gs==='in_game'?'AO VIVO':gs==='paused'?'PAUSADO':'FINALIZADO'}</div>
+                <div class="gbar"><div class="gb-b" style="flex:${gp.b}">${bt.totalGold?fmtGold(bt.totalGold):''}</div><div class="gb-r" style="flex:${gp.r}">${rt.totalGold?fmtGold(rt.totalGold):''}</div></div>
+                ${renderObjs({a:{k:bt.totalKills,t:bt.towers,br:bt.barons,i:bt.inhibitors,d:bt.dragons},b:{k:rt.totalKills,t:rt.towers,br:rt.barons,i:rt.inhibitors,d:rt.dragons}})}
+                <div class="pgt">${renderPlayers(bt.participants,bm,'b')}${renderPlayers(rt.participants,rm,'r')}</div>
+            </div>`;
+        } catch(_) { p.innerHTML='<div class="err"><p>Erro ao carregar ao vivo</p></div>'; }
     }
-    window.savePred = savePred;
 
-    function renderPredictionResult(mid, tA, tB, winner) {
-        const pred = getPrediction(mid);
-        if (!pred) return '<div class="cm-prediction-result pending">Sem palpite salvo</div>';
+    function getGP(b,r) { const t=b+r; return t?{b:b,r:r}:{b:1,r:1}; }
 
-        const winnerName = winner?.code || winner?.name || '';
-        const predWinner = pred.winner;
-        const predScore = pred.score;
+    function renderObjs(o) {
+        const drA = (o.a?.d||[]).map(dragonEmoji).join('');
+        const drB = (o.b?.d||[]).map(dragonEmoji).join('');
+        return `<div class="objs">
+            <div class="og"><span class="ob">${o.a.k||0}</span> ⚔️ <span class="or2">${o.b.k||0}</span></div>
+            <div class="og"><span class="ob">${o.a.t||0}</span> 🗼 <span class="or2">${o.b.t||0}</span></div>
+            <div class="og"><span class="ob">${o.a.br||0}</span> 🐉 <span class="or2">${o.b.br||0}</span></div>
+            <div class="og"><span class="ob">${o.a.i||0}</span> ⛩️ <span class="or2">${o.b.i||0}</span></div>
+            ${drA||drB?`<div class="og"><span style="font-size:1.1em;">${drA}</span><span style="font-size:1.1em;">${drB}</span></div>`:''}
+        </div>`;
+    }
 
-        if (predWinner === winnerName) {
-            return `<div class="cm-prediction-result correct">✓ Acertou! Palpite: ${predWinner} ${predScore ? predScore : ''}</div>`;
-        } else {
-            return `<div class="cm-prediction-result wrong">✗ Errou! Palpite: ${predWinner} ${predScore ? predScore : ''}</div>`;
+    function renderPlayers(pl,meta,side) {
+        if (!pl?.length) return '';
+        const nm = side==='b'?'Azul':'Vermelha';
+        let h = `<div class="pgs ${side}"><div class="pgh">${nm}</div>`;
+        for (const p of pl) {
+            const mi = side==='b'?(p.participantId-1):(p.participantId-6);
+            const ch = meta?.participantMetadata?.[mi]?.championId||'?';
+            const ci = CMAP[ch]||ch;
+            const k=p.kills||0,d=p.deaths||0,a=p.assists||0,cs=p.creepScore||0,lv=p.level||0;
+            const hp = p.maxHealth>0?((p.currentHealth/p.maxHealth)*100)|0:100;
+            const clr = hp>60?'#4caf50':hp>30?'#ff9800':'#ef5350';
+            h += `<div class="ppr"><img src="https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${ci||'Teemo'}.png" loading="lazy"><span class="pn3">${ch}</span><span style="font-size:.6em;color:var(--dim);">Lv.${lv}</span><span class="pk"><b>${k}</b>/<span style="color:#ef5350;">${d}</span>/<span style="color:var(--pri);">${a}</span></span><span class="cs">${cs} CS</span><div class="hpb" style="overflow:hidden;">
+                <div style="width:${hp}%;height:100%;background:${clr};border-radius:2px;"></div>
+            </div></div>`;
         }
+        h += '</div>'; return h;
     }
 
-    async function renderRanking() {
-        const content = $('cblol-content');
-
-        // Calculate prediction scores from localStorage vs finished matches
-        const scores = PLAYERS.map(p => ({ name: p.name, correct: 0, total: 0, idx: 0 }));
-        PLAYERS.forEach((p, i) => scores[i].idx = i);
+    // ======================== RANKING ========================
+    async function loadRanking() {
+        const cc = $('cc');
+        const sc = PLAYERS.map((p,i) => ({name:p.name,pts:0,ex:0,wn:0,wr:0,tot:0,idx:i}));
 
         try {
-            let leagueId = null;
-            const leagues = await pandascore('/lol/leagues?filter[name]=CBLOL');
-            if (leagues?.length) leagueId = leagues[0].id;
+            let evs=[], cursor='', first=true;
+            do {
+                let u = `https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL}`;
+                if (!first) u += '&old=true';
+                if (cursor) u += `&cursor=${cursor}`;
+                const data = await esps(u);
+                if (!data?.data?.schedule) break;
+                evs.push(...(data.data.schedule.events||[]).filter(e=>e.state==='completed'));
+                cursor = data.data.schedule.pages?.older||'';
+                first = false;
+            } while (cursor && evs.length<200);
 
-            const path = `/lol/matches/closed?${leagueId ? `filter[league_id]=${leagueId}&` : ''}page[size]=50`;
-            const matches = await pandascoreSilent(path, []);
+            for (const ev of evs) {
+                const mid = ev.id||ev.slug||'';
+                const sp = getPred(mid);
+                if (!sp) continue;
+                const ts = ev.match?.teams||[];
+                if (ts.length<2) continue;
+                const tA=ts[0],tB=ts[1];
+                const w = (tA.result?.outcome==='win')?tA:(tB.result?.outcome==='win')?tB:null;
+                if (!w) continue;
+                const wc = w.code||w.name;
+                const sa = tA.result?.gameWins||0, sb = tB.result?.gameWins||0;
 
-            if (matches) {
-                for (const m of matches) {
-                    const mid = m.id || m.slug || '';
-                    const pred = getPrediction(mid);
-                    if (!pred || !m.winner_id) continue;
-
-                    const winnerOpp = m.opponents?.find(o => o?.opponent?.id === m.winner_id);
-                    const winnerCode = winnerOpp?.opponent?.acronym || '';
-                    if (!winnerCode) continue;
-
-                    scores.forEach(s => s.total++);
-                    if (pred.winner === winnerCode) {
-                        scores.forEach(s => s.correct++);
-                    }
-                }
+                sc.forEach(s => s.tot++);
+                const gw = sp.winner===wc;
+                const gs = sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===sa&&sp.scoreB===sb;
+                if (gs) { sc.forEach(s => {s.pts+=35;s.ex++;}); }
+                else if (gw) { sc.forEach(s => {s.pts+=10;s.wn++;}); }
+                else { sc.forEach(s => s.wr++); }
             }
         } catch(_) {}
 
-        // Sort by correct desc, then name
-        const ranked = [...scores].sort((a, b) => b.correct - a.correct || a.name.localeCompare(b.name));
-
-        content.innerHTML = `
-            <h3 style="margin-bottom:16px;">🏆 Ranking de Palpites</h3>
-            <table class="ranking-table">
-                <thead><tr><th>#</th><th>Jogador</th><th>Acertos</th><th>Erros</th><th>Pontos</th></tr></thead>
-                <tbody>
-                    ${ranked.map((s, i) => `
-                        <tr ${i < 3 ? 'style="font-weight:700;"' : ''}>
-                            <td>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1)}</td>
-                            <td style="cursor:pointer;" onclick="location.hash='profile/${s.idx}'">${s.name}</td>
-                            <td style="color:#4caf50;">${s.correct}</td>
-                            <td style="color:#ef5350;">${s.total - s.correct}</td>
-                            <td style="color:var(--primary);">${s.correct * 10}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-            <p style="margin-top:16px;font-size:0.8em;color:var(--text-dim);">+10 pts por acerto · Clique no jogador para ver o perfil</p>
-        `;
+        const rk = [...sc].sort((a,b) => b.pts-a.pts||a.name.localeCompare(b.name));
+        cc.innerHTML = `<h3 style="margin-bottom:4px;">🏆 Ranking de Palpites</h3>
+            <p style="font-size:.75em;color:var(--dim);margin-bottom:16px;">🎯 Vencedor: +10 pts · ⭐ Placar exato: +25 pts · M&aacute;x: 35 pts</p>
+            <table class="rt">
+            <thead><tr><th>#</th><th>Jogador</th><th>Exato</th><th>Vencedor</th><th>Erros</th><th>Pts</th></tr></thead>
+            <tbody>${rk.map((s,i) => {
+                const wr = s.tot-s.ex-s.wn;
+                return `<tr ${i<3?'style="font-weight:700;"':''}>
+                    <td>${['🥇','🥈','🥉',''][i]||(i+1)}</td>
+                    <td style="cursor:pointer;" onclick="location.hash='profile/${s.idx}'">${s.name}</td>
+                    <td style="color:#4caf50;">${s.ex}</td><td style="color:#ffd740;">${s.wn}</td>
+                    <td style="color:#ef5350;">${wr<0?0:wr}</td><td style="color:var(--pri);font-weight:800;">${s.pts}</td></tr>`;
+            }).join('')}</tbody></table>
+            <p style="margin-top:16px;font-size:.8em;color:var(--dim);">Clique no jogador para ver o perfil</p>`;
     }
 
-    /* ============================================================
-       RENDER: ARCADE
-    ============================================================ */
-
+    // ======================== ARCADE ========================
     function renderArcade() {
-        app.innerHTML = `
-            <div style="max-width:900px;margin:0 auto;padding:0 16px;">
-                <div class="arcade-view">
-                    <div class="arcade-header">
-                        <h1>🎮 Arcade</h1>
-                        <p style="color:var(--text-dim);">Jogos clássicos pra passar o tempo</p>
-                    </div>
-                    <div class="arcade-game-grid">
-                        <a href="tictactoe.html" class="arcade-game-link">
-                            <div class="agl-icon">✕○</div>
-                            <div class="agl-name">Jogo da Velha</div>
-                            <div class="agl-desc">Contra IA (Minimax) ou 2 jogadores</div>
-                        </a>
-                        <a href="memory.html" class="arcade-game-link">
-                            <div class="agl-icon">🃏</div>
-                            <div class="agl-name">Memória</div>
-                            <div class="agl-desc">Encontre os pares de cartas</div>
-                        </a>
-                        <a href="snake.html" class="arcade-game-link">
-                            <div class="agl-icon">🐍</div>
-                            <div class="agl-name">Snake</div>
-                            <div class="agl-desc">Coma, cresça e não bata!</div>
-                        </a>
-                        <a href="pong.html" class="arcade-game-link">
-                            <div class="agl-icon">🏓</div>
-                            <div class="agl-name">Pong</div>
-                            <div class="agl-desc">Tabela clássica contra a IA</div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        `;
+        app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;">
+            <div class="av"><div class="ah"><h1>🎮 Arcade</h1><p>Jogos cl&aacute;ssicos pra passar o tempo</p></div>
+            <div class="ag">
+                <a href="tictactoe.html" class="agl"><div class="ic">✕○</div><div class="nm">Jogo da Velha</div><div class="ds">Contra IA ou 2 jogadores</div></a>
+                <a href="memory.html" class="agl"><div class="ic">🃏</div><div class="nm">Mem&oacute;ria</div><div class="ds">Encontre os pares</div></a>
+                <a href="snake.html" class="agl"><div class="ic">🐍</div><div class="nm">Snake</div><div class="ds">Coma e cres&ccedil;a!</div></a>
+                <a href="pong.html" class="agl"><div class="ic">🏓</div><div class="nm">Pong</div><div class="ds">Tabela cl&aacute;ssica</div></a>
+            </div></div></div>`;
     }
 
-    /* ============================================================
-       INIT
-    ============================================================ */
+    // ======================== INIT ========================
+    try {
+        const d = await fetch(`https://ddragon.leagueoflegends.com/cdn/${DVER}/data/en_US/champion.json`).then(r=>r.json());
+        for (const [k,v] of Object.entries(d.data)) CMAP[v.key] = k;
+    } catch(_) {}
+    nav(location.hash||'#team');
 
-    await loadCDragon();
-    navigate(location.hash || '#team');
-
-})();
+    })();
     </script>
 </body>
 </html>
