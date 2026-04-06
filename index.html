@@ -12,9 +12,9 @@
         <div class="nav-in">
             <div class="logo">PROFA <span>GAMES</span></div>
             <div class="nl" id="nav">
-                <a href="#team" class="on" data-p="team">Time</a>
+                <a href="#team" class="on" data-p="team">Squad</a>
                 <a href="#cblol" data-p="cblol">CBLOL</a>
-                <a href="#arcade" data-p="arcade">Arcade</a>
+                <a href="#live" data-p="live">Ao Vivo</a>
             </div>
             <button id="mmb">&#9776;</button>
         </div>
@@ -25,49 +25,48 @@
     <footer class="ft">PROFA GAMES &copy; 2026 &mdash; Riot Games API + LoL Esports API. N&atilde;o endossado pela Riot.</footer>
 
     <script>
-    (async() => {
+    (async () => {
     'use strict';
 
     // ======================== CONFIG ========================
     const PLAYERS = [
-        { name:'PROF',           tag:'ANON',  region:'BR1' },
-        { name:'loadt',          tag:'9753',  region:'BR1' },
-        { name:'Spring Boot',    tag:'Getss', region:'BR1' },
-        { name:'tume',           tag:'br1',   region:'BR1' },
-        { name:'Bruvel',         tag:'BTC',   region:'BR1' },
-        { name:'Matraca IV',     tag:'kash',  region:'BR1' },
+        { name:'PROF',        tag:'ANON',  region:'BR1' },
+        { name:'loadt',       tag:'9753',  region:'BR1' },
+        { name:'Spring Boot', tag:'Getss', region:'BR1' },
+        { name:'tume',        tag:'br1',   region:'BR1' },
+        { name:'Bruvel',      tag:'BTC',   region:'BR1' },
+        { name:'Matraca IV',  tag:'kash',  region:'BR1' },
     ];
-    const RIOT_KEY = window.PROFA_CONFIG?.riotKey || localStorage.getItem('lol_key') || 'RGAPI-ac93dba2-2144-4534-a0e6-c1b8d864d0ec';
+    const RIOT_KEY    = window.PROFA_CONFIG?.riotKey    || localStorage.getItem('lol_key')     || 'RGAPI-16e48557-eb13-41e8-9caa-6d30b83932bb';
     const ESPORTS_KEY = window.PROFA_CONFIG?.esportsKey || localStorage.getItem('esports_key') || '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
-    const CBLOL = '98767991332355509';
-    const DVER = '14.24.1';
+    const CBLOL_ID    = '98767991332355509';
+    const DVER        = '14.24.1';
 
     // ======================== UTILS ========================
-    const $ = id => document.getElementById(id);
-    const app = $('appc');
-    const plat = r => ({BR1:'br1',NA1:'na1',EUW1:'euw1',EUN1:'eun1',KR:'kr',TR1:'tr1',LA1:'la1',LA2:'la2',OC1:'oc1'})[r]||'br1';
-    const cluster = r => (['NA1','BR1','LA1','LA2','OC1'].includes(r))?'americas':(['EUW1','EUN1'].includes(r))?'europe':'asia';
+    const $      = id => document.getElementById(id);
+    const app    = $('appc');
+    const plat   = r => ({BR1:'br1',NA1:'na1',EUW1:'euw1',EUN1:'eun1',KR:'kr',TR1:'tr1',LA1:'la1',LA2:'la2',OC1:'oc1'})[r]||'br1';
+    const clust  = r => (['NA1','BR1','LA1','LA2','OC1'].includes(r))?'americas':(['EUW1','EUN1'].includes(r))?'europe':'asia';
     const fmtDur = s => s ? `${(s/60)|0}min` : '?';
-    const fmtAgo = ts => { if(!ts) return ''; const d=(Date.now()-ts)/1000; return d<3600?`${(d/60)|0}min atr&aacute;s`:d<86400?`${(d/3600)|0}h atr&aacute;s`:`${(d/86400)|0}d atr&aacute;s`; };
-    const fmtGold = g => (g/1000).toFixed(1)+'K';
-    const fmtTime = s => `${(s/60)|0}min`;
-    const champImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${CMAP[id]||'Teemo'}.png`;
-    const itemImg = id => id ? `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/item/${id}.png` : '';
-    const spellImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/spell/${id}.png`;
+    const fmtAgo = ts => { if(!ts) return ''; const d=(Date.now()-ts)/1000; return d<3600?`${(d/60)|0}min atrás`:d<86400?`${(d/3600)|0}h atrás`:`${(d/86400)|0}d atrás`; };
+    const fmtGold= g => g>=1000?(g/1000).toFixed(1)+'K':String(g||0);
+    const fmtTime= s => `${(s/60)|0}:${String((s%60)|0).padStart(2,'0')}`;
+    const champImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${CMAP[id]||'Teemo'}.png`;
+    const itemImg = id => id?`https://ddragon.leagueoflegends.com/cdn/${DVER}/img/item/${id}.png`:'';
+    const spellImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/spell/${id}.png`;
     const profImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/${id}.png`;
-    const modeName = m => ({CLASSIC:"Summoner's Rift",ARAM:'ARAM',TUTORIAL:'Tutorial'})[m]||m||'Normal';
-    const rankCls = t => t ? `rank-${t.toLowerCase()}` : '';
+    const modeName= m => ({CLASSIC:"Summoner's Rift",ARAM:'ARAM',TUTORIAL:'Tutorial'})[m]||m||'Normal';
+    const rankCls = t => t?`rank-${t.toLowerCase()}`:'';
+    const drgEmoji= d => ({ocean:'🌊',infernal:'🔥',cloud:'💨',mountain:'⛰️',elder:'🐲',hextech:'⚡',chemtech:'☣️'})[d]||'🔥';
+    const profFB  = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%2316213e%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%238892b0%22 font-size=%2250%22>?</text></svg>`;
+    const F       = `onerror="this.onerror=null;this.src='${profFB}'"`;
 
-    const dragonEmoji = d => ({ocean:'🌊',infernal:'🔥',cloud:'💨',mountain:'⛰️',elder:'🐲',hextech:'⚡',chemtech:'☣️'})[d]||'🔥';
-    const profFallback = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%2316213e%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%238892b0%22 font-size=%2250%22>?</text></svg>`;
-    const F = `onerror="this.onerror=null;this.src='${profFallback}"`;
-
-    let CMAP = {}; // champion key->name
+    let CMAP = {};
 
     // ======================== API ========================
     async function riot(url) {
         const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
-        if (!r.ok) throw new Error(`${r.status}: ${await r.text().catch(()=>'')}`);
+        if (!r.ok) throw new Error(`Riot ${r.status}`);
         return r.json();
     }
     async function rots(u, fb=null) { try { return await riot(u); } catch(_) { return fb; } }
@@ -75,102 +74,128 @@
     async function esp(url) {
         const full = url.startsWith('http') ? url : `https://esports-api.lolesports.com/persisted/gw${url}`;
         const r = await fetch(full, { headers:{ 'x-api-key': ESPORTS_KEY } });
-        if (!r.ok) throw new Error(`Esports ${r.status}: ${await r.text().catch(()=>'')}`);
+        if (!r.ok) throw new Error(`Esports ${r.status}`);
         return r.json();
     }
     async function esps(u, fb=null) { try { return await esp(u); } catch(_) { return fb; } }
 
-    async function live(u) {
+    async function live(u, params) {
         const full = u.startsWith('http') ? u : `https://feed.lolesports.com/livestats/v1${u}`;
-        const r = await fetch(full, { headers:{ 'x-api-key': ESPORTS_KEY } });
+        const q = params ? '?'+new URLSearchParams(params) : '';
+        const r = await fetch(full+q, { headers:{ 'x-api-key': ESPORTS_KEY } });
         if (!r.ok) return null;
         return r.json();
     }
 
+    function isoRound10() {
+        const d = new Date(); d.setMilliseconds(0);
+        if (d.getSeconds()%10!==0) d.setSeconds(d.getSeconds()-(d.getSeconds()%10));
+        d.setSeconds(d.getSeconds()-60);
+        return d.toISOString();
+    }
+
     // ======================== DATA LAYER ========================
     const cache = {};
-
     async function loadPlayer(i) {
         if (cache[i]) return cache[i];
-        const p = PLAYERS[i];
-        const c = cluster(p.region), pl = plat(p.region);
-
-        const account = await riot(`https://${c}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
+        const p = PLAYERS[i], c = clust(p.region), pl = plat(p.region);
+        const account  = await riot(`https://${c}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`);
         const summoner = await riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`);
-        const league = await rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []) || [];
-        const mastery = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}/top?count=5`, []) || [];
+        const league   = await rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []) || [];
+        const mastery  = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${account.puuid}/top?count=5`, []) || [];
         const matchIds = await rots(`https://${c}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=20`, []) || [];
-
-        const matches = [];
-        const n = Math.min(matchIds.length, 8);
-        await Promise.all(matchIds.slice(0, n).map(mid =>
+        const matches  = [];
+        await Promise.all(matchIds.slice(0, 8).map(mid =>
             riot(`https://${c}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => matches.push(d)).catch(() => {})
         ));
-
-        const data = { account, summoner, league, mastery, matches };
-        cache[i] = data;
-        return data;
+        cache[i] = { account, summoner, league, mastery, matches };
+        return cache[i];
     }
 
     // ======================== ROUTER ========================
     let liveTimer = null;
-    function clearLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer=null; } }
+    function clearLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
 
     function nav(hash) {
-        const h = hash.replace(/^#/,'');
+        const h = hash.replace(/^#/, '');
         document.querySelectorAll('.nl a').forEach(a => a.classList.remove('on'));
         const ln = document.querySelector(`.nl a[data-p="${pn(h)}"]`);
         if (ln) ln.classList.add('on');
-        clearLive();
-
-        if (!h || h==='team') renderTeam();
+        if (!h || h === 'team')          { clearLive(); renderTeam(); }
+        else if (h.startsWith('live'))   { clearLive(); renderLivePage(h); }
         else if (h.startsWith('profile/')) renderProfile(parseInt(h.split('/')[1]));
-        else if (h==='cblol') renderCBLOL('upcoming');
-        else if (h==='arcade') renderArcade();
-        else renderTeam();
+        else if (h === 'cblol')          { clearLive(); renderCBLOL('upcoming'); }
+        else                             { clearLive(); renderTeam(); }
     }
     function pn(h) {
-        if (!h||h==='team'||h.startsWith('profile/')) return 'team';
-        if (h==='cblol') return 'cblol';
-        if (h==='arcade') return 'arcade';
+        if (!h || h === 'team' || h.startsWith('profile/')) return 'team';
+        if (h === 'cblol') return 'cblol';
+        if (h.startsWith('live')) return 'live';
         return 'team';
     }
+
     window.addEventListener('hashchange', () => nav(location.hash));
     document.addEventListener('click', e => {
-        if (e.target.closest('a[href^="#"]')) { e.preventDefault(); location.hash=e.target.closest('a').getAttribute('href').slice(1); }
+        const a = e.target.closest('a[href^="#"]');
+        if (a) { e.preventDefault(); location.hash = a.getAttribute('href').slice(1); }
     });
-    // Mobile menu
     $('mmb').addEventListener('click', () => $('nav').classList.toggle('open'));
     $('nav').addEventListener('click', () => $('nav').classList.remove('open'));
 
     // ======================== TEAM ========================
     async function renderTeam() {
         app.innerHTML = `
-        <div class="hero"><h1>PROFA <span style="background:linear-gradient(135deg,var(--pri),var(--acc));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">GAMES</span></h1><p>Hub do squad &mdash; perfis, ranked e palpites CBLOL</p></div>
-        <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
-            <div class="sh"><h2>O Squad</h2></div>
-            <div class="tg">${PLAYERS.map((p,i) => `<div class="pc" data-i="${i}" onclick="location.hash='profile/${i}'"><div class="ld"><div class="sp"></div></div></div>`).join('')}</div>
+        <div class="squad-hero">
+            <div class="squad-hero-bg"></div>
+            <div class="squad-hero-inner">
+                <h1>O <span>Squad</span></h1>
+                <p>Clique em um jogador para ver perfil, ranked e partidas recentes</p>
+            </div>
+        </div>
+        <div class="section-wrap">
+            <div class="tg" id="squad-grid">
+                ${PLAYERS.map((p,i) => `<div class="pc" data-i="${i}" onclick="location.hash='profile/${i}'"><div class="ld"><div class="sp"></div></div></div>`).join('')}
+            </div>
         </div>`;
 
         PLAYERS.forEach(async (p, i) => {
             const card = document.querySelector(`[data-i="${i}"]`);
             if (!card) return;
             try {
-                const d = await loadPlayer(i);
-                const s = d.summoner, ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
-                const solo = d.league.find(e => e.queueType==='RANKED_SOLO_5x5');
-                const wr = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
-                const ago = d.matches[0] ? fmtAgo(d.matches[0].info.gameCreation) : '';
+                const d  = await loadPlayer(i);
+                const s  = d.summoner, ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
+                const solo = d.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
+                const wr   = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
+                const recent = d.matches.length
+                    ? [...d.matches].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))[0]
+                    : null;
+                const ago   = recent ? fmtAgo(recent.info.gameCreation) : '';
+                const rmp   = recent?.info?.participants?.find(x => x.puuid === d.account.puuid);
+                const rChId = rmp?.championId;
+                const rWin  = rmp?.win;
+
                 card.innerHTML = `
                 <div class="pch">
-                    <div class="pci"><img src="${profImg(ic)}" alt="" ${F}'"></div>
-                    <div><div class="pcn">${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
-                    <div class="cl">N&iacute;vel ${lv}</div></div>
+                    <div class="pci"><img src="${profImg(ic)}" alt="" ${F}></div>
+                    <div>
+                        <div class="pcn">${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
+                        <div class="cl">Nível ${lv}</div>
+                    </div>
                 </div>
-                ${solo ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>` : `<div class="pn">Sem ranked</div>`}
-                ${ago ? `<div class="lr"><span class="dot g"></span> &Uacute;ltima partida ${ago}</div>` : ''}`;
+                ${solo
+                    ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>`
+                    : `<div class="pn">Sem ranked</div>`}
+                ${rChId ? `<div class="lr">
+                    <img src="${champImg(rChId)}" style="width:22px;height:22px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
+                    <span class="dot ${rWin?'g':'r'}"></span>
+                    <span>${CMAP[rChId]||'?'} &bull; ${ago}</span>
+                </div>` : ago ? `<div class="lr"><span class="dot g"></span><span>${ago}</span></div>` : ''}`;
             } catch(_) {
-                card.innerHTML = `<div class="pch"><div class="pci" style="display:flex;align-items:center;justify-content:center;background:var(--surf);">?</div><div><div class="pcn">${p.name} <span class="t">#${p.tag}</span></div><div class="cl">Dados indispon&iacute;veis</div></div></div>`;
+                card.innerHTML = `<div class="pch">
+                    <div class="pci" style="display:flex;align-items:center;justify-content:center;background:var(--surf);font-size:1.5em;color:var(--dim);">?</div>
+                    <div><div class="pcn">${p.name} <span class="t">#${p.tag}</span></div>
+                    <div class="cl" style="color:#ef5350;">Indisponível</div></div>
+                </div>`;
             }
         });
     }
@@ -178,32 +203,32 @@
     // ======================== PROFILE ========================
     function renderProfile(idx) {
         const p = PLAYERS[idx];
-        if (!p) { location.hash='team'; return; }
-        app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;">
+        if (!p) { location.hash = 'team'; return; }
+        app.innerHTML = `<div class="section-wrap-sm">
             <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
-            <div class="pv"><div class="ld"><div class="sp"></div><p>Carregando ${p.name}...</p></div></div></div>`;
+            <div class="pv"><div class="ld"><div class="sp"></div><p>Carregando ${p.name}…</p></div></div>
+        </div>`;
 
         loadPlayer(idx).then(d => {
-            const {account:a,summoner:s,league:le,mastery:ma,matches:mt} = d;
-            const ic = s.profileIconId||5885, lv = s.summonerLevel||'?';
-            const solo = le.find(e=>e.queueType==='RANKED_SOLO_5x5');
-            const flex2 = le.find(e=>e.queueType==='RANKED_FLEX_SR');
-            let tv=0,td=0; le.forEach(e=>{tv+=e.wins||0;td+=e.losses||0;});
-            const tg=tv+td, wr2=tg>0?((tv/tg)*100).toFixed(1):'&mdash;';
-            let tk=0,tkd=0,ta=0,tcs=0;
-            mt.forEach(m=>{const mp=m.info?.participants.find(x=>x.puuid===a.puuid)||{};tk+=mp.kills||0;tkd+=mp.deaths||0;ta+=mp.assists||0;tcs+=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);});
-            const kda = mt.length>0?((tk+ta)/Math.max(tkd,1)).toFixed(1):'&mdash;';
-            const acs = mt.length>0?(tcs/mt.length)|0:0;
+            const { account:a, summoner:s, league:le, mastery:ma, matches:mt } = d;
+            const ic = s.profileIconId || 5885, lv = s.summonerLevel || '?';
+            const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
 
-            let stats = `<div class="ps">
-                <div class="pst"><div class="sm">N&iacute;vel</div><div class="sv">${lv}</div></div>
+            let tv=0, td=0; le.forEach(e => { tv+=e.wins||0; td+=e.losses||0; });
+            const tg=tv+td, wr2=tg>0?((tv/tg)*100).toFixed(1):'—';
+            let tk=0,tkd=0,ta=0,tcs=0;
+            mt.forEach(m => { const mp=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; tk+=mp.kills||0; tkd+=mp.deaths||0; ta+=mp.assists||0; tcs+=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0); });
+            const kda = mt.length ? ((tk+ta)/Math.max(tkd,1)).toFixed(1) : '—';
+            const acs = mt.length ? (tcs/mt.length)|0 : 0;
+
+            const stats = `<div class="ps">
+                <div class="pst"><div class="sm">Nível</div><div class="sv">${lv}</div></div>
                 <div class="pst"><div class="sm">Partidas</div><div class="sv">${tg}</div><div class="ss">${tv}V ${td}D</div></div>
                 <div class="pst"><div class="sm">Win Rate</div><div class="sv">${wr2}%</div></div>
-                <div class="pst"><div class="sm">KDA</div><div class="sv">${kda}</div><div class="ss">${tk}K ${tkd}D ${ta}A</div></div>
-                <div class="pst"><div class="sm">CS M&eacute;dio</div><div class="sv">${acs}</div></div>
+                <div class="pst"><div class="sm">KDA</div><div class="sv">${kda}</div><div class="ss">${tk}/${tkd}/${ta}</div></div>
+                <div class="pst"><div class="sm">CS Médio</div><div class="sv">${acs}</div></div>
             </div>`;
 
-            // Ranked
             let ranked = '';
             if (le.length) {
                 const qn = {'RANKED_SOLO_5x5':'Solo/Duo','RANKED_FLEX_SR':'Flex 5v5'};
@@ -214,12 +239,11 @@
                         <div style="font-size:.75em;color:var(--dim);text-transform:uppercase;font-weight:600;">${qn[e.queueType]||e.queueType}</div>
                         <div class="${rankCls(e.tier)}" style="font-size:1.4em;font-weight:900;">${e.tier} ${e.rank} &mdash; ${e.leaguePoints} LP</div>
                         <div style="font-size:.85em;color:var(--dim);">${e.wins}V ${e.losses}D (${w2}% WR)</div>
-                        ${e.hotStreak?'<span style="font-size:.75em;color:#ef5350;">🔥 Hot Streak</span> ':''}${e.veteran?'<span style="font-size:.75em;color:#c89b3c;">Veterano</span>':''}</div>`;
+                        ${e.hotStreak?'<span style="font-size:.75em;color:#ef5350;">🔥 Hot Streak</span>':''}${e.veteran?' <span style="font-size:.75em;color:#c89b3c;">Veterano</span>':''}</div>`;
                 }
                 ranked += '</div>';
             }
 
-            // Mastery
             let mas = '';
             if (ma.length) {
                 mas = '<div class="sx"><h3>⭐ Maestria</h3><div class="mg">';
@@ -229,59 +253,53 @@
                 mas += '</div></div>';
             }
 
-            // Matches (most recent first)
+            // Sort matches most recent first
+            const sm = [...mt].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0));
             let matchs = '';
-            const sm = [...mt].reverse();
             if (sm.length) {
                 matchs = '<div class="sx"><h3>📜 Partidas Recentes</h3>';
                 for (const m of sm) {
-                    const mp = m.info?.participants.find(x=>x.puuid===a.puuid)||{};
-                    const tw = m.info.teams?.find(t=>t.teamId===mp.teamId)?.win;
+                    const mp  = m.info?.participants?.find(x => x.puuid === a.puuid) || {};
+                    const tw  = m.info.teams?.find(t => t.teamId === mp.teamId)?.win;
                     const dur = m.info.gameDuration, cre = m.info.gameCreation;
                     const k=mp.kills||0, dd=mp.deaths||0, as2=mp.assists||0;
                     const cs2=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
-                    const cn = CMAP[mp.championId]||`#${mp.championId}`, cl2=mp.champLevel||'';
+                    const cn=CMAP[mp.championId]||`#${mp.championId}`, cl2=mp.champLevel||'';
                     let items='';
                     for(let j=0;j<=6;j++){if(mp['item'+j]) items+=`<img src="${itemImg(mp['item'+j])}" alt="" loading="lazy">`;}
                     let sums='';
                     if(mp.summoner1Id) sums+=`<img src="${spellImg(mp.summoner1Id)}" style="width:20px;height:20px;border-radius:4px;" loading="lazy">`;
                     if(mp.summoner2Id) sums+=`<img src="${spellImg(mp.summoner2Id)}" style="width:20px;height:20px;border-radius:4px;" loading="lazy">`;
-                    const c = tw?'w':'l', res=tw?'VIT&Oacute;RIA':'DERROTA';
-
-                    // Teams
+                    const cls=tw?'w':'l', res=tw?'VITÓRIA':'DERROTA';
                     const t100=(m.info?.participants||[]).filter(x=>x.teamId===100);
                     const t200=(m.info?.participants||[]).filter(x=>x.teamId===200);
-                    const row = (o,lbl='') => {
-                        const cn2=CMAP[o.championId]||`#${o.championId}`;
-                        return `<div class="or ${o.teamId===100?'b':'r'}">${lbl?'<b>'+lbl+'</b>':'<span style="width:14px;"></span>'}<img src="${champImg(o.championId)}" loading="lazy" onerror="this.style.visibility='hidden'"><span class="on">${o.riotIdGameName||'???'}</span><span class="ok"><b>${o.kills||0}</b>/<span style="color:#ef5350;">${o.deaths||0}</span>/<span style="color:var(--pri);">${o.assists||0}</span></span></div>`;
-                    };
-                    matchs += `<div class="mc ${c}">
-                        <div class="mh"><span class="${c==='w'?'':'l'}">${res}</span><span class="mhi">${fmtDur(dur)} &middot; ${modeName(m.info.gameMode)} &middot; ${fmtAgo(cre)}</span></div>
+                    const row = o => `<div class="or ${o.teamId===100?'b':'r'}">${o.puuid===a.puuid?'<b style="color:var(--pri);min-width:10px;">▶</b>':'<span style="min-width:10px;"></span>'}<img src="${champImg(o.championId)}" loading="lazy" onerror="this.style.visibility='hidden'"><span class="on">${o.riotIdGameName||'???'}</span><span class="ok"><b>${o.kills||0}</b>/<span style="color:#ef5350;">${o.deaths||0}</span>/<span style="color:var(--pri);">${o.assists||0}</span></span></div>`;
+                    matchs += `<div class="mc ${cls}">
+                        <div class="mh"><span>${res}</span><span class="mhi">${fmtDur(dur)} &bull; ${modeName(m.info.gameMode)} &bull; ${fmtAgo(cre)}</span></div>
                         <div class="mb">
                             <div class="mch"><img src="${champImg(mp.championId)}" alt="${cn}" loading="lazy"><div>
                                 <div class="mcn">${cn} Nv.${cl2}</div>
                                 <div class="kda"><b>${k}</b>/<span style="color:#ef5350;">${dd}</span>/<span style="color:var(--pri);">${as2}</span> KDA</div>
-                                <div class="csm">${cs2} CS &middot; Vis&atilde;o ${mp.visionScore||0} &middot; ${mp.goldEarned>0?(mp.goldEarned/1000).toFixed(1)+'K':0} ouro</div>
-                                ${sums}
+                                <div class="csm">${cs2} CS &bull; Visão ${mp.visionScore||0} &bull; ${mp.goldEarned>0?(mp.goldEarned/1000).toFixed(1)+'K':0} ouro</div>
+                                <div style="margin-top:4px;">${sums}</div>
                             </div></div>
                             <div class="mii">${items}</div>
                         </div>
                         <div class="os"><div class="tsr">
-                            <div><div class="th"><span class="td b"></span> AZUL (100) ${mp.teamId===100?'&larr; Seu time':''}</div>${t100.map(x=>row(x,x.puuid===a.puuid?'&rarr;':'')).join('')}</div>
-                            <div><div class="th"><span class="td r"></span> VERMELHA (200) ${mp.teamId===200?'&larr; Seu time':''}</div>${t200.map(x=>row(x,x.puuid===a.puuid?'&rarr;':'')).join('')}</div>
+                            <div><div class="th"><span class="td b"></span> AZUL ${mp.teamId===100?'← Seu time':''}</div>${t100.map(row).join('')}</div>
+                            <div><div class="th"><span class="td r"></span> VERMELHA ${mp.teamId===200?'← Seu time':''}</div>${t200.map(row).join('')}</div>
                         </div></div>
                     </div>`;
                 }
                 matchs += '</div>';
             }
 
-            const rb = solo ? `<span class="prg">${solo.tier} ${solo.rank} &mdash; ${solo.leaguePoints} LP</span>` : `<span class="prg">N&atilde;o posicionado</span>`;
-
-            app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;">
+            const rb = solo ? `<span class="prg">${solo.tier} ${solo.rank} &mdash; ${solo.leaguePoints} LP</span>` : `<span class="prg">Não posicionado</span>`;
+            app.innerHTML = `<div class="section-wrap-sm">
                 <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
                 <div class="pv">
                     <div class="pb"><div class="pbg"></div><div class="pbi">
-                        <div class="pi"><img src="${profImg(ic)}" alt="" ${F}'"></div>
+                        <div class="pi"><img src="${profImg(ic)}" alt="" ${F}></div>
                         <div><div class="pn2">${a.gameName||p.name} <span class="t">#${a.tagLine||p.tag}</span></div>
                         <span class="prg">${p.region}</span>${rb}</div>
                     </div></div>
@@ -289,114 +307,106 @@
                 </div>
             </div>`;
         }).catch(err => {
-            app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;"><button class="bb" onclick="location.hash='team'">&larr; Voltar</button><div class="err"><p style="font-size:2em;margin-bottom:12px;">❌</p><p style="font-size:1.2em;margin-bottom:8px;">Erro ao carregar perfil</p><p>${err.message}</p><button onclick="renderProfile(${idx})" style="margin-top:16px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar Novamente</button></div></div>`;
+            app.innerHTML = `<div class="section-wrap-sm"><button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+                <div class="err"><p style="font-size:2em;margin-bottom:12px;">❌</p><p style="font-size:1.2em;margin-bottom:8px;">Erro ao carregar perfil</p><p>${err.message}</p>
+                <button onclick="renderProfile(${idx})" style="margin-top:16px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar Novamente</button></div></div>`;
         });
     }
 
     // ======================== CBLOL ========================
-    const tabs = [
+    const cblolTabs = [
         {k:'upcoming',l:'Próximas'}, {k:'running',l:'Ao Vivo'}, {k:'closed',l:'Finalizadas'}, {k:'ranking',l:'Ranking'}
     ];
 
     function renderCBLOL(tab) {
         tab = tab || 'upcoming';
-        app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;">
+        app.innerHTML = `<div class="section-wrap-sm">
             <div class="cv">
-                <div class="ch2"><h1>CBLOL</h1><p>Acompanhe, palpite e dispute com o squad</p><p style="margin-top:6px;font-size:.75em;color:var(--dim);">Powered by LoL Esports API</p></div>
-                <div class="ct">${tabs.map(t=>`<button class="ctb ${t.k===tab?'on':''}" data-t="${t.k}">${t.l}</button>`).join('')}</div>
+                <div class="ch2"><h1>CBLOL</h1><p>Acompanhe, palpite e dispute com o squad</p></div>
+                <div class="ct">${cblolTabs.map(t => `<button class="ctb ${t.k===tab?'on':''}" data-t="${t.k}">${t.l}</button>`).join('')}</div>
                 <div id="cc"><div class="ld"><div class="sp"></div></div></div>
             </div>
         </div>`;
 
         document.querySelectorAll('.ctb').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.ctb').forEach(b=>b.classList.remove('on'));
+                document.querySelectorAll('.ctb').forEach(b => b.classList.remove('on'));
                 btn.classList.add('on');
                 const t = btn.dataset.t;
-                if (t==='upcoming') loadSchedule('upcoming');
+                if (t==='upcoming') { clearLive(); loadSchedule('upcoming'); }
                 else if (t==='running') loadLive();
-                else if (t==='closed') loadSchedule('closed');
+                else if (t==='closed') { clearLive(); loadSchedule('closed'); }
                 else { clearLive(); loadRanking(); }
             });
         });
 
         if (tab==='running') loadLive();
-        else if (tab==='closed') loadSchedule('closed');
-        else if (tab==='ranking') loadRanking();
-        else loadSchedule('upcoming');
+        else if (tab==='closed') { clearLive(); loadSchedule('closed'); }
+        else if (tab==='ranking') { clearLive(); loadRanking(); }
+        else { clearLive(); loadSchedule('upcoming'); }
     }
 
     async function loadSchedule(type) {
         clearLive();
         const cc = $('cc');
         cc.innerHTML = '<div class="ld"><div class="sp"></div></div>';
-
-        const isClosed = type==='closed';
+        const isClosed = type === 'closed';
         try {
-            let events = [], cursor='', first=true;
+            let events=[], cursor='', first=true;
             do {
-                let u = `https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL}`;
+                let u = `https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL_ID}`;
                 if (!first && isClosed) u += '&old=true';
                 if (cursor) u += `&cursor=${cursor}`;
                 const data = await esp(u);
                 if (!data?.data?.schedule) break;
-                const ev = data.data.schedule.events||[];
-                events.push(...ev);
+                events.push(...(data.data.schedule.events||[]));
                 cursor = data.data.schedule.pages?.older||'';
                 first = false;
-            } while (cursor && (isClosed?events.length<100:false));
+            } while (cursor && (isClosed ? events.length<100 : false));
 
             events = events.filter(e => isClosed?(e.state==='completed'):(e.state==='unstarted'));
-
             if (!events.length) { cc.innerHTML='<div class="err"><p>Nenhuma partida encontrada</p></div>'; return; }
 
             let html = '';
             for (const ev of events.reverse()) {
-                const m = ev.match||{}, ts = m.teams||[];
+                const m=ev.match||{}, ts=m.teams||[];
                 if (ts.length<2) continue;
                 const tA=ts[0], tB=ts[1];
                 const cA=tA.code||tA.name||'A', cB=tB.code||tB.name||'B';
-                const nA=tA.name||cA, nB=tB.name||cB;
                 const rA=tA.result||{}, rB=tB.result||{};
                 const sA=rA.gameWins||0, sB=rB.gameWins||0;
                 const wA=rA.outcome==='win', wB=rB.outcome==='win';
                 const winner=wA?tA:wB?tB:null;
-                const mid = ev.id||m.id||ev.slug||'';
-                const dt = ev.startTime ? new Date(ev.startTime) : null;
-                const bn = ev.blockName||'';
+                const mid=ev.id||m.id||ev.slug||'';
+                const dt=ev.startTime?new Date(ev.startTime):null;
+                const bn=ev.blockName||'';
 
                 if (isClosed) {
-                    const ac = {winnerCode:winner?(winner.code||winner.name):'',a:sA,b:sB};
+                    const ac={winnerCode:winner?(winner.code||winner.name):'',a:sA,b:sB};
                     html += `<div class="lg">
-                        <div class="lgh">${dt?dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'})+' &middot; ':''}${dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} &middot; ${bn} &middot; Finalizada</div>
+                        <div class="lgh">${dt?dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'})+' · ':''}${dt?dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · ':''} ${bn} · Finalizada</div>
                         <div class="lgp"><div class="lgt"><img src="${tA.image||''}"><div class="ln">${cA}</div></div><div class="lvs">vs</div><div class="lgt"><img src="${tB.image||''}"><div class="ln">${cB}</div></div></div>
                         <div class="lrs"><span class="${wA?'lrw':'lrl'}">${sA}</span><span>&mdash;</span><span class="${wB?'lrw':'lrl'}">${sB}</span></div>
-                        ${(rA.kills||rA.towers)?renderObjs({a:{k:rA.kills,t:rA.towers,br:rA.barons,d:rA.dragons,i:rA.inhibitors},b:{k:rB.kills,t:rB.towers,br:rB.barons,d:rB.dragons,i:rB.inhibitors}}):''}
-                        ${predResult(mid,{code:cA},{code:cB},ac)}
+                        ${predResult(mid,{code:cA},{code:cB},{winnerCode:winner?(winner.code||winner.name):'',a:sA,b:sB})}
                     </div>`;
                 } else {
-                    // Determine best of
-                    const mo = m.strategy?.type||'';
-                    const bo = mo.includes('bestOf') ? parseInt(mo.replace('bestOf','')) : 3;
-                    const gn = m.games?.length||0;
-                    const bst = gn>0?`MD${gn}`:bo?`M${bo}`:'';
-                    const sp = getPred(mid);
-
+                    const bo=m.strategy?.type?.includes('bestOf')?parseInt(m.strategy.type.replace('bestOf','')):3;
+                    const sp=getPred(mid);
                     html += `<div class="lg">
-                        <div class="lgh">${dt?dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'})+' &middot; ':''}${dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} &middot; ${bn}${bst?' &middot; '+bst:''}</div>
+                        <div class="lgh">${dt?dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'})+' · ':''}${dt?dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · ':''} ${bn} · MD${bo}</div>
                         <div class="lgp"><div class="lgt"><img src="${tA.image||''}"><div class="ln">${cA}</div></div><div class="lvs">vs</div><div class="lgt"><img src="${tB.image||''}"><div class="ln">${cB}</div></div></div>
                         <div class="prd">
                             <div><label style="font-size:.7em;color:var(--dim);display:block;">Vencedor (10 pts)</label>
-                            <select id="pw-${mid}"><option value="${cA}" ${sp?.winner&&sp?.winner===cA?'selected':''}>${cA}</option><option value="${cB}" ${sp?.winner&&sp?.winner===cB?'selected':''}>${cB}</option></select></div>
+                            <select id="pw-${mid}"><option value="${cA}" ${sp?.winner===cA?'selected':''}>${cA}</option><option value="${cB}" ${sp?.winner===cB?'selected':''}>${cB}</option></select></div>
                             <div><label style="font-size:.7em;color:var(--dim);display:block;">Placar exato (25 pts)</label>
                             <div style="display:flex;align-items:center;gap:6px;">
-                            <select id="psa-${mid}" style="width:45px;">${Array.from({length:bo||3},(_,i)=>`<option value="${i}" ${sp?.scoreA===i?'selected':''}>${i}</option>`).join('')}</select>
+                            <select id="psa-${mid}" style="width:45px;">${Array.from({length:bo},(_,i)=>`<option value="${i}" ${sp?.scoreA===i?'selected':''}>${i}</option>`).join('')}</select>
                             <span style="font-weight:800;">&mdash;</span>
-                            <select id="psb-${mid}" style="width:45px;">${Array.from({length:bo||3},(_,i)=>`<option value="${i}" ${sp?.scoreB===i?'selected':''}>${i}</option>`).join('')}</select>
+                            <select id="psb-${mid}" style="width:45px;">${Array.from({length:bo},(_,i)=>`<option value="${i}" ${sp?.scoreB===i?'selected':''}>${i}</option>`).join('')}</select>
                             </div></div>
                             <button class="sv" onclick="savePred('${mid}')">Salvar</button>
                         </div>
-                        ${sp?predPreview(sp,cA,cB):''}
+                        ${sp?`<div class="pr pd">Salvo: ${sp.winner}${sp.scoreA!=null?' ('+sp.scoreA+'—'+sp.scoreB+')':''}</div>`:''}
                     </div>`;
                 }
             }
@@ -407,60 +417,53 @@
     }
 
     // ======================== PREDICTIONS ========================
-    const pk = mid => `pred_${mid}`;
+    const pk   = mid => `pred_${mid}`;
     function getPred(mid) { try { return JSON.parse(localStorage.getItem(pk(mid))||'null'); } catch(_) { return null; } }
-    function savePred(mid) {
-        const w = $(`pw-${mid}`), sa=$(`psa-${mid}`), sb=$(`psb-${mid}`);
+    window.savePred = function(mid) {
+        const w=$(`pw-${mid}`), sa=$(`psa-${mid}`), sb=$(`psb-${mid}`);
         if (!w) return;
-        localStorage.setItem(pk(mid), JSON.stringify({winner:w.value,scoreA:sa?.value!=null?+sa.value:null,scoreB:sb?.value!=null?+sb.value:null,time:Date.now()}));
-        const btn = document.querySelector(`[onclick="savePred('${mid}')"]`);
+        localStorage.setItem(pk(mid), JSON.stringify({winner:w.value,scoreA:sa?+sa.value:null,scoreB:sb?+sb.value:null,time:Date.now()}));
+        const btn=document.querySelector(`[onclick="savePred('${mid}')"]`);
         if (btn) { btn.textContent='✓'; setTimeout(()=>btn.textContent='Salvar',1500); }
-    }
-    function predPreview(sp,a,b) { return `<div class="pr pd">Salvo: ${sp.winner} ${sp.scoreA!=null?'('+sp.scoreA+'—'+sp.scoreB+')':''}</div>`; }
-    function predResult(mid,tA,tB,ac) {
-        const sp = getPred(mid);
-        if (!sp) return '<div class="pr pd">Sem palpite</div>';
-        const gw = sp.winner===ac.winnerCode;
-        const gs = sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===ac.a&&sp.scoreB===ac.b;
-        if (gs) return `<div class="pr ex">✓ PERFEITO! +35 pts &middot; ${sp.scoreA}—${sp.scoreB}</div>`;
+    };
+    function predResult(mid, tA, tB, ac) {
+        const sp=getPred(mid); if (!sp) return '<div class="pr pd">Sem palpite</div>';
+        const gw=sp.winner===ac.winnerCode;
+        const gs=sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===ac.a&&sp.scoreB===ac.b;
+        if (gs) return `<div class="pr ex">✓ PERFEITO! +35 pts · ${sp.scoreA}—${sp.scoreB}</div>`;
         if (gw) return `<div class="pr ok">✓ Acertou o vencedor! (+10 pts)</div>`;
         return `<div class="pr no">✗ Errou! Palpite: ${sp.winner}</div>`;
     }
 
-    // ======================== LIVE GAMES ========================
+    // ======================== CBLOL LIVE (sub-aba) ========================
     async function loadLive() {
         const cc = $('cc');
+        cc.innerHTML = '<div class="ld"><div class="sp"></div></div>';
         try {
             const data = await esp('https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR');
-            const evs = data?.data?.schedule?.events||[];
-
+            const evs  = data?.data?.schedule?.events || [];
             if (!evs.length) {
                 cc.innerHTML = '<div class="err"><p style="font-size:1.2em;margin-bottom:8px;">Nenhum jogo ao vivo</p><button onclick="loadLive()" style="margin-top:8px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Verificar</button></div>';
                 return;
             }
-
-            // CBLOL first
-            evs.sort((a,b) => (a.league?.id===CBLOL?0:1)-(b.league?.id===CBLOL?0:1));
-
+            evs.sort((a,b) => (a.league?.id===CBLOL_ID?0:1)-(b.league?.id===CBLOL_ID?0:1));
             let html = '';
             for (const ev of evs) {
                 const m=ev.match||{}, ts=m.teams||[];
                 if (ts.length<2) continue;
-                const gid = ev.id||m.id||'';
-                const ln = ev.league?.name||ev.blockName||'';
-                const li = ev.league?.image||'';
+                const gid=ev.id||m.id||'';
                 html += `<div class="lg" id="lg-${gid}" data-gid="${gid}" data-ts="${ev.startTime||''}">
-                    <div class="lgh"><span class="ldot"></span> AO VIVO${li?`<img src="${li}" style="width:18px;height:18px;object-fit:contain;margin-left:6px;vertical-align:middle;">`:''}${ln?' &middot; '+ln:''}</div>
-                    <div class="ldet" onclick="togLive('${gid}','${ev.startTime}')">
+                    <div class="lgh"><span class="ldot"></span> AO VIVO${ev.league?.name?' · '+ev.league.name:''}</div>
+                    <div class="ldet" onclick="togLive('${gid}','${ev.startTime||''}')">
                         <div class="lgp"><div class="lgt"><img src="${ts[0].image||''}"><div class="ln">${ts[0].code}</div></div><div class="lvs">vs</div><div class="lgt"><img src="${ts[1].image||''}"><div class="ln">${ts[1].code}</div></div></div>
                         <div class="lrs"><span class="lrw">${ts[0].result?.gameWins||0}</span><span>&mdash;</span><span class="lrw">${ts[1].result?.gameWins||0}</span></div>
-                        <div style="text-align:center;font-size:.7em;color:var(--dim);margin-top:4px;">▼ Clique para ver detalhes</div>
+                        <div style="text-align:center;font-size:.7em;color:var(--dim);margin-top:4px;">▼ Ver detalhes</div>
                     </div>
                     <div id="lp-${gid}" class="ldp" style="display:none;"></div>
                 </div>`;
             }
             cc.innerHTML = html;
-            liveTimer = setInterval(refreshLive, 30000);
+            liveTimer = setInterval(refreshInline, 2000);
         } catch(e) {
             cc.innerHTML = `<div class="err"><p>Erro: ${e.message}</p><button onclick="loadLive()" style="margin-top:12px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
         }
@@ -472,140 +475,412 @@
         if (p.style.display !== 'none') { p.style.display='none'; return; }
         p.style.display = 'block';
         p.innerHTML = '<div class="ld"><div class="sp"></div></div>';
-        await fetchLive(gid, ts, p);
-        const el = document.querySelector(`[data-gid="${gid}"] .ldet div:last-child`);
-        if (el) el.textContent = '▲ Clique para recolher';
+        await fetchInline(gid, ts, p);
+        const label = document.querySelector(`[data-gid="${gid}"] .ldet div:last-child`);
+        if (label) label.textContent = '▲ Recolher';
     };
 
-    async function refreshLive() {
+    async function refreshInline() {
         document.querySelectorAll('.ldp[style*="block"]').forEach(p => {
             const lg = p.closest('.lg');
-            if (lg) fetchLive(lg.dataset.gid, lg.dataset.ts, p);
+            if (lg) fetchInline(lg.dataset.gid, lg.dataset.ts, p);
         });
     }
 
-    async function fetchLive(gid, ts, p) {
-        if (!p) p = $(`lp-${gid}`);
-        if (!p) return;
+    async function fetchInline(gid, ts, p) {
+        if (!p) p = $(`lp-${gid}`); if (!p) return;
         try {
-            const data = await live(`/window/${gid}`);
-            if (!data) { p.innerHTML='<div class="err"><p>Dados indispon&iacute;veis</p></div>'; return; }
-            const fr = data?.data?.frames||[];
-            if (!fr.length) { p.innerHTML='<div class="err"><p>Aguardando dados...</p></div>'; return; }
-            const lf = fr[fr.length-1];
-            const gm = data?.data?.gameMetadata||{};
-            const bm = gm?.blueTeamMetadata||{}, rm = gm?.redTeamMetadata||{};
-            const bt = lf.blueTeam||{participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
-            const rt = lf.redTeam||{participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
-            const gs = lf.gameState||'in_game', gt = lf.gameTime||0;
-            const gp = getGP(bt.totalGold, rt.totalGold);
-
+            const date = isoRound10();
+            const [wd, dd] = await Promise.all([
+                live(`/window/${gid}`, { hl:'pt-BR', startingTime:date }),
+                live(`/details/${gid}`, { hl:'pt-BR', startingTime:date })
+            ]);
+            if (!wd) { p.innerHTML='<div class="err"><p>Dados indisponíveis</p></div>'; return; }
+            const frW=wd.frames||[], frD=dd?.frames||[];
+            if (!frW.length) { p.innerHTML='<div class="err"><p>Aguardando dados…</p></div>'; return; }
+            const lf=frW[frW.length-1], ld=frD.length?frD[frD.length-1]:null;
+            const gm=wd.gameMetadata||{};
+            const bt=lf.blueTeam||{participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
+            const rt=lf.redTeam||{participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
+            const gp=bt.totalGold+rt.totalGold;
+            const gbPct=gp?Math.round((bt.totalGold/gp)*100):50;
             p.innerHTML = `<div>
-                <div style="font-size:.7em;color:var(--dim);text-align:center;margin-bottom:6px;">${fmtTime(gt)} &middot; ${gs==='in_game'?'AO VIVO':gs==='paused'?'PAUSADO':'FINALIZADO'}</div>
-                <div class="gbar"><div class="gb-b" style="flex:${gp.b}">${bt.totalGold?fmtGold(bt.totalGold):''}</div><div class="gb-r" style="flex:${gp.r}">${rt.totalGold?fmtGold(rt.totalGold):''}</div></div>
-                ${renderObjs({a:{k:bt.totalKills,t:bt.towers,br:bt.barons,i:bt.inhibitors,d:bt.dragons},b:{k:rt.totalKills,t:rt.towers,br:rt.barons,i:rt.inhibitors,d:rt.dragons}})}
-                <div class="pgt">${renderPlayers(bt.participants,bm,'b')}${renderPlayers(rt.participants,rm,'r')}</div>
+                <div style="font-size:.7em;color:var(--dim);text-align:center;margin-bottom:6px;">${fmtTime(lf.gameTime||0)} · ${lf.gameState==='in_game'?'AO VIVO':lf.gameState==='paused'?'PAUSADO':'FINALIZADO'}</div>
+                <div class="gbar"><div class="gb-b" style="flex:${gbPct}">${fmtGold(bt.totalGold)}</div><div class="gb-r" style="flex:${100-gbPct}">${fmtGold(rt.totalGold)}</div></div>
+                ${inlineObjs(bt,rt)}
+                <div class="pgt">${inlinePlayers(bt.participants,gm.blueTeamMetadata,'b',ld?.blueTeam?.participants)}${inlinePlayers(rt.participants,gm.redTeamMetadata,'r',ld?.redTeam?.participants)}</div>
             </div>`;
-        } catch(_) { p.innerHTML='<div class="err"><p>Erro ao carregar ao vivo</p></div>'; }
+        } catch(e) { p.innerHTML=`<div class="err"><p>Erro: ${e.message}</p></div>`; }
     }
 
-    function getGP(b,r) { const t=b+r; return t?{b:b,r:r}:{b:1,r:1}; }
-
-    function renderObjs(o) {
-        const drA = (o.a?.d||[]).map(dragonEmoji).join('');
-        const drB = (o.b?.d||[]).map(dragonEmoji).join('');
+    function inlineObjs(bt, rt) {
+        const dA=(bt.dragons||[]).map(drgEmoji).join('');
+        const dB=(rt.dragons||[]).map(drgEmoji).join('');
         return `<div class="objs">
-            <div class="og"><span class="ob">${o.a.k||0}</span> ⚔️ <span class="or2">${o.b.k||0}</span></div>
-            <div class="og"><span class="ob">${o.a.t||0}</span> 🗼 <span class="or2">${o.b.t||0}</span></div>
-            <div class="og"><span class="ob">${o.a.br||0}</span> 🐉 <span class="or2">${o.b.br||0}</span></div>
-            <div class="og"><span class="ob">${o.a.i||0}</span> ⛩️ <span class="or2">${o.b.i||0}</span></div>
-            ${drA||drB?`<div class="og"><span style="font-size:1.1em;">${drA}</span><span style="font-size:1.1em;">${drB}</span></div>`:''}
+            <div class="og"><span class="ob">${bt.totalKills||0}</span> ⚔️ <span class="or2">${rt.totalKills||0}</span></div>
+            <div class="og"><span class="ob">${bt.towers||0}</span> 🗼 <span class="or2">${rt.towers||0}</span></div>
+            <div class="og"><span class="ob">${bt.barons||0}</span> 🐉 <span class="or2">${rt.barons||0}</span></div>
+            <div class="og"><span class="ob">${bt.inhibitors||0}</span> ⛩️ <span class="or2">${rt.inhibitors||0}</span></div>
+            ${dA||dB?`<div class="og"><span>${dA}</span><span>${dB}</span></div>`:''}
         </div>`;
     }
 
-    function renderPlayers(pl,meta,side) {
+    function inlinePlayers(pl, meta, side, dp) {
         if (!pl?.length) return '';
-        const nm = side==='b'?'Azul':'Vermelha';
-        let h = `<div class="pgs ${side}"><div class="pgh">${nm}</div>`;
+        const nm=side==='b'?'Azul':'Vermelha';
+        let h=`<div class="pgs ${side}"><div class="pgh">${nm}</div>`;
         for (const p of pl) {
-            const mi = side==='b'?(p.participantId-1):(p.participantId-6);
-            const ch = meta?.participantMetadata?.[mi]?.championId||'?';
-            const ci = CMAP[ch]||ch;
-            const k=p.kills||0,d=p.deaths||0,a=p.assists||0,cs=p.creepScore||0,lv=p.level||0;
-            const hp = p.maxHealth>0?((p.currentHealth/p.maxHealth)*100)|0:100;
-            const clr = hp>60?'#4caf50':hp>30?'#ff9800':'#ef5350';
-            h += `<div class="ppr"><img src="https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${ci||'Teemo'}.png" loading="lazy"><span class="pn3">${ch}</span><span style="font-size:.6em;color:var(--dim);">Lv.${lv}</span><span class="pk"><b>${k}</b>/<span style="color:#ef5350;">${d}</span>/<span style="color:var(--pri);">${a}</span></span><span class="cs">${cs} CS</span><div class="hpb" style="overflow:hidden;">
-                <div style="width:${hp}%;height:100%;background:${clr};border-radius:2px;"></div>
-            </div></div>`;
+            const mi=side==='b'?(p.participantId-1):(p.participantId-6);
+            const ch=meta?.participantMetadata?.[mi]?.championId||'?';
+            let k=p.kills||0,d=p.deaths||0,a=p.assists||0,cs=p.creepScore||0,lv=p.level||0;
+            if (dp?.[mi]) { const x=dp[mi]; k=x.kills||k; d=x.deaths||d; a=x.assists||a; cs=x.creepScore||cs; lv=x.level||lv; }
+            const hp=p.maxHealth>0?((p.currentHealth/p.maxHealth)*100)|0:100;
+            const clr=hp>60?'#4caf50':hp>30?'#ff9800':'#ef5350';
+            h+=`<div class="ppr"><img src="${champImg(ch)}" loading="lazy"><span class="pn3">${ch}</span><span style="font-size:.6em;color:var(--dim);">Lv.${lv}</span><span class="pk"><b>${k}</b>/<span style="color:#ef5350;">${d}</span>/<span style="color:var(--pri);">${a}</span></span><span class="cs">${cs} CS</span><div class="hpb"><div style="width:${hp}%;height:100%;background:${clr};border-radius:2px;"></div></div></div>`;
         }
-        h += '</div>'; return h;
+        h+='</div>'; return h;
     }
 
     // ======================== RANKING ========================
     async function loadRanking() {
         const cc = $('cc');
         const sc = PLAYERS.map((p,i) => ({name:p.name,pts:0,ex:0,wn:0,wr:0,tot:0,idx:i}));
-
         try {
             let evs=[], cursor='', first=true;
             do {
-                let u = `https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL}`;
-                if (!first) u += '&old=true';
-                if (cursor) u += `&cursor=${cursor}`;
-                const data = await esps(u);
+                let u=`https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR&leagueId=${CBLOL_ID}`;
+                if (!first) u+='&old=true';
+                if (cursor) u+=`&cursor=${cursor}`;
+                const data=await esps(u);
                 if (!data?.data?.schedule) break;
                 evs.push(...(data.data.schedule.events||[]).filter(e=>e.state==='completed'));
-                cursor = data.data.schedule.pages?.older||'';
-                first = false;
+                cursor=data.data.schedule.pages?.older||'';
+                first=false;
             } while (cursor && evs.length<200);
 
             for (const ev of evs) {
-                const mid = ev.id||ev.slug||'';
-                const sp = getPred(mid);
-                if (!sp) continue;
-                const ts = ev.match?.teams||[];
-                if (ts.length<2) continue;
-                const tA=ts[0],tB=ts[1];
-                const w = (tA.result?.outcome==='win')?tA:(tB.result?.outcome==='win')?tB:null;
+                const mid=ev.id||ev.slug||'';
+                const sp=getPred(mid); if (!sp) continue;
+                const ts=ev.match?.teams||[]; if (ts.length<2) continue;
+                const w=(ts[0].result?.outcome==='win')?ts[0]:(ts[1].result?.outcome==='win')?ts[1]:null;
                 if (!w) continue;
-                const wc = w.code||w.name;
-                const sa = tA.result?.gameWins||0, sb = tB.result?.gameWins||0;
-
+                const wc=w.code||w.name;
+                const sa=ts[0].result?.gameWins||0, sb=ts[1].result?.gameWins||0;
                 sc.forEach(s => s.tot++);
-                const gw = sp.winner===wc;
-                const gs = sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===sa&&sp.scoreB===sb;
-                if (gs) { sc.forEach(s => {s.pts+=35;s.ex++;}); }
-                else if (gw) { sc.forEach(s => {s.pts+=10;s.wn++;}); }
-                else { sc.forEach(s => s.wr++); }
+                const gw=sp.winner===wc, gs=sp.scoreA!=null&&sp.scoreB!=null&&sp.scoreA===sa&&sp.scoreB===sb;
+                if (gs) sc.forEach(s => {s.pts+=35;s.ex++;});
+                else if (gw) sc.forEach(s => {s.pts+=10;s.wn++;});
+                else sc.forEach(s => s.wr++);
             }
         } catch(_) {}
 
-        const rk = [...sc].sort((a,b) => b.pts-a.pts||a.name.localeCompare(b.name));
+        const rk=[...sc].sort((a,b) => b.pts-a.pts||a.name.localeCompare(b.name));
         cc.innerHTML = `<h3 style="margin-bottom:4px;">🏆 Ranking de Palpites</h3>
-            <p style="font-size:.75em;color:var(--dim);margin-bottom:16px;">🎯 Vencedor: +10 pts · ⭐ Placar exato: +25 pts · M&aacute;x: 35 pts</p>
-            <table class="rt">
-            <thead><tr><th>#</th><th>Jogador</th><th>Exato</th><th>Vencedor</th><th>Erros</th><th>Pts</th></tr></thead>
-            <tbody>${rk.map((s,i) => {
-                const wr = s.tot-s.ex-s.wn;
-                return `<tr ${i<3?'style="font-weight:700;"':''}>
-                    <td>${['🥇','🥈','🥉',''][i]||(i+1)}</td>
-                    <td style="cursor:pointer;" onclick="location.hash='profile/${s.idx}'">${s.name}</td>
-                    <td style="color:#4caf50;">${s.ex}</td><td style="color:#ffd740;">${s.wn}</td>
-                    <td style="color:#ef5350;">${wr<0?0:wr}</td><td style="color:var(--pri);font-weight:800;">${s.pts}</td></tr>`;
-            }).join('')}</tbody></table>
+            <p style="font-size:.75em;color:var(--dim);margin-bottom:16px;">🎯 Vencedor: +10 pts · ⭐ Exato: +25 pts · Máx: 35 pts/jogo</p>
+            <table class="rt"><thead><tr><th>#</th><th>Jogador</th><th>Exato</th><th>Vencedor</th><th>Erros</th><th>Pts</th></tr></thead>
+            <tbody>${rk.map((s,i) => `<tr ${i<3?'style="font-weight:700;"':''}>
+                <td>${['🥇','🥈','🥉'][i]||(i+1)}</td>
+                <td style="cursor:pointer;" onclick="location.hash='profile/${s.idx}'">${s.name}</td>
+                <td style="color:#4caf50;">${s.ex}</td><td style="color:#ffd740;">${s.wn}</td>
+                <td style="color:#ef5350;">${Math.max(0,s.wr)}</td>
+                <td style="color:var(--pri);font-weight:800;">${s.pts}</td></tr>`).join('')}
+            </tbody></table>
             <p style="margin-top:16px;font-size:.8em;color:var(--dim);">Clique no jogador para ver o perfil</p>`;
     }
 
-    // ======================== ARCADE ========================
-    function renderArcade() {
-        app.innerHTML = `<div style="max-width:900px;margin:0 auto;padding:0 16px;">
-            <div class="av"><div class="ah"><h1>🎮 Arcade</h1><p>Jogos cl&aacute;ssicos pra passar o tempo</p></div>
-            <div class="ag">
-                <a href="tictactoe.html" class="agl"><div class="ic">✕○</div><div class="nm">Jogo da Velha</div><div class="ds">Contra IA ou 2 jogadores</div></a>
-                <a href="memory.html" class="agl"><div class="ic">🃏</div><div class="nm">Mem&oacute;ria</div><div class="ds">Encontre os pares</div></a>
-                <a href="snake.html" class="agl"><div class="ic">🐍</div><div class="nm">Snake</div><div class="ds">Coma e cres&ccedil;a!</div></a>
-                <a href="pong.html" class="agl"><div class="ic">🏓</div><div class="nm">Pong</div><div class="ds">Tabela cl&aacute;ssica</div></a>
-            </div></div></div>`;
+    // ======================== LIVE PAGE (standalone) ========================
+    let liveDetailTimer = null;
+
+    function renderLivePage(h) {
+        const gameId = h.startsWith('live/') ? h.split('/')[1] : null;
+        clearLive();
+        if (liveDetailTimer) { clearInterval(liveDetailTimer); liveDetailTimer = null; }
+
+        if (!gameId) {
+            app.innerHTML = `<div class="section-wrap">
+                <div class="live-page-hero">
+                    <span class="ldot"></span>
+                    <h1>Jogos <span>Ao Vivo</span></h1>
+                    <p>Selecione um jogo para acompanhar em tempo real</p>
+                </div>
+                <div class="live-grid" id="live-grid"><div class="ld"><div class="sp"></div></div></div>
+                <div id="live-today-wrap" style="display:none;">
+                    <div class="live-today-title">JOGOS DO DIA</div>
+                    <div class="live-today-grid" id="live-today-grid"></div>
+                </div>
+            </div>`;
+            loadLiveCardList();
+        } else {
+            app.innerHTML = `<div class="section-wrap-sm">
+                <button class="bb" onclick="location.hash='live'">&larr; Jogos ao vivo</button>
+                <div id="live-detail"><div class="ld"><div class="sp"></div></div></div>
+            </div>`;
+            loadLiveGameDetail(gameId);
+        }
+    }
+
+    async function loadLiveCardList() {
+        try {
+            const [liveData, scheduleData] = await Promise.all([
+                esp('https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR'),
+                esp('https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR')
+            ]);
+            const liveEvents = (liveData?.data?.schedule?.events||[]).filter(e => e.match);
+            const today = new Date().toISOString().split('T')[0];
+            const todayEvents = (scheduleData?.data?.schedule?.events||[]).filter(e => e.match && e.startTime?.startsWith(today));
+            const grid = $('live-grid');
+
+            if (liveEvents.length) {
+                grid.innerHTML = `<div class="live-grid-inner">${liveEvents.map(g => {
+                    const t1=g.match?.teams?.[0], t2=g.match?.teams?.[1];
+                    return `<div class="live-game-card" onclick="location.hash='live/${g.id}'">
+                        <div class="lgc-league"><span class="ldot"></span> ${g.league?.name||''}</div>
+                        <div class="live-card-body">
+                            <div class="live-card-team"><img src="${t1?.image||''}"><span>${t1?.code||t1?.name||'?'}</span></div>
+                            <div class="live-card-vs">
+                                <div class="live-score">${t1?.result?.gameWins||0} — ${t2?.result?.gameWins||0}</div>
+                                <div style="font-size:.7em;color:var(--dim);margin-top:4px;">Ver detalhes</div>
+                            </div>
+                            <div class="live-card-team"><img src="${t2?.image||''}"><span>${t2?.code||t2?.name||'?'}</span></div>
+                        </div>
+                    </div>`;
+                }).join('')}</div>`;
+            } else {
+                grid.innerHTML = `<div class="live-empty"><p style="color:var(--dim);text-align:center;padding:4rem 0;font-size:1.1em;">Nenhum jogo ao vivo no momento</p></div>`;
+            }
+
+            if (todayEvents.length) {
+                const wrap = $('live-today-wrap');
+                const tg   = $('live-today-grid');
+                if (wrap) wrap.style.display = 'block';
+                if (tg) tg.innerHTML = todayEvents.map(g => {
+                    const t1=g.match?.teams?.[0], t2=g.match?.teams?.[1];
+                    const dt=new Date(g.startTime);
+                    return `<div class="live-game-card today">
+                        <div class="lgc-league">${g.league?.name||''} · ${dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+                        <div class="live-card-body">
+                            <div class="live-card-team"><img src="${t1?.image||''}"><span>${t1?.code||t1?.name||'?'}</span></div>
+                            <div class="live-card-vs"><span style="font-size:1em;font-weight:700;color:var(--dim);">VS</span></div>
+                            <div class="live-card-team"><img src="${t2?.image||''}"><span>${t2?.code||t2?.name||'?'}</span></div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        } catch(e) {
+            $('live-grid').innerHTML = `<div class="err"><p>Erro: ${e.message}</p><button onclick="loadLiveCardList()" style="margin-top:8px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
+        }
+    }
+
+    async function loadLiveGameDetail(gid) {
+        try {
+            const detailsResp = await esp(`https://esports-api.lolesports.com/persisted/gw/getEventDetails?hl=pt-BR&id=${gid}`);
+            const eventData   = detailsResp?.data?.event;
+            let gameWindowId  = parseInt(gid) + 1;
+            if (eventData?.match?.games) {
+                for (const game of eventData.match.games) {
+                    if (game.state === 'inProgress' || game.state === 'completed') {
+                        gameWindowId = parseInt(gid) + game.number;
+                        break;
+                    }
+                }
+            }
+            const teams = eventData?.match?.teams || [];
+            const t1 = teams[0]||{}, t2 = teams[1]||{};
+            const ln = eventData?.league?.name||'', li = eventData?.league?.image||'';
+            const wins1 = t1?.result?.gameWins||0, wins2 = t2?.result?.gameWins||0;
+
+            $('live-detail').innerHTML = `
+                <div class="live-detail-header">
+                    ${li?`<img src="${li}" class="live-league-icon" alt="${ln}"> `:''}
+                    <span style="font-size:.85em;font-weight:600;color:var(--dim);">${ln}</span>
+                    <div class="live-detail-matchup">
+                        <div class="live-detail-team">
+                            <img src="${t1.image||''}" alt="${t1.code||''}">
+                            <span>${t1.code||t1.name||'?'}</span>
+                        </div>
+                        <div class="live-detail-vs">
+                            <div class="live-detail-score">${wins1} — ${wins2}</div>
+                            <span class="ldot"></span>
+                        </div>
+                        <div class="live-detail-team">
+                            <img src="${t2.image||''}" alt="${t2.code||''}">
+                            <span>${t2.code||t2.name||'?'}</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="live-frame" class="live-frame"><div class="ld"><div class="sp"></div></div></div>`;
+
+            const fetchFrame = async () => {
+                try {
+                    const date = isoRound10();
+                    const [wd, dd] = await Promise.all([
+                        live(`/window/${gameWindowId}`, {hl:'pt-BR',startingTime:date}),
+                        live(`/details/${gameWindowId}`, {hl:'pt-BR',startingTime:date})
+                    ]);
+                    const frW = wd?.frames||[];
+                    if (!frW.length) { $('live-frame').innerHTML='<div class="err"><p>Aguardando dados do jogo…</p></div>'; return; }
+                    const lf = frW[frW.length-1];
+                    const df = dd?.frames?.length ? dd.frames[dd.frames.length-1] : null;
+                    const gm = wd.gameMetadata||{};
+                    $('live-frame').innerHTML = buildLiveFrame(lf, df, gm, t1, t2);
+                } catch(_) { /* retry silently */ }
+            };
+            await fetchFrame();
+            if (liveDetailTimer) clearInterval(liveDetailTimer);
+            liveDetailTimer = setInterval(fetchFrame, 2000);
+        } catch(e) {
+            $('live-detail').innerHTML = `<div class="err"><p>Erro ao carregar: ${e.message}</p>
+                <button onclick="loadLiveGameDetail('${gid}')" style="margin-top:12px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar novamente</button></div>`;
+        }
+    }
+
+    function buildLiveFrame(lf, df, gm, t1, t2) {
+        const bt = lf.blueTeam  || {participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
+        const rt = lf.redTeam   || {participants:[],totalGold:0,totalKills:0,towers:0,barons:0,inhibitors:0,dragons:[]};
+        const bMeta = gm.blueTeamMetadata || {};
+        const rMeta = gm.redTeamMetadata  || {};
+        const dParts = df?.participants || [];  // flat 10-player array from details
+        const gs = lf.gameState||'in_game', gt = lf.gameTime||0;
+
+        const goldTotal = (bt.totalGold||0) + (rt.totalGold||0);
+        const gbPct = goldTotal ? Math.round((bt.totalGold / goldTotal) * 100) : 50;
+
+        // ---- team stats bar ----
+        function teamStatBar(team, side) {
+            const c = side==='b' ? 'var(--pri)' : 'var(--acc)';
+            const items = [
+                {i:'⛩️', v: team.inhibitors||0},
+                {i:'🐉', v: team.barons||0},
+                {i:'🗼', v: team.towers||0},
+                {i:'💰', v: fmtGold(team.totalGold||0)},
+                {i:'⚔️', v: team.totalKills||0}
+            ];
+            const row = side==='b' ? items : [...items].reverse();
+            const dir = side==='b' ? 'row' : 'row-reverse';
+            return `<div style="flex:1;display:flex;flex-direction:${dir};gap:10px;align-items:center;">
+                ${row.map(x=>`<div class="tstat"><span class="ti">${x.i}</span><span class="tv" style="color:${c};">${x.v}</span></div>`).join('')}
+            </div>`;
+        }
+
+        // ---- dragons ----
+        const bDrg = (bt.dragons||[]).map(d => `<span class="drg-icon" title="${d}">${drgEmoji(d)}</span>`).join('');
+        const rDrg = (rt.dragons||[]).map(d => `<span class="drg-icon" title="${d}">${drgEmoji(d)}</span>`).join('');
+
+        // ---- player row builder ----
+        function playerRow(p, side, opp) {
+            const mi     = side==='b' ? (p.participantId-1) : (p.participantId-6);
+            const meta   = side==='b' ? bMeta : rMeta;
+            const pmeta  = meta?.participantMetadata?.[mi] || {};
+            const champId= pmeta.championId || '?';
+            const sName  = pmeta.summonerName || '';
+
+            const di   = p.participantId - 1;          // 0-based index in flat details array
+            const dp   = dParts[di] || {};
+            const items= dp.items || [];
+
+            const k=p.kills||0, d=p.deaths||0, a=p.assists||0, cs=p.creepScore||0, lv=p.level||1;
+            const hp   = p.maxHealth>0 ? Math.round((p.currentHealth/p.maxHealth)*100) : 100;
+            const hpClr= hp>60?'#4caf50':hp>30?'#ff9800':'#ef5350';
+            const gold = p.totalGold||0;
+
+            const gd     = gold - (opp?.totalGold||0);
+            const gdStr  = gd>0 ? `+${fmtGold(gd)}` : fmtGold(gd);
+            const gdCls  = gd>0 ? 'gpos' : gd<0 ? 'gneg' : '';
+
+            const color  = side==='b' ? 'var(--pri)' : 'var(--acc)';
+
+            // items: 6 main + 1 trinket slot
+            const itemsHtml = Array.from({length:7}, (_,j) => {
+                const id = items[j];
+                return id
+                    ? `<img src="${itemImg(id)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+                    : `<span class="li-empty"></span>`;
+            }).join('');
+
+            return `<tr>
+                <td class="lt-champ-cell">
+                    <div class="lchamp">
+                        <div class="lchamp-img-wrap">
+                            <img src="${champImg(champId)}" alt="${champId}" onerror="this.style.opacity='0.3'">
+                            <span class="lchamp-lv" style="background:${color};">${lv}</span>
+                        </div>
+                        <div>
+                            <div class="lchamp-cn">${champId}</div>
+                            <div class="lchamp-sn">${sName}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="lt-hp-cell">
+                    <div class="lhp"><div class="lhp-fill" style="width:${hp}%;background:${hpClr};"></div></div>
+                    <div class="lhp-val">${p.currentHealth||0}/${p.maxHealth||0}</div>
+                </td>
+                <td><div class="litems">${itemsHtml}</div></td>
+                <td class="lt-num">${cs}</td>
+                <td class="lt-k">${k}</td>
+                <td class="lt-d">${d}</td>
+                <td class="lt-a">${a}</td>
+                <td class="lt-num">${fmtGold(gold)}</td>
+                <td class="${gdCls} lt-num">${gdStr}</td>
+            </tr>`;
+        }
+
+        // ---- full team table ----
+        function teamTable(participants, side, teamLabel, oppParticipants) {
+            const color = side==='b' ? 'var(--pri)' : 'var(--acc)';
+            const rows  = participants.map((p,i) => playerRow(p, side, oppParticipants[i]||{})).join('');
+            return `<div class="lt-wrap">
+                <table class="lt">
+                    <thead>
+                        <tr class="lt-head-row" style="--team-color:${color};">
+                            <th class="lt-th-main">${teamLabel}</th>
+                            <th>VIDA</th>
+                            <th>ITENS</th>
+                            <th>CS</th>
+                            <th style="color:#4caf50;">K</th>
+                            <th style="color:#ef5350;">D</th>
+                            <th style="color:var(--pri);">A</th>
+                            <th>OURO</th>
+                            <th>+/-</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+        }
+
+        const bLabel = t1?.code||'Azul', rLabel = t2?.code||'Vermelha';
+        const bTable = teamTable(bt.participants||[], 'b', bLabel, rt.participants||[]);
+        const rTable = teamTable(rt.participants||[], 'r', rLabel, bt.participants||[]);
+
+        return `
+            <div class="live-status ${gs}">
+                <span class="ldot"></span>
+                ${fmtTime(gt)} &mdash; ${gs==='in_game'?'AO VIVO':gs==='paused'?'⏸ PAUSADO':'FINALIZADO'}
+            </div>
+
+            <div class="tsb">
+                ${teamStatBar(bt,'b')}
+                <div style="width:50px;"></div>
+                ${teamStatBar(rt,'r')}
+            </div>
+
+            <div class="gadvbar">
+                <div class="gadv-b" style="width:${gbPct}%;"></div>
+                <div class="gadv-r" style="width:${100-gbPct}%;"></div>
+            </div>
+            <div class="gadv-labels">
+                <span style="color:var(--pri);">${fmtGold(bt.totalGold||0)}</span>
+                <span style="color:var(--acc);">${fmtGold(rt.totalGold||0)}</span>
+            </div>
+
+            <div class="drg-bar">
+                <div class="drg-b">${bDrg||'<span style="color:var(--dim);font-size:.75em;">sem dragões</span>'}</div>
+                <div class="drg-r">${rDrg||'<span style="color:var(--dim);font-size:.75em;">sem dragões</span>'}</div>
+            </div>
+
+            ${bTable}
+            ${rTable}
+        `;
     }
 
     // ======================== INIT ========================
@@ -613,7 +888,7 @@
         const d = await fetch(`https://ddragon.leagueoflegends.com/cdn/${DVER}/data/en_US/champion.json`).then(r=>r.json());
         for (const [k,v] of Object.entries(d.data)) CMAP[v.key] = k;
     } catch(_) {}
-    nav(location.hash||'#team');
+    nav(location.hash || '#team');
 
     })();
     </script>
