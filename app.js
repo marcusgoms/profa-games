@@ -569,29 +569,32 @@
         }
 
         // Nothing cached anywhere — must fetch from API (queued to avoid rate limit)
-        _refreshQueue = _refreshQueue.then(() => new Promise(r => setTimeout(r, 3000)));
-        await _refreshQueue;
-        const data = await fetchPlayerFast(i);
-        data._ts = Date.now();
-        cache[i] = data;
-        lsSet(`profa_player_${i}`, data);
-        fbSavePlayer(i, data);
+        // Entire fetch runs inside the queue so nothing overlaps
+        const work = _refreshQueue.then(async () => {
+            await new Promise(r => setTimeout(r, 3000));
+            const data = await fetchPlayerFast(i);
+            data._ts = Date.now();
+            cache[i] = data;
+            lsSet(`profa_player_${i}`, data);
+            fbSavePlayer(i, data);
+        });
+        _refreshQueue = work.catch(() => {});
+        await work;
         return cache[i];
     }
 
     // Background refresh: fetches fresh data, merges with existing matches, saves to Firebase
-    // Stagger refreshes to avoid rate limiting (each player waits i*3s)
+    // All API work is serialized through _refreshQueue to avoid rate limit
     let _refreshQueue = Promise.resolve();
     function refreshPlayer(i) {
         if (bgRefresh[i]) return bgRefresh[i];
-        // Chain refreshes sequentially with delay to avoid rate limit
-        _refreshQueue = _refreshQueue.then(() => new Promise(r => setTimeout(r, 3000)));
-        bgRefresh[i] = _refreshQueue.then(async () => {
+        // Chain entire work (delay + fetch) sequentially — queue holds until done
+        const work = _refreshQueue.then(async () => {
+            await new Promise(r => setTimeout(r, 3000));
             try {
                 const fresh = await fetchPlayerFast(i);
                 const prev = cache[i];
                 fresh._ts = Date.now();
-                // Merge: keep all existing matches + add any new ones from API
                 if (prev?.matches?.length) {
                     const existingIds = new Set(prev.matches.map(m => m.metadata?.matchId).filter(Boolean));
                     const brandNew = fresh.matches.filter(m => !existingIds.has(m.metadata?.matchId));
@@ -599,7 +602,6 @@
                     if (prev.mastery?.length) fresh.mastery = prev.mastery;
                     fresh._full = prev._full || false;
                 }
-                // Detect rank changes for feed
                 if (prev) detectRankChanges(i, prev, fresh);
                 cache[i] = fresh;
                 lsSet(`profa_player_${i}`, fresh);
@@ -608,10 +610,14 @@
             } catch(_) {}
             delete bgRefresh[i];
         });
+        // Queue must wait for this work to finish before starting next
+        _refreshQueue = work.catch(() => {});
+        bgRefresh[i] = work;
         return bgRefresh[i];
     }
 
     // BACKGROUND: loads remaining matches (up to 50) + mastery. Only fetches matches not already in cache.
+    // All API calls go through _refreshQueue to avoid rate limit collisions.
     function loadPlayerBackground(i) {
         if (bgLoading[i]) return bgLoading[i];
         if (cache[i]?._full && !isStale(cache[i])) return Promise.resolve(cache[i]);
@@ -624,23 +630,34 @@
             const puuid = base.account.puuid;
             const ids = base._matchIds || [];
 
-            const mastery = await rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []);
+            // Queue mastery fetch through the global queue
+            const masteryWork = _refreshQueue.then(async () => {
+                await new Promise(r => setTimeout(r, 1000));
+                return rots(`https://${pl}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, []);
+            });
+            _refreshQueue = masteryWork.catch(() => []);
+            const mastery = await masteryWork.catch(() => []);
 
             // Only fetch matches we don't already have
             const alreadyLoaded = new Set(base.matches.map(m => m.metadata?.matchId).filter(Boolean));
             const toLoad = ids.slice(0, MAX_MATCHES).filter(mid => !alreadyLoaded.has(mid));
             const newMatches = [];
-            // Fetch in batches of 3 with delay to avoid rate limits
+            // Fetch in batches of 3, each batch queued through the global queue
             for (let b = 0; b < toLoad.length; b += 3) {
-                if (b > 0) await new Promise(r => setTimeout(r, 2000));
-                await Promise.all(toLoad.slice(b, b+3).map(mid =>
-                    riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => newMatches.push(d)).catch(() => {})
-                ));
+                const batch = toLoad.slice(b, b+3);
+                const batchWork = _refreshQueue.then(async () => {
+                    await new Promise(r => setTimeout(r, 2000));
+                    await Promise.all(batch.map(mid =>
+                        riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => newMatches.push(d)).catch(() => {})
+                    ));
+                });
+                _refreshQueue = batchWork.catch(() => {});
+                await batchWork.catch(() => {});
             }
 
             const allMatches = [...base.matches, ...newMatches]
-                .filter((m, idx, arr) => arr.findIndex(x => x.metadata?.matchId === m.metadata?.matchId) === idx)
-                .sort((a, b) => (b.info?.gameCreation||0) - (a.info?.gameCreation||0))
+                .filter((m, idx2, arr) => arr.findIndex(x => x.metadata?.matchId === m.metadata?.matchId) === idx2)
+                .sort((a2, b2) => (b2.info?.gameCreation||0) - (a2.info?.gameCreation||0))
                 .slice(0, MAX_MATCHES);
 
             cache[i] = { ...base, mastery: mastery||[], matches: allMatches, _full: true, _ts: Date.now() };
