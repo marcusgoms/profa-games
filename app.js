@@ -5628,7 +5628,7 @@
                 const resp = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${d.account.puuid}`, {
                     headers: { 'X-Riot-Token': RIOT_KEY }
                 });
-                if (resp.status === 429) { console.warn('[Live] Rate limited, parando check'); break; }
+                if (resp.status === 429) { console.warn('[Live] Rate limited, aguardando...'); await new Promise(r => setTimeout(r, 5000)); continue; }
                 if (resp.status === 403 || resp.status === 401) { console.warn('[Live] API key inválida'); break; }
                 if (resp.ok) {
                     const gameData = await resp.json().catch(() => null);
@@ -5710,9 +5710,10 @@
             champBadge.remove();
         }
 
-        // Also try full re-render if onPlayerRefreshed exists
-        if (typeof window.onPlayerRefreshed === 'function' && cache[i]) {
-            window.onPlayerRefreshed(i, cache[i]);
+        // Live players float to top of squad grid
+        const grid = document.getElementById('squad-grid');
+        if (grid && isInGame) {
+            grid.insertBefore(card, grid.firstChild);
         }
     }
 
