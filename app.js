@@ -18,7 +18,7 @@
     const KEY_SAVED_AT = parseInt(localStorage.getItem('lol_key_ts') || '0');
     const KEY_TTL = 24 * 60 * 60 * 1000; // 24h
     const CBLOL_ID    = '98767991332355509';
-    const DVER        = '14.24.1';
+    let DVER          = '14.24.1';
 
     // ======================== FIREBASE ========================
     let db = null;
@@ -43,10 +43,11 @@
         try { return JSON.parse(localStorage.getItem(AUTH_KEY)); } catch(_) { return null; }
     }
     function setLoggedUser(user) {
-        if (user) localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-        else localStorage.removeItem(AUTH_KEY);
+        if (user) {
+            localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+            if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+        } else localStorage.removeItem(AUTH_KEY);
         updateNavUser();
-        // Update presence
         if (db) updatePresence(user);
     }
 
@@ -327,7 +328,9 @@
     const fmtTime= s => `${(s/60)|0}:${String((s%60)|0).padStart(2,'0')}`;
     const champImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${CMAP[id]||id||'Teemo'}.png`;
     const itemImg = id => id?`https://ddragon.leagueoflegends.com/cdn/${DVER}/img/item/${id}.png`:'';
-    const spellImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/spell/${id}.png`;
+    // Spell ID → name map (DDragon uses names not IDs)
+    const SPELL_MAP = {1:'SummonerBoost',3:'SummonerExhaust',4:'SummonerFlash',6:'SummonerHaste',7:'SummonerHeal',11:'SummonerSmite',12:'SummonerTeleport',13:'SummonerMana',14:'SummonerDot',21:'SummonerBarrier',30:'SummonerPoroRecall',31:'SummonerPoroThrow',32:'SummonerSnowball',39:'SummonerSnowURFSnowball_Mark',54:'Summoner_UltBookPlaceholder',55:'Summoner_UltBookSmitePlaceholder',2201:'SummonerCherryHold',2202:'SummonerCherryFlash'};
+    const spellImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/spell/${SPELL_MAP[id]||id||'SummonerFlash'}.png`;
     const profImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/${id}.png`;
     function getCustomIcon(idx) { return localStorage.getItem('profa_custom_icon_'+idx); }
     function setCustomIcon(idx, iconId) { localStorage.setItem('profa_custom_icon_'+idx, iconId); }
@@ -757,7 +760,9 @@
         </div>
         <div class="section-wrap">
             <div class="tg" id="squad-grid">
-                ${PLAYERS.map((p,i) => `<div class="pc ${p.special==='noob'?'pc-noob':''}" data-i="${i}" onclick="location.hash='profile/${i}'"><div class="ld"><div class="sp"></div></div></div>`).join('')}
+                ${PLAYERS.map((p,i) => `<div class="pc ${p.special==='noob'?'pc-noob':''}" data-i="${i}" onclick="location.hash='profile/${i}'">
+                    <div class="skel-card"><div class="skel-avatar skel-pulse"></div><div class="skel-lines"><div class="skel-line skel-pulse" style="width:60%"></div><div class="skel-line skel-pulse" style="width:40%"></div><div class="skel-line skel-pulse" style="width:80%"></div></div></div>
+                </div>`).join('')}
             </div>
         </div>
         <div class="section-wrap">
@@ -1455,7 +1460,7 @@
             app.innerHTML = `<div class="section-wrap-sm">
                 <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
                 <div class="pv">
-                    <div class="pb"><div class="pbg"></div><div class="pbi">
+                    <div class="pb" style="--pb-splash:url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${CMAP[champArr[0]?.id]||'Zed'}_0.jpg')"><div class="pbg"></div><div class="pbi">
                         <div class="pi"><img src="${profImg(ic)}" alt="" id="prof-main-icon" ${F}></div>
                         <div><div class="pn2">${a.gameName||p.name} <span class="t">#${a.tagLine||p.tag}</span></div>
                         <div class="prof-badges">${rb}${flexBadge}<span class="prg prg-region">${p.region}</span></div>
@@ -2449,49 +2454,69 @@
         if (!res) return;
         res.innerHTML = '<div class="ld"><div class="sp"></div></div>';
         try {
-            const [da, db] = await Promise.all([loadPlayer(ai), loadPlayer(bi)]);
+            const [da, ddb] = await Promise.all([loadPlayer(ai), loadPlayer(bi)]);
             const pa = PLAYERS[ai], pb = PLAYERS[bi];
-            const sa = da.league.find(e=>e.queueType==='RANKED_SOLO_5x5');
-            const sb = db.league.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const leA = Array.isArray(da.league)?da.league:[], leB = Array.isArray(ddb.league)?ddb.league:[];
+            const sa = leA.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const sb = leB.find(e=>e.queueType==='RANKED_SOLO_5x5');
 
             function pStats(d) {
-                const mt = Array.isArray(d.matches)?d.matches:[], a = d.account||{};
-                let k=0,dd=0,as=0,cs=0,g=0;
-                mt.forEach(m => { const p=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; k+=p.kills||0; dd+=p.deaths||0; as+=p.assists||0; cs+=(p.totalMinionsKilled||0)+(p.neutralMinionsKilled||0); g+=p.goldEarned||0; });
+                const mt = Array.isArray(d.matches)?d.matches:[], ac = d.account||{};
+                let k=0,dd=0,as=0,cs=0,g=0,dmg=0,vis=0,doubles=0,triples=0,quadras=0,pentas=0;
+                mt.forEach(m => { const p2=m.info?.participants?.find(x=>x.puuid===ac.puuid)||{}; k+=p2.kills||0; dd+=p2.deaths||0; as+=p2.assists||0; cs+=(p2.totalMinionsKilled||0)+(p2.neutralMinionsKilled||0); g+=p2.goldEarned||0; dmg+=p2.totalDamageDealtToChampions||0; vis+=p2.visionScore||0; doubles+=p2.doubleKills||0; triples+=p2.tripleKills||0; quadras+=p2.quadraKills||0; pentas+=p2.pentaKills||0; });
                 const n=mt.length||1;
-                const wins = mt.filter(m => { const p=m.info?.participants?.find(x=>x.puuid===a.puuid); return p?.win; }).length;
-                return { kda:((k+as)/Math.max(dd,1)).toFixed(1), avgK:(k/n).toFixed(1), avgD:(dd/n).toFixed(1), avgA:(as/n).toFixed(1), avgCS:(cs/n)|0, avgGold:((g/n)/1000).toFixed(1), wr: mt.length?((wins/mt.length)*100).toFixed(0):'—', wins, losses:mt.length-wins, games:mt.length };
+                const wins = mt.filter(m => { const p2=m.info?.participants?.find(x=>x.puuid===ac.puuid); return p2?.win; }).length;
+                return { kda:((k+as)/Math.max(dd,1)).toFixed(1), avgK:(k/n).toFixed(1), avgD:(dd/n).toFixed(1), avgA:(as/n).toFixed(1), avgCS:(cs/n)|0, avgGold:((g/n)/1000).toFixed(1), avgDmg:((dmg/n)/1000).toFixed(1), avgVis:(vis/n).toFixed(1), wr: mt.length?((wins/mt.length)*100).toFixed(0):'—', wins, losses:mt.length-wins, games:mt.length, multikills:doubles+triples+quadras+pentas, pentas };
             }
 
-            const stA = pStats(da), stB = pStats(db);
-            const icA = playerIcon(ai, da.summoner.profileIconId), icB = playerIcon(bi, db.summoner.profileIconId);
+            // Head-to-head: games they played together
+            const mtA = Array.isArray(da.matches)?da.matches:[], mtB = Array.isArray(ddb.matches)?ddb.matches:[];
+            const puuidA = da.account?.puuid, puuidB = ddb.account?.puuid;
+            let h2hWinsA=0, h2hWinsB=0;
+            if (puuidA && puuidB) {
+                const bIds = new Set(mtB.map(m=>m.metadata?.matchId).filter(Boolean));
+                mtA.forEach(m => {
+                    if (!bIds.has(m.metadata?.matchId)) return;
+                    const pA2 = m.info?.participants?.find(x=>x.puuid===puuidA);
+                    const pB2 = m.info?.participants?.find(x=>x.puuid===puuidB);
+                    if (!pA2 || !pB2) return;
+                    if (pA2.teamId !== pB2.teamId) { if (pA2.win) h2hWinsA++; else h2hWinsB++; }
+                });
+            }
+
+            const stA = pStats(da), stB = pStats(ddb);
+            const icA = playerIcon(ai, da.summoner?.profileIconId), icB = playerIcon(bi, ddb.summoner?.profileIconId);
             const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
             const rankOrder = {I:3,II:2,III:1,IV:0};
             const lpA = sa ? (tierOrder[sa.tier]||0)*400+(rankOrder[sa.rank]||0)*100+(sa.leaguePoints||0) : 0;
             const lpB = sb ? (tierOrder[sb.tier]||0)*400+(rankOrder[sb.rank]||0)*100+(sb.leaguePoints||0) : 0;
 
             function bar(label, va, vb, unit='', higher=true) {
-                const na=parseFloat(va), nb=parseFloat(vb);
-                const max=Math.max(na,nb,1), pa=((na/max)*100).toFixed(0), ppb=((nb/max)*100).toFixed(0);
+                const na=parseFloat(va)||0, nb=parseFloat(vb)||0;
+                const max=Math.max(na,nb,1), pca=((na/max)*100).toFixed(0), pcb=((nb/max)*100).toFixed(0);
                 const wA = higher ? na>=nb : na<=nb, wB = higher ? nb>=na : nb<=na;
                 return `<div class="cmp-row">
                     <div class="cmp-val ${wA?'cmp-win':''}">${va}${unit}</div>
-                    <div class="cmp-bars"><div class="cmp-bar-wrap"><div class="cmp-bar cmp-bar-a" style="width:${pa}%"></div></div><div class="cmp-label">${label}</div><div class="cmp-bar-wrap"><div class="cmp-bar cmp-bar-b" style="width:${ppb}%"></div></div></div>
+                    <div class="cmp-bars"><div class="cmp-bar-wrap"><div class="cmp-bar cmp-bar-a" style="width:${pca}%"></div></div><div class="cmp-label">${label}</div><div class="cmp-bar-wrap"><div class="cmp-bar cmp-bar-b" style="width:${pcb}%"></div></div></div>
                     <div class="cmp-val ${wB?'cmp-win':''}">${vb}${unit}</div>
                 </div>`;
             }
 
-            // Top champions
             function topChamps(d) {
                 return (d.mastery||[]).slice(0,3).map(m => `<img src="${champImg(m.championId)}" title="${CMAP[m.championId]||'?'}" class="cmp-champ-icon">`).join('');
             }
 
+            const h2hHtml = (h2hWinsA+h2hWinsB) > 0
+                ? `<div class="cmp-h2h"><div class="cmp-h2h-title">Confronto Direto</div><div class="cmp-h2h-score"><span class="${h2hWinsA>=h2hWinsB?'cmp-win':''}">${h2hWinsA}</span> x <span class="${h2hWinsB>=h2hWinsA?'cmp-win':''}">${h2hWinsB}</span></div><div class="cmp-h2h-sub">${h2hWinsA+h2hWinsB} partidas em lados opostos</div></div>`
+                : '';
+
             res.innerHTML = `
             <div class="cmp-header">
-                <div class="cmp-player"><img src="${profImg(icA)}" class="cmp-avatar" ${F}><div class="cmp-name">${da.account.gameName||pa.name}</div><div class="cmp-rank ${rankCls(sa?.tier)}">${sa?sa.tier+' '+sa.rank+' — '+sa.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(da)}</div></div>
+                <div class="cmp-player"><img src="${profImg(icA)}" class="cmp-avatar" ${F}><div class="cmp-name">${da.account?.gameName||pa.name}</div><div class="cmp-rank ${rankCls(sa?.tier)}">${sa?sa.tier+' '+sa.rank+' — '+sa.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(da)}</div></div>
                 <div class="cmp-vs-big">VS</div>
-                <div class="cmp-player"><img src="${profImg(icB)}" class="cmp-avatar" ${F}><div class="cmp-name">${db.account.gameName||pb.name}</div><div class="cmp-rank ${rankCls(sb?.tier)}">${sb?sb.tier+' '+sb.rank+' — '+sb.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(db)}</div></div>
+                <div class="cmp-player"><img src="${profImg(icB)}" class="cmp-avatar" ${F}><div class="cmp-name">${ddb.account?.gameName||pb.name}</div><div class="cmp-rank ${rankCls(sb?.tier)}">${sb?sb.tier+' '+sb.rank+' — '+sb.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(ddb)}</div></div>
             </div>
+            ${h2hHtml}
             <div class="cmp-stats">
                 ${bar('Elo (LP Total)', lpA, lpB)}
                 ${bar('Win Rate', stA.wr, stB.wr, '%')}
@@ -2501,6 +2526,9 @@
                 ${bar('Assists/jogo', stA.avgA, stB.avgA)}
                 ${bar('CS/jogo', stA.avgCS, stB.avgCS)}
                 ${bar('Gold/jogo', stA.avgGold, stB.avgGold, 'K')}
+                ${bar('Dano/jogo', stA.avgDmg, stB.avgDmg, 'K')}
+                ${bar('Visão/jogo', stA.avgVis, stB.avgVis)}
+                ${bar('Multi-kills', stA.multikills, stB.multikills)}
                 ${bar('Partidas', stA.games, stB.games)}
             </div>`;
         } catch(e) { res.innerHTML = `<div class="err"><p>Erro: ${e.message}</p></div>`; }
@@ -2688,9 +2716,72 @@
         </div>
 
         <div class="dash-section">
+            <h3>Histórico de LP</h3>
+            <div id="dash-lp-chart"><p style="color:var(--dim);text-align:center;font-size:.85em;">Carregando...</p></div>
+        </div>
+
+        <div class="dash-section">
+            <h3>Placar de Palpites CBLOL</h3>
+            <div id="dash-preds"><p style="color:var(--dim);text-align:center;font-size:.85em;">Carregando palpites...</p></div>
+        </div>
+
+        <div class="dash-section">
             <h3>Feed de Atividade</h3>
             <div id="dash-feed"><div class="ld"><div class="sp"></div></div></div>
         </div>`;
+
+        // LP history chart in dashboard
+        try {
+            const lpHist = JSON.parse(localStorage.getItem('soloq_history') || '{}');
+            const lpDates = Object.keys(lpHist).sort();
+            const lpEl = $('dash-lp-chart');
+            if (lpEl && lpDates.length >= 2) {
+                const names = [...new Set(lpDates.flatMap(dt => Object.keys(lpHist[dt]||{})))];
+                const tierColors2 = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
+                let tableHtml = '<div class="dash-lp-table"><table><thead><tr><th>Jogador</th>';
+                lpDates.forEach(dt => { const p2 = dt.split('-'); tableHtml += `<th>${p2[2]}/${p2[1]}</th>`; });
+                tableHtml += '<th>Var.</th></tr></thead><tbody>';
+                names.forEach(name => {
+                    const vals = lpDates.map(dt => lpHist[dt]?.[name]);
+                    const first = vals.find(v => v !== undefined), last = vals.filter(v => v !== undefined).pop();
+                    const diff = (first !== undefined && last !== undefined) ? last - first : 0;
+                    const ps2 = playerStats.find(s => s.name === name);
+                    const solo2 = ps2 ? allData[ps2.idx]?.league?.find(e=>e.queueType==='RANKED_SOLO_5x5') : null;
+                    const color = tierColors2[solo2?.tier] || 'var(--pri)';
+                    tableHtml += `<tr><td style="color:${color};font-weight:700;">${name}</td>`;
+                    vals.forEach(v => { tableHtml += `<td>${v!==undefined?v:'—'}</td>`; });
+                    tableHtml += `<td style="color:${diff>0?'#4caf50':diff<0?'#ef5350':'var(--dim)'};font-weight:700;">${diff>0?'+':''}${diff}</td></tr>`;
+                });
+                tableHtml += '</tbody></table></div>';
+                lpEl.innerHTML = tableHtml;
+            } else if (lpEl) {
+                lpEl.innerHTML = '<p style="color:var(--dim);text-align:center;font-size:.85em;">Dados de LP registrados. Volte amanhã para ver a evolução.</p>';
+            }
+        } catch(_) {}
+
+        // Load prediction scoreboard
+        if (db) {
+            db.ref('predictions').once('value').then(snap => {
+                const predsEl = $('dash-preds');
+                if (!predsEl) return;
+                const allPreds = snap.val();
+                if (!allPreds) { predsEl.innerHTML = '<p style="color:var(--dim);text-align:center;font-size:.85em;">Nenhum palpite registrado</p>'; return; }
+                // Count points per player idx
+                const scores = {};
+                PLAYERS.forEach((_,i) => { scores[i] = { name: PLAYERS[i].name, pts: 0, total: 0, correct: 0, exact: 0 }; });
+                Object.values(allPreds).forEach(match => {
+                    Object.entries(match).forEach(([idx, pred]) => {
+                        const i = parseInt(idx);
+                        if (!scores[i]) return;
+                        scores[i].total++;
+                    });
+                });
+                const sorted2 = Object.values(scores).filter(s=>s.total>0).sort((x,y)=>y.pts-x.pts||y.total-x.total);
+                if (!sorted2.length) { predsEl.innerHTML = '<p style="color:var(--dim);text-align:center;font-size:.85em;">Nenhum palpite registrado</p>'; return; }
+                const medals2 = ['🥇','🥈','🥉'];
+                predsEl.innerHTML = `<div class="dash-rank-list">${sorted2.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${PLAYERS.findIndex(p=>p.name===s.name)}'"><span class="dash-rank-pos">${medals2[i]||i+1+'º'}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val">${s.total} palpites</span></div>`).join('')}</div>`;
+            }).catch(() => {});
+        }
 
         // Load feed
         loadFeed(20).then(items => {
@@ -3026,19 +3117,33 @@
     }
 
     // Detect rank changes and post to feed
+    // Browser notifications
+    function sendNotification(title, body, icon) {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'granted') {
+            new Notification(title, { body, icon: icon || 'https://ddragon.leagueoflegends.com/cdn/14.24.1/img/profileicon/4644.png' });
+        } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission();
+        }
+    }
+
     function detectRankChanges(playerIdx, oldData, newData) {
         if (!oldData?.league || !newData?.league) return;
-        const oldSolo = oldData.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
-        const newSolo = newData.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
+        const oldSolo = (Array.isArray(oldData.league)?oldData.league:[]).find(e => e.queueType === 'RANKED_SOLO_5x5');
+        const newSolo = (Array.isArray(newData.league)?newData.league:[]).find(e => e.queueType === 'RANKED_SOLO_5x5');
         if (!oldSolo || !newSolo) return;
         const tierOrder = { IRON: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4, EMERALD: 5, DIAMOND: 6, MASTER: 7, GRANDMASTER: 8, CHALLENGER: 9 };
         const oldVal = (tierOrder[oldSolo.tier] || 0) * 4 + ({ I: 3, II: 2, III: 1, IV: 0 }[oldSolo.rank] || 0);
         const newVal = (tierOrder[newSolo.tier] || 0) * 4 + ({ I: 3, II: 2, III: 1, IV: 0 }[newSolo.rank] || 0);
         const name = PLAYERS[playerIdx]?.name || '?';
         if (newVal > oldVal) {
-            postFeedEvent({ type: 'rank_up', player: name, idx: playerIdx, msg: `${name} subiu para ${newSolo.tier} ${newSolo.rank}!` });
+            const msg = `${name} subiu para ${newSolo.tier} ${newSolo.rank}!`;
+            postFeedEvent({ type: 'rank_up', player: name, idx: playerIdx, msg });
+            sendNotification('Rank Up!', msg);
         } else if (newVal < oldVal) {
-            postFeedEvent({ type: 'rank_down', player: name, idx: playerIdx, msg: `${name} caiu para ${newSolo.tier} ${newSolo.rank}` });
+            const msg = `${name} caiu para ${newSolo.tier} ${newSolo.rank}`;
+            postFeedEvent({ type: 'rank_down', player: name, idx: playerIdx, msg });
+            sendNotification('Rank Down', msg);
         }
     }
 
@@ -3060,8 +3165,10 @@
                 if (resp.ok) {
                     if (!_liveAlerts[i]) {
                         _liveAlerts[i] = true;
-                        showInGameAlert(i, d.account.gameName || p.name);
-                        postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${p.name} está em partida agora!` });
+                        const pName = d.account.gameName || p.name;
+                        showInGameAlert(i, pName);
+                        postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${pName} está em partida agora!` });
+                        sendNotification('Em Jogo!', `${pName} está em partida agora!`);
                     }
                 } else {
                     delete _liveAlerts[i];
@@ -3173,11 +3280,17 @@
     // ======================== INIT ========================
     // Theme
     applyTheme(localStorage.getItem('profa_theme') || 'dark');
-    // Carrega dados de campeões em background — não bloqueia a renderização
-    fetch(`https://ddragon.leagueoflegends.com/cdn/${DVER}/data/en_US/champion.json`)
+    // Auto-detect latest DDragon version, then load champion data
+    fetch('https://ddragon.leagueoflegends.com/api/versions.json')
         .then(r => r.json())
-        .then(d => { for (const [k,v] of Object.entries(d.data)) CMAP[v.key] = k; })
-        .catch(() => {});
+        .then(versions => { if (versions?.[0]) DVER = versions[0]; })
+        .catch(() => {})
+        .finally(() => {
+            fetch(`https://ddragon.leagueoflegends.com/cdn/${DVER}/data/en_US/champion.json`)
+                .then(r => r.json())
+                .then(d => { for (const [k,v] of Object.entries(d.data)) CMAP[v.key] = k; })
+                .catch(() => {});
+        });
     updateNavUser();
     nav(location.hash || '#team');
     // Check API key health on load (non-blocking)

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'profa-v4';
+const CACHE_NAME = 'profa-v5';
 const ASSETS = ['/', '/index.html', '/style.css', '/config.js', '/app.js'];
 
 self.addEventListener('install', e => {

@@ -69,9 +69,9 @@ a { text-decoration: none; color: inherit; }
     content: '';
     position: absolute;
     inset: 0;
-    background: url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Zed_0.jpg') center/cover no-repeat;
-    opacity: 0.05;
-    filter: saturate(0.3);
+    background: var(--pb-splash, none) center/cover no-repeat;
+    opacity: 0.08;
+    filter: saturate(0.5);
     pointer-events: none;
     border-radius: 16px;
 }
@@ -464,6 +464,14 @@ a { text-decoration: none; color: inherit; }
 .ldot { width: 9px; height: 9px; border-radius: 50%; background: #ef5350; display: inline-block; animation: pulse 1.5s infinite; flex-shrink: 0; }
 .err { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 0.9em; }
 
+/* SKELETON LOADING */
+.skel-card { display: flex; align-items: center; gap: 12px; padding: 4px; }
+.skel-avatar { width: 48px; height: 48px; border-radius: 10px; flex-shrink: 0; }
+.skel-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.skel-line { height: 10px; border-radius: 5px; }
+.skel-pulse { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: skelPulse 1.5s ease-in-out infinite; }
+@keyframes skelPulse { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
 /* NAV USER */
 .nav-user { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
 .nav-user-info { display: flex; align-items: center; gap: 8px; }
@@ -783,8 +791,27 @@ body::after {
 [data-theme="light"] .theme-toggle { border-color: rgba(0,0,0,0.1); }
 [data-theme="light"] body::before { opacity: 0.02; }
 [data-theme="light"] body::after { background: linear-gradient(180deg, var(--bg) 0%, rgba(240,242,245,0.9) 30%, rgba(240,242,245,0.95) 70%, var(--bg) 100%); }
-[data-theme="light"] #main-nav { background: rgba(240,242,245,0.92); }
+[data-theme="light"] #main-nav { background: rgba(240,242,245,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(0,0,0,0.06); }
 [data-theme="light"] .modal-box { box-shadow: 0 24px 64px rgba(0,0,0,0.15); }
+[data-theme="light"] .nl a { color: var(--dim); }
+[data-theme="light"] .nl a.on, [data-theme="light"] .nl a:hover { color: var(--pri); background: rgba(0,136,170,0.08); }
+[data-theme="light"] .pc { border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+[data-theme="light"] .pc:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+[data-theme="light"] .pb { background: linear-gradient(135deg, #e8edf2, #f0f2f5 50%, #dde3ea); }
+[data-theme="light"] .pb::after { opacity: 0.06; }
+[data-theme="light"] .mc.w { background: rgba(76,175,80,0.08); } [data-theme="light"] .mc.l { background: rgba(239,83,80,0.08); }
+[data-theme="light"] .pst, [data-theme="light"] .ranked-card, [data-theme="light"] .champ-row, [data-theme="light"] .role-item, [data-theme="light"] .hl-item, [data-theme="light"] .mi { border-color: rgba(0,0,0,0.06); box-shadow: 0 1px 4px rgba(0,0,0,0.03); }
+[data-theme="light"] .squad-hero { background: linear-gradient(135deg, #e0e8f0, #f0f2f5 50%, #dde3ea); }
+[data-theme="light"] .cblol-hero { background: linear-gradient(135deg, #1a1a2e, #0d0d1a); }
+[data-theme="light"] .match-filters select { background: var(--surf); border-color: rgba(0,0,0,0.1); }
+[data-theme="light"] .chat-box { background: var(--surf); }
+[data-theme="light"] .chat-bubble { background: var(--card); border: 1px solid rgba(0,0,0,0.06); }
+[data-theme="light"] .chat-me .chat-bubble { background: rgba(0,136,170,0.1); }
+[data-theme="light"] .dash-card { border-color: rgba(0,0,0,0.06); box-shadow: 0 1px 4px rgba(0,0,0,0.03); }
+[data-theme="light"] .or.b { background: rgba(0,136,170,0.05); } [data-theme="light"] .or.r { background: rgba(214,48,80,0.05); }
+[data-theme="light"] .sp { border-color: rgba(0,0,0,0.08); border-top-color: var(--pri); }
+[data-theme="light"] .skel-pulse { background: linear-gradient(90deg, #e8edf2 25%, #dde3ea 50%, #e8edf2 75%); background-size: 200% 100%; }
+[data-theme="light"] .ft { background: var(--card); border-top: 1px solid rgba(0,0,0,0.06); color: var(--dim); }
 
 /* ==================== LIVE BADGE ==================== */
 .live-badge-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ef5350; animation: pulse 1.5s infinite; vertical-align: middle; margin-left: 2px; }
@@ -811,6 +838,11 @@ body::after {
 .cmp-champs { display: flex; justify-content: center; gap: 4px; margin-top: 8px; }
 .cmp-champ-icon { width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
 .cmp-vs-big { font-size: 2em; font-weight: 900; color: var(--dim); opacity: 0.3; }
+.cmp-h2h { text-align: center; background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.04); }
+.cmp-h2h-title { font-size: 0.7em; text-transform: uppercase; color: var(--dim); font-weight: 600; letter-spacing: 0.5px; margin-bottom: 6px; }
+.cmp-h2h-score { font-size: 2em; font-weight: 900; }
+.cmp-h2h-score .cmp-win { color: var(--pri); }
+.cmp-h2h-sub { font-size: 0.75em; color: var(--dim); margin-top: 4px; }
 .cmp-stats { display: flex; flex-direction: column; gap: 8px; }
 .cmp-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
 .cmp-val { min-width: 60px; font-weight: 800; font-size: 0.95em; text-align: center; }
@@ -891,6 +923,12 @@ body::after {
 .dash-hour-bar span { font-size: 0.55em; color: var(--dim); margin-top: 4px; }
 
 /* ==================== ACHIEVEMENTS/BADGES ==================== */
+.dash-lp-table { overflow-x: auto; }
+.dash-lp-table table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+.dash-lp-table th, .dash-lp-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.04); white-space: nowrap; }
+.dash-lp-table th { color: var(--dim); font-size: 0.85em; text-transform: uppercase; font-weight: 600; }
+.dash-lp-table td:first-child, .dash-lp-table th:first-child { text-align: left; }
+.dash-lp-table tr:hover td { background: rgba(0,212,255,0.03); }
 .dash-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
 .dash-badge { display: flex; align-items: center; gap: 12px; padding: 14px; background: rgba(0,0,0,0.1); border-radius: 10px; border: 1px solid rgba(255,255,255,0.04); }
 .dash-badge-locked { opacity: 0.35; filter: grayscale(1); }
