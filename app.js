@@ -1507,7 +1507,7 @@
             });
         });
 
-        const W = 800, H = 380, PADL = 70, PADR = 90, PADT = 25, PADB = 50;
+        const W = 800, H = 600, PADL = 70, PADR = 90, PADT = 25, PADB = 50;
         const cw = W - PADL - PADR, ch = H - PADT - PADB;
 
         // Collect all values for y-axis range
