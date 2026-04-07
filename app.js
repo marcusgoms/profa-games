@@ -1106,6 +1106,8 @@
                     _allPlayersLoaded = true;
                     PLAYERS.forEach((_, j) => setTimeout(() => loadPlayerBackground(j), j * 5000));
                     startRetryLoop();
+                    // Check in-game immediately after all players loaded
+                    setTimeout(checkSquadInGame, 3000);
                 }
             });
         }
@@ -3389,9 +3391,16 @@
     // ======================== NOTIFICAÇÃO DE PARTIDA AO VIVO ========================
     let _liveAlerts = {};
     let _allPlayersLoaded = false;
+    let _liveCheckRunning = false;
     async function checkSquadInGame() {
-        // Only check after all players have loaded AND key is valid
-        if (apiExpired || !_allPlayersLoaded) return;
+        // Avoid overlapping checks
+        if (_liveCheckRunning) return;
+        // Need at least some players cached to check
+        const hasSomePlayers = PLAYERS.some((_, i) => cache[i]?.account?.puuid);
+        if (apiExpired || !hasSomePlayers) return;
+        _liveCheckRunning = true;
+        console.log('[Live] Verificando jogadores em partida...');
+        let found = 0;
         for (let i = 0; i < PLAYERS.length; i++) {
             const d = cache[i];
             if (!d?.account?.puuid) continue;
@@ -3400,10 +3409,10 @@
                 const resp = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${d.account.puuid}`, {
                     headers: { 'X-Riot-Token': RIOT_KEY }
                 });
-                if (resp.status === 429) break; // Stop checking if rate limited
+                if (resp.status === 429) { console.warn('[Live] Rate limited, parando check'); break; }
+                if (resp.status === 403 || resp.status === 401) { console.warn('[Live] API key inválida'); break; }
                 if (resp.ok) {
                     const gameData = await resp.json().catch(() => null);
-                    // Find the champion the player is using
                     let liveChampId = null;
                     if (gameData?.participants) {
                         const me = gameData.participants.find(x => x.puuid === d.account.puuid);
@@ -3411,6 +3420,8 @@
                     }
                     const wasAlerted = !!_liveAlerts[i];
                     _liveAlerts[i] = { champId: liveChampId, gameData };
+                    found++;
+                    console.log(`[Live] ${p.name} está em jogo! Campeão: ${CMAP[liveChampId] || liveChampId || '?'}`);
                     if (!wasAlerted) {
                         const pName = d.account.gameName || p.name;
                         const champName = CMAP[liveChampId] || '';
@@ -3418,15 +3429,19 @@
                         postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${pName} está em partida agora!${champName ? ` (${champName})` : ''}` });
                         sendNotification('Em Jogo!', `${pName} está jogando de ${champName || 'campeão'}!`);
                     }
-                    // Update card live if on squad page
                     updateCardLive(i);
                 } else {
-                    if (_liveAlerts[i]) { delete _liveAlerts[i]; updateCardLive(i); }
+                    if (_liveAlerts[i]) {
+                        console.log(`[Live] ${p.name} saiu da partida`);
+                        delete _liveAlerts[i];
+                        updateCardLive(i);
+                    }
                 }
-            } catch(_) {}
-            // Small delay between spectator checks to avoid rate limit
-            await new Promise(r => setTimeout(r, 1500));
+            } catch(e) { console.warn(`[Live] Erro ao checar ${p.name}:`, e.message); }
+            await new Promise(r => setTimeout(r, 1200));
         }
+        console.log(`[Live] Check completo. ${found} jogador(es) em partida.`);
+        _liveCheckRunning = false;
     }
 
     function showInGameAlert(idx, name, champName) {
@@ -3440,15 +3455,51 @@
         setTimeout(() => alert.remove(), 30000);
     }
 
-    // Update a single card's live state without re-rendering everything
+    // Update a single card's live state — applies classes + splash directly
     function updateCardLive(i) {
         const card = document.querySelector(`[data-i="${i}"]`);
         if (!card) return;
-        const d = cache[i];
-        if (!d) return;
-        // Re-render this card with updated live data
-        const onRefresh = window.onPlayerRefreshed;
-        if (typeof onRefresh === 'function') onRefresh(i, d);
+
+        const liveData = _liveAlerts[i];
+        const isInGame = !!liveData;
+        const liveChampId = liveData?.champId;
+        const liveChampName = liveChampId ? (CMAP[liveChampId] || null) : null;
+
+        // Toggle classes
+        card.classList.toggle('pc-ingame', isInGame);
+        card.style.removeProperty('--live-splash');
+
+        if (isInGame && liveChampName) {
+            card.style.setProperty('--live-splash', `url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${liveChampName}_0.jpg')`);
+        }
+
+        // Ensure splash div exists
+        if (isInGame && !card.querySelector('.pc-live-splash')) {
+            const splashDiv = document.createElement('div');
+            splashDiv.className = 'pc-live-splash';
+            card.insertBefore(splashDiv, card.firstChild);
+        }
+
+        // Add/remove champion badge
+        let champBadge = card.querySelector('.pc-live-champ');
+        if (isInGame && liveChampName) {
+            if (!champBadge) {
+                champBadge = document.createElement('div');
+                champBadge.className = 'pc-live-champ';
+                // Insert before noob-footer or at end
+                const noobFooter = card.querySelector('.noob-footer');
+                if (noobFooter) card.insertBefore(champBadge, noobFooter);
+                else card.appendChild(champBadge);
+            }
+            champBadge.innerHTML = `🎮 Jogando de <b>${liveChampName}</b>`;
+        } else if (champBadge) {
+            champBadge.remove();
+        }
+
+        // Also try full re-render if onPlayerRefreshed exists
+        if (typeof window.onPlayerRefreshed === 'function' && cache[i]) {
+            window.onPlayerRefreshed(i, cache[i]);
+        }
     }
 
     // ======================== PALPITES COM PRAZO ========================
@@ -3567,9 +3618,9 @@
     // Set presence for logged user
     const initUser = getLoggedUser();
     if (initUser) updatePresence(initUser);
-    // Check squad in game every 5 min (delayed start to not compete with initial load)
-    setTimeout(checkSquadInGame, 60000);
-    setInterval(checkSquadInGame, 300000);
+    // Check squad in game — first check 10s after load, then every 90s
+    setTimeout(checkSquadInGame, 10000);
+    setInterval(checkSquadInGame, 90000);
     // Load LP history from Firebase into localStorage
     if (db) {
         db.ref('lpHistory').once('value').then(snap => {
