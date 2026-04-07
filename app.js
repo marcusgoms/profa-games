@@ -1173,6 +1173,7 @@
             </div>
         </div>
         <div class="section-wrap">
+            <div id="squad-podium"></div>
             <div class="tg" id="squad-grid">
                 ${PLAYERS.map((p,i) => `<div class="pc ${p.special==='noob'?'pc-noob':''}" data-i="${i}" onclick="location.hash='profile/${i}'">
                     <div class="skel-card"><div class="skel-avatar skel-pulse"></div><div class="skel-lines"><div class="skel-line skel-pulse" style="width:60%"></div><div class="skel-line skel-pulse" style="width:40%"></div><div class="skel-line skel-pulse" style="width:80%"></div></div></div>
@@ -1320,6 +1321,7 @@
             if (rd) { if (existing >= 0) rankData[existing] = rd; else rankData.push(rd); }
             else if (existing >= 0) rankData.splice(existing, 1);
             renderSoloQRanking(rankData, false);
+            renderSquadPodium(rankData);
             renderTimeline();
 
             // Re-render current page if it depends on player data
@@ -1361,6 +1363,7 @@
                 loaded++;
                 init3DTilt();
                 renderSoloQRanking(rankData, loaded < PLAYERS.length);
+                renderSquadPodium(rankData);
                 renderTimeline();
                 if (loaded === PLAYERS.length) {
                     _allPlayersLoaded = true;
@@ -1430,6 +1433,40 @@
         }
 
         PLAYERS.forEach((_, i) => tryLoadPlayer(i));
+    }
+
+    function renderSquadPodium(data) {
+        const el = document.getElementById('squad-podium');
+        if (!el) return;
+        if (data.length < 3) { el.innerHTML = ''; return; }
+        const top3 = [...data].sort((a, b) => b.totalLP - a.totalLP).slice(0, 3);
+        // Reorder for podium: [2nd, 1st, 3rd]
+        const podiumOrder = [top3[1], top3[0], top3[2]];
+        const medals = ['🥈', '🥇', '🥉'];
+        const classes = ['silver', 'gold', 'bronze'];
+        const heights = ['110px', '140px', 'auto'];
+        el.innerHTML = `
+            <div class="squad-podium">
+                <h2 class="squad-podium__title">Top Ranked do Squad</h2>
+                <div class="squad-podium__stage">
+                    ${podiumOrder.map((p, i) => {
+                        const wr = p.wins + p.losses > 0 ? ((p.wins / (p.wins + p.losses)) * 100).toFixed(0) : '0';
+                        const pos = i === 1 ? 1 : i === 0 ? 2 : 3;
+                        return `<div class="squad-podium__card squad-podium__card--${classes[i]}" onclick="location.hash='profile/${p.idx}'">
+                            <div class="squad-podium__medal">${medals[i]}</div>
+                            <div class="squad-podium__pos">#${pos}</div>
+                            <div class="squad-podium__avatar">
+                                <img src="${profImg(p.icon)}" alt="" ${F}>
+                            </div>
+                            <div class="squad-podium__name">${p.name}</div>
+                            <div class="squad-podium__rank ${rankCls(p.tier)}">${p.tier} ${p.rank}</div>
+                            <div class="squad-podium__lp">${p.lp} PDL</div>
+                            <div class="squad-podium__wr">${wr}% WR</div>
+                            <div class="squad-podium__bar" style="height:${heights[i]}"></div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
     }
 
     function renderSoloQRanking(data, stillLoading) {
