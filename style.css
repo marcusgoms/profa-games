@@ -913,6 +913,48 @@ body::after {
     border: 1px dashed rgba(233,69,96,0.25);
 }
 .noob-crown { margin-right: 4px; }
+/* THE OFFICE COMMENTARY */
+.office-comment {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, rgba(200,170,110,0.08), rgba(200,170,110,0.03));
+    border-radius: 10px;
+    border: 1px solid rgba(200,170,110,0.12);
+    position: relative;
+    overflow: hidden;
+}
+.office-comment::before {
+    content: '🎞️';
+    position: absolute;
+    top: -4px;
+    right: 6px;
+    font-size: 1.8em;
+    opacity: 0.06;
+}
+.office-comment-char {
+    font-size: 0.65em;
+    font-weight: 800;
+    color: #c8aa6e;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.office-comment-icon { font-size: 1.3em; }
+.office-comment-txt {
+    font-size: 0.73em;
+    color: var(--txt);
+    line-height: 1.45;
+    font-style: italic;
+    opacity: 0.85;
+}
+[data-theme="light"] .office-comment {
+    background: linear-gradient(135deg, rgba(160,130,70,0.08), rgba(160,130,70,0.03));
+    border-color: rgba(160,130,70,0.15);
+}
+
 .noob-footer {
     margin-top: 10px;
     padding: 8px 10px;

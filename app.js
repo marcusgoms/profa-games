@@ -582,6 +582,169 @@
         return d;
     }
 
+    // ======================== THE OFFICE STYLE COMMENTARY ========================
+    function generateOfficeComment(playerName, matches, account, league) {
+        if (!matches || matches.length < 3) return null;
+        const puuid = account?.puuid;
+        if (!puuid) return null;
+
+        // Analyze last 10 matches
+        const recent = [...matches].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0)).slice(0, 10);
+        let kills=0, deaths=0, assists=0, cs=0, vis=0, dmg=0, gold=0, wins=0, pentas=0, games=0;
+        let maxDeaths=0, maxKills=0, zeroDeathGames=0, firstBloods=0;
+        const champCount = {};
+        for (const m of recent) {
+            const p = m.info?.participants?.find(x => x.puuid === puuid);
+            if (!p) continue;
+            games++;
+            kills += p.kills||0; deaths += p.deaths||0; assists += p.assists||0;
+            cs += (p.totalMinionsKilled||0)+(p.neutralMinionsKilled||0);
+            vis += p.visionScore||0; dmg += p.totalDamageDealtToChampions||0;
+            gold += p.goldEarned||0;
+            if (p.win) wins++;
+            pentas += p.pentaKills||0;
+            if ((p.deaths||0) > maxDeaths) maxDeaths = p.deaths||0;
+            if ((p.kills||0) > maxKills) maxKills = p.kills||0;
+            if ((p.deaths||0) === 0) zeroDeathGames++;
+            if (p.firstBloodKill) firstBloods++;
+            const cname = CMAP[p.championId] || 'Desconhecido';
+            champCount[cname] = (champCount[cname]||0) + 1;
+        }
+        if (games < 3) return null;
+
+        const avgK = kills/games, avgD = deaths/games, avgA = assists/games;
+        const avgCS = cs/games, avgVis = vis/games, avgDmg = dmg/games;
+        const kda = (kills+assists)/Math.max(deaths,1);
+        const wr = (wins/games)*100;
+        const topChamp = Object.entries(champCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || '?';
+        const topCount = Object.entries(champCount).sort((a,b)=>b[1]-a[1])[0]?.[1] || 0;
+        const uniqueChamps = Object.keys(champCount).length;
+
+        // Solo rank
+        const solo = Array.isArray(league) ? league.find(e => e.queueType === 'RANKED_SOLO_5x5') : null;
+        const tier = solo?.tier || '';
+
+        // Build pool of applicable comments
+        const pool = [];
+        const n = playerName;
+
+        // KDA-based
+        if (kda >= 5) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} tem um KDA de ${kda.toFixed(1)}. Isso é o que acontece quando você tem a disciplina de um fazendeiro de beterrabas. Fato."` });
+            pool.push({ icon:'🎬', char:'Michael', txt:`"Eu não estou dizendo que ${n} é o melhor jogador do mundo. Estou dizendo que o mundo é o melhor jogador de ${n}. Esperem... isso fez sentido? O KDA fez."` });
+        } else if (kda >= 3) {
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} com KDA de ${kda.toFixed(1)}. Honestamente, é tipo assistir alguém fazer o mínimo... mas com estilo. *olha pra câmera*"` });
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} é o jogador completo. Mata, morre às vezes, assiste bastante... tipo eu numa reunião. Presente, mas contribuindo? Questionável."` });
+        } else if (kda < 1.5) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"KDA de ${kda.toFixed(1)}. Em Schrute Farms, nós chamaríamos ${n} de... o espantalho. Está lá, mas ninguém tem medo."` });
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} tem um KDA que me faz chorar. E olha que eu choro vendo propaganda de margarina. ${kda.toFixed(1)}... isso é nota de prova, não KDA."` });
+            pool.push({ icon:'🧑‍💼', char:'Toby', txt:`"Tecnicamente o KDA de ${n} está dentro dos padrões aceitáveis de—" "NINGUÉM PERGUNTOU, TOBY.""` });
+        }
+
+        // Death-based
+        if (avgD >= 8) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} morre em média ${avgD.toFixed(0)} vezes por jogo. Isso não é um jogador, é um minion com skin premium."` });
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} tem um dom. O dom de morrer. Se morrer desse LP, ${n} já era Challenger."` });
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} morre tanto que o respawn mandou cartão de fidelidade. *olha pra câmera* Tipo, com desconto no tempo cinza."` });
+        } else if (avgD >= 6) {
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} morre ${avgD.toFixed(0)} vezes por jogo. Isso é tipo... o Kevin derramando chili. Triste, evitável, mas acontece toda vez."` });
+        } else if (avgD <= 2 && zeroDeathGames >= 2) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} é praticamente imortal. ${zeroDeathGames} jogos sem morrer. Como assistente regional do time, aprovo."` });
+        }
+
+        // Kills-based
+        if (avgK >= 10) {
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} matando ${avgK.toFixed(0)} por jogo?! THAT'S WHAT SHE— não, pera, isso é realmente impressionante."` });
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${avgK.toFixed(0)} kills por jogo. ${n} é a águia do time. Eu sou o falcão. Juntos, somos... pássaros mortais."` });
+        } else if (avgK <= 2) {
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} com ${avgK.toFixed(0)} kills por jogo. Não sei se tá jogando LoL ou fazenda do Facebook. *olha pra câmera*"` });
+            pool.push({ icon:'🧑‍💼', char:'Toby', txt:`"${n}, talvez devêssemos conversar sobre seus objetivos de—" "CALA A BOCA TOBY, NINGUÉM LIGA.""` });
+        }
+
+        // Win rate
+        if (wr >= 70) {
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${wr.toFixed(0)}% de winrate. ${n} é o Golden Boy. Ou Girl. Eu sou super progressivo. O ponto é: WINNER."` });
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${wr.toFixed(0)}% WR. Eu teria ${wr.toFixed(0)+1}%, mas reconheço um soldado superior. Temporariamente."` });
+        } else if (wr <= 30) {
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${wr.toFixed(0)}% de vitória. ${n}... querido... está tudo bem em casa? Quer um abraço? Eu vou te dar um abraço."` });
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} ganhando ${wr.toFixed(0)}% dos jogos é tipo o Michael fazendo discurso — todo mundo torce pra acabar logo."` });
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${wr.toFixed(0)}% de WR. Em qualquer civilização séria, ${n} já teria sido deportado para o TFT."` });
+        } else if (wr >= 50 && wr < 55) {
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} com ${wr.toFixed(0)}% WR. Perfeitamente medíocre. É tipo ser o cara que traz bolo pro escritório — ninguém reclama, ninguém aplaude."` });
+        }
+
+        // Vision
+        if (avgVis <= 5) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} com visão score de ${avgVis.toFixed(0)}. Isso explica tudo. É tipo dirigir à noite com os faróis desligados. Na chuva. Vendado."` });
+            pool.push({ icon:'🎬', char:'Michael', txt:`"Ward? ${n} nem sabe o que é uma ward. E honestamente? Eu também não sabia até semana passada. Somos gêmeos."` });
+        } else if (avgVis >= 30) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"Visão score de ${avgVis.toFixed(0)}. ${n} vê tudo. Como eu. Eu tenho visão periférica de 240 graus. Isso é genético dos Schrute."` });
+        }
+
+        // CS
+        if (avgCS <= 80) {
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} farmando ${avgCS.toFixed(0)} CS por jogo. Nem os minions respeitam ${n} — eles simplesmente passam andando."` });
+            pool.push({ icon:'🎬', char:'Michael', txt:`"Quando eu pergunto pro ${n} sobre CS, ele diz 'CS? Counter Strike?' e eu não sei se tá zuando."` });
+        } else if (avgCS >= 200) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${avgCS.toFixed(0)} CS por jogo. ${n} é uma máquina de colheita. Como eu na temporada de beterraba. Respeito."` });
+        }
+
+        // Champion pool
+        if (topCount >= 6 && games >= 8) {
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} jogou de ${topChamp} ${topCount} vezes nos últimos ${games} jogos. OTP? Não. Obcecado? Definitivamente. *olha pra câmera*"` });
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${topCount} jogos de ${topChamp}. Isso se chama lealdade. Algo que Jim nunca entenderia."` });
+        } else if (uniqueChamps >= 8) {
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} jogou ${uniqueChamps} campeões diferentes. É tipo meu humor — imprevisível, caótico, mas no fundo... ainda confuso."` });
+        }
+
+        // Pentas
+        if (pentas > 0) {
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} FEZ UM PENTA! UM PENTA! Alguém tira foto! Isso vai pro mural! ISSO VAI PRO LINKEDIN!"` });
+            pool.push({ icon:'📎', char:'Dwight', txt:`"Pentakill. O equivalente moderno de um guerreiro Schrute derrotando cinco lobos. Com as mãos. No inverno."` });
+        }
+
+        // Max deaths in a single game
+        if (maxDeaths >= 12) {
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} morreu ${maxDeaths} vezes num jogo. Eu acho que o inimigo colocou ${n} no speed dial."` });
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${maxDeaths} mortes num jogo. ${n}, isso não é inting, é performance art. E como toda arte... ninguém entendeu."` });
+        }
+
+        // First bloods
+        if (firstBloods >= 3) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} pega first blood como se fosse café da manhã. ${firstBloods} vezes em ${games} jogos. Predador nato."` });
+        }
+
+        // Damage
+        if (avgDmg >= 25000) {
+            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} causa ${(avgDmg/1000).toFixed(0)}K de dano por jogo. Fato: isso é mais dano que uma bazuca num urso. Eu testei."` });
+        } else if (avgDmg <= 8000) {
+            pool.push({ icon:'📋', char:'Jim', txt:`"${(avgDmg/1000).toFixed(0)}K de dano por jogo. ${n} tá jogando LoL ou Stardew Valley? Genuinamente perguntando."` });
+            pool.push({ icon:'🎬', char:'Michael', txt:`"O dano de ${n} é tão baixo que os inimigos mandaram mensagem perguntando se tá AFK. Tava não, né ${n}? ...né?"` });
+        }
+
+        // Rank
+        if (tier === 'IRON') {
+            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} é Ferro. FERRO. Isso significa que... é forte? Ferro é forte. Eu vou com essa interpretação."` });
+            pool.push({ icon:'📎', char:'Dwight', txt:`"Iron. O rank mais baixo. Em qualquer sociedade funcional, ${n} seria exilado para jogar Minecraft."` });
+        } else if (tier === 'CHALLENGER') {
+            pool.push({ icon:'🎬', char:'Michael', txt:`"CHALLENGER?! ${n} É CHALLENGER? E eu nem sabia?! Eu preciso de um autógrafo. AGORA. Onde assina?"` });
+        } else if (tier === 'BRONZE') {
+            pool.push({ icon:'📋', char:'Jim', txt:`"${n} é Bronze. Não no jogo — como medalha olímpica. Terceiro lugar de baixo pra cima. Mas ei, pódio é pódio."` });
+        }
+
+        // Generic fallbacks
+        pool.push({ icon:'🎬', char:'Michael', txt:`"${n} é como pizza de escritório. Não é gourmet, mas todo mundo quer. E reclama. Mas come."` });
+        pool.push({ icon:'📎', char:'Dwight', txt:`"Eu analisei as stats de ${n} e posso confirmar: é um jogador. No sentido mais literal e não-elogioso da palavra."` });
+        pool.push({ icon:'📋', char:'Jim', txt:`"Assistir ${n} jogar é tipo assistir o Michael aprender Excel. Você sabe que vai dar errado, mas não consegue parar de olhar."` });
+        pool.push({ icon:'🧑‍💼', char:'Toby', txt:`"Eu preparei um relatório detalhado sobre o desempenho de ${n}—" "TOBY, PELA ÚLTIMA VEZ, VAI PRA ANNEX!""` });
+        pool.push({ icon:'🎬', char:'Michael', txt:`"Se o time fosse The Office, ${n} seria... não o Toby. Qualquer um menos o Toby. Talvez um Kevin? Com potencial!"` });
+
+        // Pick 1 random based on a daily seed (changes once per day per player)
+        const daySeed = Math.floor(Date.now() / 86400000) + (playerName.charCodeAt(0)||0);
+        const chosen = pool[daySeed % pool.length];
+        return chosen;
+    }
+
     // Compress match data — keep only fields we actually use (saves ~90% Firebase space)
     function compressMatch(m, puuid) {
         if (!m?.info || !m?.metadata) return null;
@@ -1114,6 +1277,13 @@
                 <span>${CMAP[rChId]||'?'} &bull; ${ago}</span>
             </div>` : ago ? `<div class="lr"><span class="dot g"></span><span>${ago}</span></div>` : ''}
             ${streakBadgeHtml}
+            ${(() => {
+                const comment = generateOfficeComment(d.account?.gameName||p.name, mt, d.account, d.league);
+                return comment ? `<div class="office-comment">
+                    <div class="office-comment-char"><span class="office-comment-icon">${comment.icon}</span> ${comment.char}</div>
+                    <div class="office-comment-txt">${comment.txt}</div>
+                </div>` : '';
+            })()}
             ${noobFooter}`;
 
             // Cache profile for offline PWA
