@@ -1020,7 +1020,7 @@
         app.classList.remove('page-enter'); void app.offsetWidth; app.classList.add('page-enter');
         // Sidebars só no Squad FF
         const _sL = document.getElementById('sidebar-left'), _sR = document.getElementById('sidebar-right');
-        if (_sL) _sL.classList.toggle('tier-sidebar--visible', !h || h === 'team');
+        if (_sL) _sL.classList.toggle('profafm--visible', !h || h === 'team');
         if (_sR) _sR.classList.toggle('squad-sidebar--visible', !h || h === 'team');
         if (!h || h === 'team')               { clearLive(); renderTeam(); }
         else if (h.startsWith('live'))        { clearLive(); renderLivePage(h); }
@@ -6038,48 +6038,119 @@
         }).catch(() => {});
     }
 
-    // ======================== TIER LIST SIDEBARS ========================
-    (function initTierSidebars() {
-        const TOP_WR = [
-            { name:'KogMaw', display:"Kog'Maw", wr:54.3, tier:'S', role:'ADC' },
-            { name:'Veigar', display:'Veigar', wr:53.8, tier:'S', role:'Mid' },
-            { name:'Swain', display:'Swain', wr:53.6, tier:'A', role:'APC' },
-            { name:'Rammus', display:'Rammus', wr:53.5, tier:'A', role:'Jungle' },
-            { name:'Nasus', display:'Nasus', wr:53.1, tier:'B', role:'Top' },
-            { name:'Kayle', display:'Kayle', wr:52.9, tier:'A', role:'Top' },
-            { name:'Singed', display:'Singed', wr:52.7, tier:'B', role:'Top' },
-            { name:'Ornn', display:'Ornn', wr:52.5, tier:'A', role:'Top' },
-            { name:'Nilah', display:'Nilah', wr:52.5, tier:'B', role:'ADC' },
-            { name:'Nami', display:'Nami', wr:52.4, tier:'S', role:'Sup' },
-            { name:'Sona', display:'Sona', wr:52.2, tier:'A', role:'Sup' },
-            { name:'Briar', display:'Briar', wr:52.1, tier:'A', role:'Jungle' },
-            { name:'Milio', display:'Milio', wr:52.1, tier:'A', role:'Sup' },
-            { name:'DrMundo', display:'Dr. Mundo', wr:52.0, tier:'B', role:'Jungle' },
-            { name:'Soraka', display:'Soraka', wr:52.0, tier:'A', role:'Sup' },
+    // ======================== PROFA FM RADIO ========================
+    (function initProfaFM() {
+        const STATIONS = [
+            { name: 'LoFi Gaming', url: 'https://stream.zeno.fm/f3wvbbqmdg8uv', icon: '🎧' },
+            { name: 'Synthwave', url: 'https://stream.zeno.fm/yan0d1f6ck5tv', icon: '🌆' },
+            { name: 'Chillhop', url: 'https://stream.zeno.fm/0r0xa792kwzuv', icon: '☕' },
+            { name: 'Rock Gaming', url: 'https://stream.zeno.fm/4d6bhkaqmg8uv', icon: '🎸' },
+            { name: 'Trap/Bass', url: 'https://stream.zeno.fm/dnp0ep9f6qhvv', icon: '🔊' },
         ];
-        function wrClass(wr) {
-            if (wr >= 52) return 'tier-row__wr--high';
-            if (wr >= 50) return 'tier-row__wr--mid';
-            return 'tier-row__wr--low';
-        }
-        function renderList(containerId, list) {
-            const el = document.getElementById(containerId);
+        let _fmIdx = 0, _fmPlaying = false, _fmAudio = null, _fmAnimId = null;
+
+        function renderStations() {
+            const el = document.getElementById('profafm-stations');
             if (!el) return;
-            el.innerHTML = list.map((c, i) => `
-                <div class="tier-row" title="${c.display} — ${c.role}">
-                    <span class="tier-row__pos">${i + 1}</span>
-                    <img class="tier-row__img" src="https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${c.name}.png" alt="${c.display}" onerror="this.style.opacity='0.3'">
-                    <div class="tier-row__info">
-                        <div class="tier-row__name">${c.display}</div>
-                        <div class="tier-row__wr ${wrClass(c.wr)}">${c.wr.toFixed(1)}% WR</div>
-                    </div>
-                    <span class="tier-row__tier tier-row__tier--${c.tier}">${c.tier}</span>
+            el.innerHTML = STATIONS.map((s, i) => `
+                <div class="profafm__station ${i === _fmIdx ? 'profafm__station--active' : ''}" onclick="profaFMSelect(${i})">
+                    <span class="profafm__station-icon">${s.icon}</span>
+                    <span class="profafm__station-name">${s.name}</span>
+                    ${i === _fmIdx && _fmPlaying ? '<span class="profafm__station-live">ON AIR</span>' : ''}
                 </div>
             `).join('');
         }
-        setTimeout(() => {
-            renderList('tier-left-list', TOP_WR);
-        }, 2500);
+
+        function updateNow() {
+            const el = document.getElementById('profafm-now');
+            if (!el) return;
+            const s = STATIONS[_fmIdx];
+            el.innerHTML = _fmPlaying
+                ? `<span class="profafm__now-icon">${s.icon}</span><span class="profafm__now-label">${s.name}</span><span class="profafm__now-live">AO VIVO</span>`
+                : `<span class="profafm__now-label">Parado</span>`;
+        }
+
+        function updatePlayBtn() {
+            const btn = document.getElementById('profafm-play');
+            if (btn) btn.innerHTML = _fmPlaying ? '&#10074;&#10074;' : '&#9654;';
+        }
+
+        function animViz() {
+            const canvas = document.getElementById('profafm-canvas');
+            if (!canvas) { _fmAnimId = null; return; }
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            const bars = 18;
+            const bw = (w / bars) - 2;
+            ctx.clearRect(0, 0, w, h);
+            for (let i = 0; i < bars; i++) {
+                const bh = _fmPlaying ? (Math.random() * 0.7 + 0.15) * h : 3;
+                const x = i * (bw + 2);
+                const grad = ctx.createLinearGradient(x, h - bh, x, h);
+                grad.addColorStop(0, '#00d4ff');
+                grad.addColorStop(1, '#e94560');
+                ctx.fillStyle = grad;
+                ctx.fillRect(x, h - bh, bw, bh);
+            }
+            _fmAnimId = requestAnimationFrame(animViz);
+        }
+
+        function stopViz() {
+            if (_fmAnimId) { cancelAnimationFrame(_fmAnimId); _fmAnimId = null; }
+            const canvas = document.getElementById('profafm-canvas');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                const w = canvas.width, h = canvas.height;
+                ctx.clearRect(0, 0, w, h);
+                const bars = 18, bw = (w / bars) - 2;
+                for (let i = 0; i < bars; i++) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.fillRect(i * (bw + 2), h - 3, bw, 3);
+                }
+            }
+        }
+
+        window.profaFMToggle = function() {
+            if (_fmPlaying) {
+                if (_fmAudio) { _fmAudio.pause(); _fmAudio.src = ''; }
+                _fmPlaying = false;
+                stopViz();
+            } else {
+                if (!_fmAudio) _fmAudio = new Audio();
+                _fmAudio.src = STATIONS[_fmIdx].url;
+                _fmAudio.volume = (document.getElementById('profafm-vol')?.value || 50) / 100;
+                _fmAudio.play().catch(() => {});
+                _fmPlaying = true;
+                animViz();
+            }
+            updatePlayBtn(); updateNow(); renderStations();
+        };
+
+        window.profaFMSelect = function(idx) {
+            _fmIdx = idx;
+            if (_fmPlaying) {
+                if (_fmAudio) { _fmAudio.src = STATIONS[_fmIdx].url; _fmAudio.play().catch(() => {}); }
+            }
+            updateNow(); renderStations();
+        };
+
+        window.profaFMNext = function() {
+            _fmIdx = (_fmIdx + 1) % STATIONS.length;
+            if (_fmPlaying && _fmAudio) { _fmAudio.src = STATIONS[_fmIdx].url; _fmAudio.play().catch(() => {}); }
+            updateNow(); renderStations();
+        };
+
+        window.profaFMPrev = function() {
+            _fmIdx = (_fmIdx - 1 + STATIONS.length) % STATIONS.length;
+            if (_fmPlaying && _fmAudio) { _fmAudio.src = STATIONS[_fmIdx].url; _fmAudio.play().catch(() => {}); }
+            updateNow(); renderStations();
+        };
+
+        window.profaFMVol = function(v) {
+            if (_fmAudio) _fmAudio.volume = v / 100;
+        };
+
+        renderStations(); updateNow(); stopViz();
     })();
 
     // ======================== SQUAD SIDEBAR (right) ========================

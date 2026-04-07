@@ -39,21 +39,36 @@
             <button id="mmb">&#9776;</button>
         </div>
     </nav>
-    <!-- Tier List Sidebars -->
-    <aside id="sidebar-left" class="tier-sidebar tier-sidebar--left tier-sidebar--collapsed">
-        <button class="tier-sidebar__toggle" onclick="this.parentElement.classList.toggle('tier-sidebar--collapsed')" title="Expandir/Minimizar">
-            <span class="tier-sidebar__toggle-icon">&#9654;</span>
-            <span class="tier-sidebar__toggle-label">TOP WR</span>
+    <!-- PROFA FM Radio -->
+    <aside id="sidebar-left" class="profafm profafm--collapsed">
+        <button class="profafm__toggle" onclick="this.parentElement.classList.toggle('profafm--collapsed')" title="PROFA FM">
+            <span class="profafm__toggle-icon">&#9835;</span>
+            <span class="profafm__toggle-label">PROFA FM</span>
         </button>
-        <div class="tier-sidebar__body">
-            <div class="tier-sidebar__header">
-                <span class="tier-sidebar__icon">&#9650;</span>
-                <span class="tier-sidebar__title">TOP WIN RATE</span>
+        <div class="profafm__body">
+            <div class="profafm__header">
+                <span class="profafm__logo">&#9835;</span>
+                <div>
+                    <span class="profafm__title">PROFA FM</span>
+                    <span class="profafm__sub">R&aacute;dio do Squad</span>
+                </div>
             </div>
-            <div class="tier-sidebar__list" id="tier-left-list"></div>
-            <div class="tier-sidebar__footer">
-                <span class="tier-sidebar__src">Platinum+ &bull; Patch Atual</span>
+            <div class="profafm__viz" id="profafm-viz">
+                <canvas id="profafm-canvas" width="180" height="40"></canvas>
             </div>
+            <div class="profafm__now" id="profafm-now">
+                <span class="profafm__now-label">Offline</span>
+            </div>
+            <div class="profafm__controls">
+                <button class="profafm__btn profafm__btn--prev" onclick="profaFMPrev()" title="Anterior">&#9664;&#9664;</button>
+                <button class="profafm__btn profafm__btn--play" id="profafm-play" onclick="profaFMToggle()" title="Play/Pause">&#9654;</button>
+                <button class="profafm__btn profafm__btn--next" onclick="profaFMNext()" title="Pr&oacute;xima">&#9654;&#9654;</button>
+            </div>
+            <div class="profafm__volume">
+                <span class="profafm__vol-icon">&#128264;</span>
+                <input type="range" id="profafm-vol" class="profafm__vol-slider" min="0" max="100" value="50" oninput="profaFMVol(this.value)">
+            </div>
+            <div class="profafm__stations" id="profafm-stations"></div>
         </div>
     </aside>
     <aside id="sidebar-right" class="squad-sidebar squad-sidebar--right squad-sidebar--collapsed">
