@@ -2507,58 +2507,58 @@
     // ======================== PROFA FM — RÁDIO GAMER ========================
     const RADIO_STATIONS = [
         { name: 'RPG Chill', icon: '🏰', tracks: [
-            { title:'Minecraft - Sweden', id:'aBkTkxKDduc' },
-            { title:'Minecraft - Wet Hands', id:'mukiMaOSLEs' },
-            { title:'Minecraft - Calm Compilation', id:'Dg0IjOzopYU' },
-            { title:'Zelda - Great Fairy Fountain', id:'oF2ckydjJBg' },
-            { title:'Skyrim - Ambient Music', id:'aQeIYVM3YBM' },
-            { title:'Stardew Valley - OST', id:'FQSHcl6TJb4' },
-            { title:'Undertale - OST Peaceful', id:'EBhFHJMVfiI' },
-            { title:'Animal Crossing - Music', id:'cHkMjEoLSCY' },
-            { title:'Minecraft - Full Soundtrack', id:'Nxemk6pMJHE' },
-            { title:'Zelda Ocarina - Lost Woods', id:'KQFwhaJiOg0' },
+            { title:'Minecraft - Sweden (C418)', id:'_3ngiSxVCBs' },
+            { title:'Minecraft - Wet Hands', id:'0RMhjO0FbKY' },
+            { title:'Skyrim - Secunda', id:'V4P_S9OCOMU' },
+            { title:'Skyrim - Streets of Whiterun', id:'qo3VAltxlr8' },
+            { title:'Zelda BOTW - Hateno Village', id:'vBnSP5mFYdo' },
+            { title:'Stardew Valley - Spring', id:'2GYHhU4DRCE' },
+            { title:'Undertale - Home', id:'7TKnwMb3JMw' },
+            { title:'Hollow Knight - Greenpath', id:'gIBEd5TRamE' },
+            { title:'Animal Crossing - 2AM', id:'HX_HVqWUjBo' },
+            { title:'Ori - Naru Embracing Light', id:'3BPjX5XwJVc' },
         ]},
         { name: 'Aventura', icon: '⚔️', tracks: [
-            { title:'Zelda BOTW - Main Theme', id:'vmMGaMBo4a4' },
-            { title:'Mario Galaxy - Gusty Garden', id:'WcHHuhUOjkU' },
-            { title:'Hollow Knight - City of Tears', id:'1unm0LS10ao' },
-            { title:'Ori - Main Theme', id:'MkzeOmkOUHM' },
-            { title:'Chrono Trigger - Wind Scene', id:'hELte7w5uBg' },
-            { title:'Final Fantasy - To Zanarkand', id:'h-0G_FI61a8' },
-            { title:'Kingdom Hearts - Dearly Beloved', id:'g25QHnYXMgE' },
-            { title:'Persona 5 - Beneath the Mask', id:'MNiVl8cTMPM' },
+            { title:'Zelda - Song of Storms', id:'43IPAGw01IY' },
+            { title:'Mario Galaxy - Gusty Garden', id:'bcZhJDimFtE' },
+            { title:'Chrono Trigger - Wind Scene', id:'RqZaFDA7PXY' },
+            { title:'Final Fantasy X - To Zanarkand', id:'KGMRz0AEDX4' },
+            { title:'Kingdom Hearts - Dearly Beloved', id:'TG1pRNQAByI' },
+            { title:'Persona 5 - Beneath the Mask', id:'gFFOXwniVKw' },
+            { title:'Xenoblade - Gaur Plain', id:'xweRl4LZlmo' },
+            { title:'Pokémon - Lavender Town', id:'JNJJ-QkZ8cM' },
         ]},
         { name: 'Batalha', icon: '🔥', tracks: [
-            { title:'Doom Eternal - BFG Division', id:'W9GaIbECisQ' },
-            { title:'Metal Gear - Snake Eater', id:'9aHQnDTd1y4' },
-            { title:'Dark Souls III - Main Theme', id:'stWae6r7Blw' },
-            { title:'Halo Theme - Mjolnir Mix', id:'q_pAa9252Uo' },
-            { title:'God of War - Main Theme', id:'y9hh91-2iaA' },
-            { title:'NieR Automata - Weight of World', id:'Egn_VNVKzI4' },
-            { title:'Cuphead - Full OST', id:'dMoLQBcXQ3M' },
-            { title:'Undertale - Megalovania', id:'wDgQdr8ZkTw' },
+            { title:'Doom - BFG Division', id:'pNkQMtZAMAw' },
+            { title:'Dark Souls - Gwyn Theme', id:'AB6sOhQan9Y' },
+            { title:'Halo - Main Theme', id:'0jXTBAGv9ZQ' },
+            { title:'Metal Gear Rising - Rules of Nature', id:'N3472Q6kvg0' },
+            { title:'Undertale - Megalovania', id:'0FCvzsVlXpQ' },
+            { title:'Cuphead - Floral Fury', id:'YEvEjMJci7s' },
+            { title:'Devil May Cry 5 - Bury the Light', id:'Jrg9KxGNeJY' },
+            { title:'NieR Automata - A Beautiful Song', id:'aq6kv3tfd9g' },
         ]},
         { name: 'LoL / Arcane', icon: '🎮', tracks: [
             { title:'Legends Never Die', id:'4Q46xYqUwZQ' },
-            { title:'Warriors', id:'fmI_Ndrxy14' },
+            { title:'Warriors - Imagine Dragons', id:'fmI_Ndrxy14' },
             { title:'RISE', id:'fB8TyLTD7EE' },
-            { title:'Enemy (Arcane)', id:'D9G1VOjN_84' },
-            { title:'Guns for Hire (Arcane)', id:'r4jJGBHv04g' },
-            { title:'Burn It All Down', id:'GCKeCntqnpI' },
+            { title:'Enemy - Imagine Dragons (Arcane)', id:'D9G1VOjN_84' },
+            { title:'Burn It All Down - Worlds 2021', id:'GCKeCntqnpI' },
             { title:'Awaken', id:'zF5Ddo9JdpY' },
-            { title:'Phoenix', id:'i1IKnWDecwA' },
-            { title:'POP/STARS', id:'UOxkGD8qRB4' },
-            { title:'Worlds 2022 - Star Walkin', id:'gRNMRRK9f8I' },
+            { title:'Phoenix - Worlds 2019', id:'i1IKnWDecwA' },
+            { title:'POP/STARS - K/DA', id:'UOxkGD8qRB4' },
+            { title:'Star Walkin - Worlds 2022', id:'gRNMRRK9f8I' },
+            { title:'Worlds Apart - Worlds 2024', id:'w90m7amBe_s' },
         ]},
         { name: 'Lo-Fi Gaming', icon: '🎧', tracks: [
-            { title:'Pokémon Lo-Fi Chill', id:'J5qEpSxl3CE' },
-            { title:'Super Mario Lo-Fi', id:'GlMmANjHhHE' },
-            { title:'Zelda Lo-Fi Beats', id:'nK0iOqGHNGs' },
-            { title:'Undertale Lo-Fi', id:'FZ_sShLasHE' },
-            { title:'Animal Crossing Lo-Fi', id:'MiPHF5-Y3LI' },
-            { title:'Genshin Impact - Relaxing', id:'Yv--LB1Bfow' },
-            { title:'Terraria - Overworld Day', id:'tRNrlHkhqHE' },
-            { title:'Celeste - First Steps', id:'N8OHAHbhqDg' },
+            { title:'Lo-Fi Zelda - Lost Woods', id:'p2iMojMnpEo' },
+            { title:'Lo-Fi Pokémon - Route 1', id:'qlBHQDhsLBY' },
+            { title:'Lo-Fi Mario - Dire Dire Docks', id:'8y8eRpE4r5g' },
+            { title:'Lo-Fi Minecraft - Sweden', id:'mYKFlbFYqh8' },
+            { title:'Lo-Fi Animal Crossing - Rainy', id:'_38JDGnr0vA' },
+            { title:'Lo-Fi Ghibli - Merry Go Round', id:'rEITNR1r-Rw' },
+            { title:'Lo-Fi Undertale - Snowdin', id:'1i2VDJa5TQE' },
+            { title:'Lo-Fi Stardew - Pelican Town', id:'jqJIF_k3bR4' },
         ]},
     ];
 
@@ -2567,6 +2567,8 @@
     let _radioShuffle = localStorage.getItem('profa_radio_shuffle') === '1';
     let musicPlaying = false;
     let ytPlayer = null;
+    let _radioSkipCount = 0;
+    const MAX_CONSECUTIVE_SKIPS = 3;
     const MUSIC_VOL = parseInt(localStorage.getItem('profa_radio_vol')||'15');
 
     function currentStation() { return RADIO_STATIONS[_radioStation] || RADIO_STATIONS[0]; }
@@ -2638,23 +2640,24 @@
             events: {
                 onReady: () => { ytPlayer.setVolume(MUSIC_VOL); },
                 onStateChange: (e) => {
-                    if (e.data === YT.PlayerState.ENDED) musicNext();
-                    if (e.data === YT.PlayerState.UNSTARTED && musicPlaying) {
+                    if (e.data === YT.PlayerState.ENDED) { _radioSkipCount = 0; musicNext(); }
+                    if (e.data === YT.PlayerState.PLAYING) {
+                        _radioSkipCount = 0;
                         clearTimeout(window._radioSkipTimer);
-                        window._radioSkipTimer = setTimeout(() => {
-                            if (!musicPlaying || ytPlayer?.getPlayerState?.() !== YT.PlayerState.PLAYING) {
-                                console.warn('[Radio] Track stuck, skipping...');
-                                musicNext();
-                            }
-                        }, 6000);
                     }
-                    if (e.data === YT.PlayerState.PLAYING) clearTimeout(window._radioSkipTimer);
                     musicPlaying = e.data === YT.PlayerState.PLAYING;
                     updateMusicUI();
                 },
                 onError: (e) => {
-                    console.warn('[Radio] Video error code', e.data, '- skipping...');
-                    setTimeout(musicNext, 800);
+                    console.warn('[Radio] Video error code', e.data);
+                    _radioSkipCount++;
+                    if (_radioSkipCount < MAX_CONSECUTIVE_SKIPS) {
+                        setTimeout(musicNext, 1500);
+                    } else {
+                        console.warn('[Radio] Muitas falhas seguidas, parando.');
+                        musicPlaying = false;
+                        updateMusicUI();
+                    }
                 }
             }
         });
@@ -2689,6 +2692,7 @@
     window.switchStation = function(idx) {
         _radioStation = idx;
         _radioTrack = 0;
+        _radioSkipCount = 0;
         localStorage.setItem('profa_radio_station', String(idx));
         localStorage.setItem('profa_radio_track', '0');
         if (ytPlayer?.loadVideoById) ytPlayer.loadVideoById(currentTrack().id);
@@ -2701,16 +2705,11 @@
     };
     window.musicPlay = function(i) {
         _radioTrack = i;
+        _radioSkipCount = 0;
         localStorage.setItem('profa_radio_track', String(i));
         clearTimeout(window._radioSkipTimer);
         if (ytPlayer?.loadVideoById) {
             ytPlayer.loadVideoById(currentTrack().id);
-            window._radioSkipTimer = setTimeout(() => {
-                if (ytPlayer?.getPlayerState?.() !== YT.PlayerState.PLAYING) {
-                    console.warn('[Radio] Track failed to start, skipping...');
-                    musicNext();
-                }
-            }, 7000);
         }
         updateMusicUI();
     };
