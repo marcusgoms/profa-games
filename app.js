@@ -1029,7 +1029,6 @@
         else if (h === 'cblol')               { clearLive(); renderCBLOL('upcoming'); }
         else if (h === 'dashboard')           { clearLive(); renderDashboard(); }
         else if (h === 'arena')               { clearLive(); renderArenaRPG(); }
-        else if (h.startsWith('dm/'))           { clearLive(); renderDM(parseInt(h.split('/')[1])); }
         else if (h === 'chat')                { clearLive(); clearChatBadge(); renderChat(); }
         else if (h === 'teambuilder')         { clearLive(); renderTeamBuilder(); }
         else                                  { clearLive(); renderTeam(); }
@@ -1037,7 +1036,7 @@
     function pn(h) {
         if (!h || h === 'team' || h.startsWith('profile/') || h.startsWith('compare')) return 'team';
         if (h === 'arena') return 'arena';
-        if (h === 'chat' || h.startsWith('dm/')) return 'chat';
+        if (h === 'chat') return 'chat';
         if (h === 'cblol') return 'cblol';
         if (h.startsWith('live')) return 'live';
         if (h === 'dashboard') return 'dashboard';
@@ -6128,7 +6127,7 @@
             rows.push({ idx: i, name: p.name, tier: null, rank: null, lp: null, icon: playerIcon(i, null), isNoob, isOnline, lastSeen, hasRank: false });
         });
         el.innerHTML = rows.map(r => `
-            <div class="sq-row ${r.isNoob ? 'sq-row--noob' : ''}" onclick="location.hash='dm/${r.idx}'" title="Chat privado com ${r.name}">
+            <div class="sq-row ${r.isNoob ? 'sq-row--noob' : ''}" onclick="openDMWindow(${r.idx})" title="Chat privado com ${r.name}">
                 <img class="sq-row__avatar ${r.isOnline ? 'sq-row__avatar--online' : ''}" src="${profImg(r.icon)}" alt="" ${F}>
                 <div class="sq-row__info">
                     <div class="sq-row__name">${r.name} ${r.isNoob ? '<span class="sq-row__noob-tag">NOOB</span>' : ''}</div>
@@ -6151,92 +6150,130 @@
         });
     };
 
-    // ======================== DM (Chat Privado) ========================
-    let _dmRef = null;
+    // ======================== DM FLOATING WINDOWS (Facebook-style) ========================
+    const _dmWindows = {}; // { idx: { ref, el, minimized } }
     function getDMKey(a, b) { return a < b ? `dm_${a}_${b}` : `dm_${b}_${a}`; }
-    function stopDM() { if (_dmRef) { _dmRef.off(); _dmRef = null; } }
 
-    function renderDM(targetIdx) {
-        stopDM();
-        stopChat();
+    window.openDMWindow = function(targetIdx) {
+        // If already open, just focus it
+        if (_dmWindows[targetIdx]) {
+            const w = _dmWindows[targetIdx];
+            w.el.classList.remove('dm-win--minimized');
+            w.minimized = false;
+            const input = w.el.querySelector('.dm-win__input');
+            if (input) input.focus();
+            return;
+        }
         const user = getLoggedUser();
+        if (!user) { showToast('⚠️', 'Faça login para usar o chat privado'); return; }
         const target = PLAYERS[targetIdx];
-        if (!target) { location.hash = 'chat'; return; }
+        if (!target) return;
         const isNoob = target.special === 'noob';
-        const targetPresence = _onlineUsers[targetIdx];
-        const isOnline = targetPresence?.online;
+        const presence = _onlineUsers[targetIdx];
+        const isOnline = presence?.online;
 
-        app.innerHTML = `<div class="chat-fullpage">
-            <div class="chat-topbar">
-                <div class="chat-topbar-info" style="display:flex;align-items:center;gap:12px;">
-                    <button class="bb" onclick="location.hash='chat'" style="margin:0;padding:6px 10px;font-size:0.8em;">&larr;</button>
-                    <img src="${profImg(playerIcon(targetIdx, null))}" style="width:32px;height:32px;border-radius:50%;border:2px solid ${isNoob?'#ef5350':'rgba(255,255,255,0.1)'};" ${F}>
-                    <div>
-                        <h2 style="font-size:1em;margin:0;">${target.name} ${isNoob?'<span style="color:#ef5350;font-size:0.6em;">NOOB 🤡</span>':''}</h2>
-                        <div class="chat-topbar-status">
-                            <span class="online-dot" style="background:${isOnline?'#4caf50':'#666'};"></span>
-                            ${isOnline ? 'Online' : (targetPresence?.ts ? fmtAgo(targetPresence.ts) : 'Offline')}
-                        </div>
-                    </div>
+        // Create floating window
+        const win = document.createElement('div');
+        win.className = 'dm-win' + (isNoob ? ' dm-win--noob' : '');
+        win.id = 'dm-win-' + targetIdx;
+        // Position: stack from right
+        const openCount = Object.keys(_dmWindows).length;
+        win.style.right = (16 + openCount * 340) + 'px';
+
+        win.innerHTML = `
+            <div class="dm-win__header" onclick="toggleDMWindow(${targetIdx})">
+                <img class="dm-win__avatar ${isOnline?'dm-win__avatar--online':''}" src="${profImg(playerIcon(targetIdx, null))}" ${F}>
+                <div class="dm-win__hinfo">
+                    <span class="dm-win__hname">${target.name}${isNoob?' <span class="dm-win__noob">🤡</span>':''}</span>
+                    <span class="dm-win__hstatus">${isOnline ? '🟢 Online' : 'Offline'}</span>
                 </div>
+                <button class="dm-win__close" onclick="event.stopPropagation();closeDMWindow(${targetIdx})" title="Fechar">&times;</button>
             </div>
-            <div class="chat-box" id="dm-box"><div class="ld"><div class="sp"></div></div></div>
-            ${user ? `
-            <div class="chat-input-area">
-                <div class="chat-input-row">
-                    <input type="text" id="dm-input" placeholder="Mensagem para ${target.name}..." maxlength="500" autocomplete="off">
-                    <button class="chat-send" onclick="sendDM(${targetIdx})">➤</button>
+            <div class="dm-win__body">
+                <div class="dm-win__messages" id="dm-msgs-${targetIdx}"><div class="ld" style="padding:20px;"><div class="sp"></div></div></div>
+                <div class="dm-win__inputarea">
+                    <input class="dm-win__input" id="dm-input-${targetIdx}" type="text" placeholder="Aa" maxlength="500" autocomplete="off">
+                    <button class="dm-win__send" onclick="sendDM(${targetIdx})">➤</button>
                 </div>
-            </div>` : '<div class="chat-login-prompt"><p>Faça login para enviar mensagens</p><button class="cfg-btn" onclick="showLoginModal()">Entrar</button></div>'}
-        </div>`;
+            </div>`;
 
-        const dmInput = document.getElementById('dm-input');
-        if (dmInput) {
-            dmInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDM(targetIdx); } });
-            dmInput.focus();
+        document.body.appendChild(win);
+        // Animate in
+        requestAnimationFrame(() => win.classList.add('dm-win--open'));
+
+        const input = win.querySelector('.dm-win__input');
+        if (input) {
+            input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDM(targetIdx); } });
+            input.focus();
         }
 
-        if (!db) { const box = document.getElementById('dm-box'); if(box) box.innerHTML='<p class="chat-empty">Firebase não configurado.</p>'; return; }
-        const dmKey = getDMKey(user ? user.idx : -1, targetIdx);
-        _dmRef = db.ref('dms/' + dmKey).orderByChild('ts').limitToLast(100);
-        _dmRef.on('value', snap => {
-            const box = document.getElementById('dm-box');
-            if (!box) { stopDM(); return; }
-            const msgs = [];
-            snap.forEach(child => {
-                const val = child.val();
-                if (val) msgs.push({ _key: child.key, ...val, ts: val.ts || Date.now() });
+        // Firebase listener
+        let ref = null;
+        if (db) {
+            const dmKey = getDMKey(user.idx, targetIdx);
+            ref = db.ref('dms/' + dmKey).orderByChild('ts').limitToLast(100);
+            ref.on('value', snap => {
+                const box = document.getElementById('dm-msgs-' + targetIdx);
+                if (!box) return;
+                const msgs = [];
+                snap.forEach(child => {
+                    const val = child.val();
+                    if (val) msgs.push({ ...val, ts: val.ts || Date.now() });
+                });
+                msgs.sort((a, b) => (a.ts||0) - (b.ts||0));
+                if (!msgs.length) {
+                    box.innerHTML = `<p class="dm-win__empty">Diga oi${isNoob?' (se tiver coragem 🤡)':''} 👋</p>`;
+                    return;
+                }
+                const wasAtBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+                let html = '';
+                msgs.forEach(m => {
+                    const isMe = user.idx === m.idx;
+                    const d = new Date(m.ts);
+                    const t = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+                    html += `<div class="dm-msg ${isMe?'dm-msg--me':'dm-msg--them'}">
+                        <div class="dm-msg__bubble">${escapeHtml(m.text||'')}</div>
+                        <span class="dm-msg__time">${t}</span>
+                    </div>`;
+                });
+                box.innerHTML = html;
+                if (wasAtBottom) box.scrollTop = box.scrollHeight;
             });
-            msgs.sort((a, b) => (a.ts || 0) - (b.ts || 0));
-            if (!msgs.length) {
-                box.innerHTML = `<p class="chat-empty">Nenhuma mensagem ainda. Diga oi para ${target.name}${isNoob?' (se tiver coragem)':''}! 👋</p>`;
-                return;
-            }
-            const wasAtBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
-            let html = '';
-            msgs.forEach(m => {
-                const isMe = user?.idx === m.idx;
-                const icon = playerIcon(m.idx, null);
-                const d = new Date(m.ts);
-                const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                html += `<div class="chat-msg ${isMe ? 'chat-msg-me' : 'chat-msg-other'}">
-                    ${!isMe ? `<img src="${profImg(icon)}" class="chat-avatar" ${F}>` : ''}
-                    <div class="chat-bubble ${isMe ? 'chat-bubble-me' : 'chat-bubble-other'}">
-                        ${!isMe ? `<div class="chat-name" style="${m.idx === targetIdx && isNoob ? 'color:#ef5350;' : ''}">${escapeHtml(m.name||'')}</div>` : ''}
-                        <div class="chat-text">${escapeHtml(m.text||'')}</div>
-                        <div class="chat-time">${timeStr}</div>
-                    </div>
-                </div>`;
-            });
-            box.innerHTML = html;
-            if (wasAtBottom) box.scrollTop = box.scrollHeight;
-        });
-    }
+        }
+
+        _dmWindows[targetIdx] = { ref, el: win, minimized: false };
+    };
+
+    window.toggleDMWindow = function(idx) {
+        const w = _dmWindows[idx];
+        if (!w) return;
+        w.minimized = !w.minimized;
+        w.el.classList.toggle('dm-win--minimized', w.minimized);
+        if (!w.minimized) {
+            const input = w.el.querySelector('.dm-win__input');
+            if (input) input.focus();
+        }
+    };
+
+    window.closeDMWindow = function(idx) {
+        const w = _dmWindows[idx];
+        if (!w) return;
+        if (w.ref) w.ref.off();
+        w.el.classList.remove('dm-win--open');
+        setTimeout(() => { w.el.remove(); }, 200);
+        delete _dmWindows[idx];
+        // Reposition remaining windows
+        let i = 0;
+        for (const key of Object.keys(_dmWindows)) {
+            _dmWindows[key].el.style.right = (16 + i * 340) + 'px';
+            i++;
+        }
+    };
 
     window.sendDM = function(targetIdx) {
         const user = getLoggedUser();
         if (!user || !db) return;
-        const input = document.getElementById('dm-input');
+        const input = document.getElementById('dm-input-' + targetIdx);
         if (!input || !input.value.trim()) return;
         const text = input.value.trim();
         input.value = '';
