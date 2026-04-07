@@ -834,6 +834,7 @@
     function clearLive() {
         if (liveTimer)       { clearInterval(liveTimer);       liveTimer       = null; }
         if (liveDetailTimer) { clearInterval(liveDetailTimer); liveDetailTimer = null; }
+        clearLiveMatch();
         stopChat();
     }
 
@@ -1084,7 +1085,7 @@
 
             const streakBadgeHtml = (streakType === 'win' && streakCount >= 3) ? `<div class="pc-streak-badge">🔥 ${streakCount} vitórias seguidas</div>`
                 : (streakType === 'loss' && streakCount >= 3) ? `<div class="pc-streak-badge">💀 ${streakCount} derrotas seguidas</div>`
-                : isInGame && liveChampName ? `<div class="pc-live-champ">🎮 Jogando de <b>${liveChampName}</b></div>`
+                : isInGame && liveChampName ? `<div class="pc-live-champ" onclick="event.stopPropagation();showLiveMatch(${i})">🎮 Jogando de <b>${liveChampName}</b> — <u>Ver ao vivo</u></div>`
                 : '';
 
             card.innerHTML = `
@@ -1758,8 +1759,12 @@
                 ? `<span class="prg prg-flex">${flex.tier} ${flex.rank} Flex</span>`
                 : '';
 
+            const liveAlert = _liveAlerts[idx];
+            const liveBanner = liveAlert ? `<div class="prof-live-banner" onclick="showLiveMatch(${idx})"><span class="ldot"></span> EM PARTIDA AO VIVO — Clique para assistir</div>` : '';
+
             app.innerHTML = `<div class="section-wrap-sm">
                 <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+                ${liveBanner}
                 <div class="pv">
                     <div class="pb" style="--pb-splash:url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${CMAP[champArr[0]?.id]||'Zed'}_0.jpg')"><div class="pbg"></div><div class="pbi">
                         <div class="pi"><img src="${profImg(ic)}" alt="" id="prof-main-icon" ${F}></div>
@@ -4687,7 +4692,8 @@
                 if (noobFooter) card.insertBefore(champBadge, noobFooter);
                 else card.appendChild(champBadge);
             }
-            champBadge.innerHTML = `🎮 Jogando de <b>${liveChampName}</b>`;
+            champBadge.innerHTML = `🎮 Jogando de <b>${liveChampName}</b> — <u>Ver ao vivo</u>`;
+            champBadge.onclick = (e) => { e.stopPropagation(); showLiveMatch(i); };
         } else if (champBadge) {
             champBadge.remove();
         }
@@ -4697,6 +4703,216 @@
             window.onPlayerRefreshed(i, cache[i]);
         }
     }
+
+    // ======================== LIVE MATCH VIEW (Spectator) ========================
+    let _liveMatchTimer = null;
+    let _liveTimeTimer = null;
+    let _liveGameStart = 0;
+
+    function clearLiveMatch() {
+        if (_liveMatchTimer) { clearInterval(_liveMatchTimer); _liveMatchTimer = null; }
+        if (_liveTimeTimer) { clearInterval(_liveTimeTimer); _liveTimeTimer = null; }
+    }
+
+    // Guess lane roles based on champion + spell (heuristic)
+    function guessRole(p) {
+        const smite = p.spell1Id === 11 || p.spell2Id === 11;
+        if (smite) return 'JNG';
+        // Known support champions by ID (rough list)
+        const supChamps = new Set([12,37,40,43,44,89,111,117,201,223,235,267,350,412,432,497,518,555,876,887,950]);
+        const adcChamps = new Set([15,18,21,22,29,42,51,67,81,96,110,119,133,145,147,202,221,222,234,236,360,498,523,528,895,901]);
+        if (supChamps.has(p.championId)) return 'SUP';
+        if (adcChamps.has(p.championId)) return 'ADC';
+        return null; // Unknown, will be assigned later
+    }
+
+    function assignRoles(team) {
+        const roles = ['TOP', 'JNG', 'MID', 'ADC', 'SUP'];
+        const assigned = new Array(5).fill(null);
+        const used = new Set();
+        // First pass: assign confident guesses
+        team.forEach((p, i) => {
+            const g = guessRole(p);
+            if (g && !used.has(g)) { assigned[i] = g; used.add(g); }
+        });
+        // Second pass: fill remaining
+        team.forEach((p, i) => {
+            if (!assigned[i]) {
+                const remaining = roles.filter(r => !used.has(r));
+                if (remaining.length) { assigned[i] = remaining[0]; used.add(remaining[0]); }
+                else assigned[i] = 'MID';
+            }
+        });
+        return assigned;
+    }
+
+    function fmtGameTime(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    async function fetchSpectatorData(playerIdx) {
+        const d = cache[playerIdx];
+        if (!d?.account?.puuid) return null;
+        const p = PLAYERS[playerIdx], pl = plat(p.region);
+        try {
+            const resp = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${d.account.puuid}`, {
+                headers: { 'X-Riot-Token': RIOT_KEY }
+            });
+            if (!resp.ok) return null;
+            return await resp.json();
+        } catch(_) { return null; }
+    }
+
+    function renderLiveMatchView(container, gameData, playerPuuid) {
+        if (!gameData?.participants) { container.innerHTML = '<div class="err">Dados não disponíveis</div>'; return; }
+
+        const blue = gameData.participants.filter(p => p.teamId === 100);
+        const red = gameData.participants.filter(p => p.teamId === 200);
+        const blueRoles = assignRoles(blue);
+        const redRoles = assignRoles(red);
+
+        // Sort by role order: TOP, JNG, MID, ADC, SUP
+        const roleOrder = { TOP: 0, JNG: 1, MID: 2, ADC: 3, SUP: 4 };
+        const blueSort = blue.map((p, i) => ({ ...p, role: blueRoles[i] })).sort((a, b) => (roleOrder[a.role]??5) - (roleOrder[b.role]??5));
+        const redSort = red.map((p, i) => ({ ...p, role: redRoles[i] })).sort((a, b) => (roleOrder[a.role]??5) - (roleOrder[b.role]??5));
+
+        const roleIcons = { TOP: '🗡️', JNG: '🌿', MID: '⚡', ADC: '🏹', SUP: '🛡️' };
+        const roleNames = { TOP: 'Top', JNG: 'Jungle', MID: 'Mid', ADC: 'ADC', SUP: 'Suporte' };
+
+        // Game time
+        const gameStart = gameData.gameStartTime || 0;
+        const gameLen = gameData.gameLength || 0;
+        let elapsed = gameLen;
+        if (gameStart > 0) {
+            elapsed = Math.max(0, Math.floor((Date.now() - gameStart) / 1000));
+        }
+        _liveGameStart = gameStart;
+
+        // Check which team our player is on
+        const isBlue = blue.some(p => p.puuid === playerPuuid);
+
+        const matchupRows = [];
+        for (let i = 0; i < 5; i++) {
+            const b = blueSort[i] || {};
+            const r = redSort[i] || {};
+            const role = blueSort[i]?.role || redSort[i]?.role || '?';
+            const bIsMe = b.puuid === playerPuuid;
+            const rIsMe = r.puuid === playerPuuid;
+            const bName = b.riotId || b.summonerId || '?';
+            const rName = r.riotId || r.summonerId || '?';
+            const bChamp = CMAP[b.championId] || '?';
+            const rChamp = CMAP[r.championId] || '?';
+
+            matchupRows.push(`
+            <div class="lm-row">
+                <div class="lm-player lm-blue ${bIsMe ? 'lm-me' : ''}">
+                    <div class="lm-spells">
+                        <img src="${spellImg(b.spell1Id)}" class="lm-spell" onerror="this.style.opacity='0.3'">
+                        <img src="${spellImg(b.spell2Id)}" class="lm-spell" onerror="this.style.opacity='0.3'">
+                    </div>
+                    <img src="${champImg(b.championId)}" class="lm-champ-img" onerror="this.style.opacity='0.3'">
+                    <div class="lm-info">
+                        <div class="lm-name">${bIsMe ? '⭐ ' : ''}${bName}</div>
+                        <div class="lm-champ">${bChamp}</div>
+                    </div>
+                </div>
+                <div class="lm-role">
+                    <span class="lm-role-icon">${roleIcons[role] || '?'}</span>
+                    <span class="lm-role-name">${roleNames[role] || role}</span>
+                </div>
+                <div class="lm-player lm-red ${rIsMe ? 'lm-me' : ''}">
+                    <div class="lm-info lm-info-right">
+                        <div class="lm-name">${rIsMe ? '⭐ ' : ''}${rName}</div>
+                        <div class="lm-champ">${rChamp}</div>
+                    </div>
+                    <img src="${champImg(r.championId)}" class="lm-champ-img" onerror="this.style.opacity='0.3'">
+                    <div class="lm-spells">
+                        <img src="${spellImg(r.spell1Id)}" class="lm-spell" onerror="this.style.opacity='0.3'">
+                        <img src="${spellImg(r.spell2Id)}" class="lm-spell" onerror="this.style.opacity='0.3'">
+                    </div>
+                </div>
+            </div>`);
+        }
+
+        // Banned champions
+        const blueBans = (gameData.bannedChampions || []).filter(b => b.teamId === 100).map(b => b.championId);
+        const redBans = (gameData.bannedChampions || []).filter(b => b.teamId === 200).map(b => b.championId);
+
+        container.innerHTML = `
+        <div class="lm-header">
+            <div class="lm-team lm-team-blue">AZUL</div>
+            <div class="lm-timer">
+                <div class="lm-timer-icon">🔴 AO VIVO</div>
+                <div class="lm-timer-time" id="lm-elapsed">${fmtGameTime(elapsed)}</div>
+                <div class="lm-timer-mode">${gameData.gameMode || 'CLASSIC'}</div>
+            </div>
+            <div class="lm-team lm-team-red">VERMELHO</div>
+        </div>
+        ${blueBans.length || redBans.length ? `
+        <div class="lm-bans">
+            <div class="lm-bans-side lm-bans-blue">
+                ${blueBans.map(id => `<img src="${champImg(id)}" class="lm-ban-img" title="${CMAP[id]||'?'}" onerror="this.style.opacity='0.2'">`).join('')}
+            </div>
+            <span class="lm-bans-label">BANS</span>
+            <div class="lm-bans-side lm-bans-red">
+                ${redBans.map(id => `<img src="${champImg(id)}" class="lm-ban-img" title="${CMAP[id]||'?'}" onerror="this.style.opacity='0.2'">`).join('')}
+            </div>
+        </div>` : ''}
+        <div class="lm-matchups">
+            ${matchupRows.join('')}
+        </div>`;
+
+        // Start elapsed time counter
+        if (_liveTimeTimer) clearInterval(_liveTimeTimer);
+        if (gameStart > 0) {
+            _liveTimeTimer = setInterval(() => {
+                const el = document.getElementById('lm-elapsed');
+                if (el) {
+                    const now = Math.max(0, Math.floor((Date.now() - gameStart) / 1000));
+                    el.textContent = fmtGameTime(now);
+                }
+            }, 1000);
+        }
+    }
+
+    // Show live match for a player (called from profile or card)
+    window.showLiveMatch = async function(playerIdx) {
+        clearLiveMatch();
+        const d = cache[playerIdx];
+        if (!d?.account?.puuid) return;
+        const p = PLAYERS[playerIdx];
+
+        app.innerHTML = `<div class="section-wrap-sm">
+            <button class="bb" onclick="location.hash='profile/${playerIdx}'">&larr; Voltar ao perfil</button>
+            <div class="lm-wrap">
+                <div class="lm-title">
+                    <span class="ldot"></span>
+                    <h2>${d.account.gameName || p.name} — Partida ao Vivo</h2>
+                </div>
+                <div id="lm-container"><div class="ld"><div class="sp"></div></div></div>
+                <div class="lm-refresh-info" id="lm-refresh-info">Atualizando a cada 3s...</div>
+            </div>
+        </div>`;
+
+        async function refreshLiveMatch() {
+            const gameData = await fetchSpectatorData(playerIdx);
+            const container = document.getElementById('lm-container');
+            if (!container) { clearLiveMatch(); return; }
+            if (!gameData) {
+                container.innerHTML = '<div class="err"><p>Partida encerrada ou indisponível</p><button onclick="location.hash=\'profile/' + playerIdx + '\'" style="margin-top:10px;padding:8px 18px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Voltar ao perfil</button></div>';
+                clearLiveMatch();
+                const info = document.getElementById('lm-refresh-info');
+                if (info) info.textContent = 'Partida finalizada';
+                return;
+            }
+            renderLiveMatchView(container, gameData, d.account.puuid);
+        }
+
+        await refreshLiveMatch();
+        _liveMatchTimer = setInterval(refreshLiveMatch, 3000);
+    };
 
     // ======================== PALPITES COM PRAZO ========================
     function isPredictionLocked(startTime) {

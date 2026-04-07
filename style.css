@@ -1178,6 +1178,84 @@ body::after {
 @keyframes slideInRight { from { transform:translateX(100px);opacity:0; } to { transform:translateX(0);opacity:1; } }
 .ingame-alert .ldot { width: 10px; height: 10px; flex-shrink: 0; }
 
+/* ==================== LIVE MATCH VIEW ==================== */
+.lm-wrap { margin-top: 12px; }
+.lm-title { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.lm-title h2 { font-size: 1.3em; margin: 0; }
+.lm-title .ldot { width: 12px; height: 12px; }
+.lm-refresh-info { text-align: center; font-size: 0.7em; color: var(--dim); margin-top: 10px; }
+
+.lm-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-radius: 12px 12px 0 0;
+    background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(30,30,50,0.8) 50%, rgba(239,68,68,0.15) 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.lm-team { font-weight: 800; font-size: 0.85em; letter-spacing: 2px; text-transform: uppercase; }
+.lm-team-blue { color: #3b82f6; }
+.lm-team-red { color: #ef4444; }
+.lm-timer { text-align: center; }
+.lm-timer-icon { font-size: 0.7em; color: #ef4444; font-weight: 700; letter-spacing: 1px; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+.lm-timer-time { font-size: 1.8em; font-weight: 900; font-family: 'Courier New', monospace; color: #fff; letter-spacing: 2px; }
+.lm-timer-mode { font-size: 0.65em; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+
+.lm-bans {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 16px; background: rgba(0,0,0,0.2); border-left: 1px solid rgba(255,255,255,0.06); border-right: 1px solid rgba(255,255,255,0.06);
+}
+.lm-bans-side { display: flex; gap: 4px; }
+.lm-bans-label { font-size: 0.6em; color: var(--dim); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+.lm-ban-img { width: 28px; height: 28px; border-radius: 4px; filter: grayscale(0.7) brightness(0.6); border: 1px solid rgba(255,255,255,0.1); }
+
+.lm-matchups {
+    background: var(--card); border-radius: 0 0 12px 12px;
+    border: 1px solid rgba(255,255,255,0.06); border-top: none; overflow: hidden;
+}
+.lm-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.2s;
+}
+.lm-row:last-child { border-bottom: none; }
+.lm-row:hover { background: rgba(255,255,255,0.02); }
+
+.lm-player {
+    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+}
+.lm-blue { justify-content: flex-start; }
+.lm-red { justify-content: flex-end; }
+.lm-champ-img { width: 40px; height: 40px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+.lm-blue .lm-champ-img { border-color: rgba(59,130,246,0.3); }
+.lm-red .lm-champ-img { border-color: rgba(239,68,68,0.3); }
+.lm-me .lm-champ-img { border-color: var(--pri) !important; box-shadow: 0 0 10px rgba(0,212,255,0.4); }
+
+.lm-spells { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.lm-spell { width: 18px; height: 18px; border-radius: 3px; }
+
+.lm-info { min-width: 0; }
+.lm-info-right { text-align: right; }
+.lm-name { font-size: 0.8em; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.lm-me .lm-name { color: var(--pri); }
+.lm-champ { font-size: 0.7em; color: var(--dim); }
+
+.lm-role {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    width: 50px; flex-shrink: 0;
+}
+.lm-role-icon { font-size: 1.2em; }
+.lm-role-name { font-size: 0.55em; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+
+.prof-live-banner {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 12px; margin-bottom: 12px; border-radius: 10px; cursor: pointer;
+    background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(59,130,246,0.15));
+    border: 1px solid rgba(239,68,68,0.3); font-weight: 700; font-size: 0.9em;
+    animation: pulse 2s infinite; transition: transform 0.2s;
+}
+.prof-live-banner:hover { transform: scale(1.02); }
+.prof-live-banner .ldot { width: 10px; height: 10px; }
+
 /* ==================== PREDICTION LOCKED ==================== */
 .cblol-pred-locked { text-align: center; padding: 12px; background: rgba(255,215,64,0.05); border-radius: 10px; border: 1px dashed rgba(255,215,64,0.2); margin-top: 8px; }
 
@@ -1928,6 +2006,15 @@ body::after {
     .chat-input-wrap input { padding: 10px 12px; font-size: 0.85em; }
     .chat-send { padding: 10px 16px; font-size: 0.85em; }
     .ingame-alert { right: 10px; bottom: 70px; font-size: .78em; max-width: 280px; }
+    .lm-row { padding: 8px 8px; gap: 4px; }
+    .lm-champ-img { width: 32px; height: 32px; }
+    .lm-spell { width: 14px; height: 14px; }
+    .lm-name { font-size: 0.7em; max-width: 90px; }
+    .lm-champ { font-size: 0.6em; }
+    .lm-role { width: 36px; }
+    .lm-role-icon { font-size: 1em; }
+    .lm-timer-time { font-size: 1.3em; }
+    .lm-ban-img { width: 22px; height: 22px; }
     .prof-stats-expanded { grid-template-columns: repeat(2, 1fr); gap: 5px; }
     .hl-grid { grid-template-columns: repeat(2, 1fr); gap: 5px; }
     .champ-row-stats { flex-direction: column; gap: 2px; align-items: flex-end; }
