@@ -926,8 +926,8 @@
             <div class="squad-hero-splash"></div>
             <div class="squad-hero-inner">
                 <img src="https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/4644.png" alt="" class="hero-emblem">
-                <h1>O <span>Squad FF</span></h1>
-                <p>FF = FAMILY FRIENDS (Discord) ou BTC TO THE FUCKIN MOON (WhatsApp)</p>
+                <h1><span>FAMILY FRIENDS</span></h1>
+                <p>BTC TO THE FUCKIN MOON</p>
             </div>
         </div>
         <div class="section-wrap">
