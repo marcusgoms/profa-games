@@ -786,12 +786,14 @@
         else if (h.startsWith('compare'))     { clearLive(); renderCompare(h); }
         else if (h === 'cblol')               { clearLive(); renderCBLOL('upcoming'); }
         else if (h === 'dashboard')           { clearLive(); renderDashboard(); }
+        else if (h === 'arena')               { clearLive(); renderArenaRPG(); }
         else if (h === 'chat')                { clearLive(); renderChat(); }
         else if (h === 'teambuilder')         { clearLive(); renderTeamBuilder(); }
         else                                  { clearLive(); renderTeam(); }
     }
     function pn(h) {
         if (!h || h === 'team' || h.startsWith('profile/') || h.startsWith('compare')) return 'team';
+        if (h === 'arena') return 'arena';
         if (h === 'chat') return 'chat';
         if (h === 'cblol') return 'cblol';
         if (h.startsWith('live')) return 'live';
@@ -3085,6 +3087,272 @@
         badges.push({ icon:'🎯', title:'Vidente', desc:`${predKeys.length} palpites feitos`, player:'', unlocked:predKeys.length>=5 });
 
         return badges;
+    }
+
+    // ======================== RPG ARENA ========================
+    const RPG_CLASSES = [
+        { id:'warrior',  name:'Guerreiro',  icon:'⚔️', color:'#e53935', desc:'Força bruta e dano devastador', stat:'atk' },
+        { id:'assassin', name:'Assassino',  icon:'🗡️', color:'#ab47bc', desc:'Precisão letal com KDA impecável', stat:'agi' },
+        { id:'guardian', name:'Guardião',   icon:'🛡️', color:'#1e88e5', desc:'Bastião inabalável da equipe', stat:'def' },
+        { id:'oracle',   name:'Oráculo',    icon:'👁️', color:'#00acc1', desc:'Visão absoluta do campo de batalha', stat:'int' },
+        { id:'sovereign',name:'Soberano',   icon:'👑', color:'#fdd835', desc:'Riqueza e domínio dos recursos', stat:'for' },
+        { id:'sage',     name:'Sábio',      icon:'✨', color:'#66bb6a', desc:'Mestre das vitórias consistentes', stat:'sab' },
+    ];
+    const RPG_RANKS = [
+        { name:'Aprendiz',     min:0,   color:'#78909c', glow:'rgba(120,144,156,0.3)' },
+        { name:'Soldado',      min:20,  color:'#66bb6a', glow:'rgba(102,187,106,0.3)' },
+        { name:'Veterano',     min:35,  color:'#42a5f5', glow:'rgba(66,165,245,0.3)' },
+        { name:'Elite',        min:50,  color:'#ab47bc', glow:'rgba(171,71,188,0.4)' },
+        { name:'Campeão',      min:65,  color:'#ffa726', glow:'rgba(255,167,38,0.4)' },
+        { name:'Lendário',     min:78,  color:'#ef5350', glow:'rgba(239,83,80,0.5)' },
+        { name:'Mítico',       min:88,  color:'#e040fb', glow:'rgba(224,64,251,0.5)' },
+        { name:'Divino',       min:95,  color:'#ffd740', glow:'rgba(255,215,64,0.6)' },
+    ];
+
+    function getRPGRank(power) {
+        let r = RPG_RANKS[0];
+        for (const rank of RPG_RANKS) { if (power >= rank.min) r = rank; }
+        return r;
+    }
+
+    function calcRPGStats(matches, puuid) {
+        const recent = [...matches]
+            .filter(m => m?.info?.participants)
+            .sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))
+            .slice(0, 20);
+        if (!recent.length) return null;
+        let kills=0,deaths=0,assists=0,cs=0,dmg=0,gold=0,vision=0,dur=0,wins=0;
+        let topChampId=null, champCounts={};
+        recent.forEach(m => {
+            const p = m.info.participants.find(x=>x.puuid===puuid);
+            if (!p) return;
+            kills+=p.kills||0; deaths+=p.deaths||0; assists+=p.assists||0;
+            cs+=(p.totalMinionsKilled||0)+(p.neutralMinionsKilled||0);
+            dmg+=p.totalDamageDealtToChampions||0; gold+=p.goldEarned||0;
+            vision+=p.visionScore||0; dur+=m.info?.gameDuration||0;
+            if(p.win) wins++;
+            const cid=p.championId;
+            if(cid){champCounts[cid]=(champCounts[cid]||0)+1;}
+        });
+        const n = recent.length;
+        const avgMin = (dur/n)/60 || 1;
+        // Find most played champion
+        let maxC=0; for(const[cid,cnt]of Object.entries(champCounts)){if(cnt>maxC){maxC=cnt;topChampId=cid;}}
+
+        const avgKDA = (kills+assists)/Math.max(deaths,1);
+        const avgDPM = (dmg/n)/avgMin;
+        const avgGPM = (gold/n)/avgMin;
+        const avgVision = vision/n;
+        const avgCS = cs/n;
+        const winRate = (wins/n)*100;
+
+        // Normalize stats to 0-100 scale (approximate benchmarks)
+        const atk = Math.min(100, (avgDPM / 800) * 100);       // DPM: 800+ = max
+        const def = Math.min(100, Math.max(0, (1 - (deaths/n)/8) * 100)); // Low deaths = high def
+        const agi = Math.min(100, (avgKDA / 6) * 100);         // KDA: 6+ = max
+        const int = Math.min(100, (avgVision / 40) * 100);     // Vision: 40+ = max
+        const fr = Math.min(100, (avgGPM / 500) * 100);        // GPM: 500+ = max
+        const sab = Math.min(100, winRate);                     // Win rate direct
+
+        const power = ((atk + def + agi + int + fr + sab) / 6);
+
+        // Determine class by dominant stat
+        const statMap = { atk, def, agi, int, for: fr, sab };
+        let dominant = 'atk', dominantVal = 0;
+        for (const [k,v] of Object.entries(statMap)) {
+            if (v > dominantVal) { dominantVal = v; dominant = k; }
+        }
+        const rpgClass = RPG_CLASSES.find(c => c.stat === dominant) || RPG_CLASSES[0];
+        const rank = getRPGRank(power);
+
+        return {
+            atk: Math.round(atk), def: Math.round(def), agi: Math.round(agi),
+            int: Math.round(int), for: Math.round(fr), sab: Math.round(sab),
+            power: Math.round(power), rpgClass, rank, topChampId,
+            raw: { avgKDA: avgKDA.toFixed(2), avgDPM: avgDPM.toFixed(0), avgGPM: avgGPM.toFixed(0),
+                   avgVision: avgVision.toFixed(1), avgCS: avgCS.toFixed(0), winRate: winRate.toFixed(0),
+                   games: n, wins, deaths: (deaths/n).toFixed(1) }
+        };
+    }
+
+    function rpgRadarSVG(stats, classColor) {
+        const labels = [
+            { key:'atk', label:'ATK', angle: -90 },
+            { key:'agi', label:'AGI', angle: -30 },
+            { key:'sab', label:'SAB', angle: 30 },
+            { key:'def', label:'DEF', angle: 90 },
+            { key:'int', label:'INT', angle: 150 },
+            { key:'for', label:'FOR', angle: 210 },
+        ];
+        const cx=100, cy=100, R=75;
+        const toRad = d => d * Math.PI / 180;
+
+        // Grid rings
+        let grid = '';
+        for (let r = 0.25; r <= 1; r += 0.25) {
+            const pts = labels.map(l => {
+                const a = toRad(l.angle);
+                return `${cx + R*r*Math.cos(a)},${cy + R*r*Math.sin(a)}`;
+            }).join(' ');
+            grid += `<polygon points="${pts}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+        }
+        // Axes
+        let axes = '';
+        labels.forEach(l => {
+            const a = toRad(l.angle);
+            axes += `<line x1="${cx}" y1="${cy}" x2="${cx+R*Math.cos(a)}" y2="${cy+R*Math.sin(a)}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+        });
+        // Data polygon
+        const dataPts = labels.map(l => {
+            const v = (stats[l.key]||0)/100;
+            const a = toRad(l.angle);
+            return `${cx + R*v*Math.cos(a)},${cy + R*v*Math.sin(a)}`;
+        }).join(' ');
+        // Labels
+        let lbls = '';
+        labels.forEach(l => {
+            const a = toRad(l.angle);
+            const lx = cx + (R+18)*Math.cos(a);
+            const ly = cy + (R+18)*Math.sin(a);
+            lbls += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,0.7)" font-size="10" font-weight="600">${l.label}</text>`;
+            lbls += `<text x="${lx}" y="${ly+12}" text-anchor="middle" dominant-baseline="middle" fill="${classColor}" font-size="9" font-weight="700">${stats[l.key]}</text>`;
+        });
+
+        return `<svg viewBox="0 0 200 200" class="rpg-radar">
+            ${grid}${axes}
+            <polygon points="${dataPts}" fill="${classColor}22" stroke="${classColor}" stroke-width="2" class="rpg-radar-poly"/>
+            ${lbls}
+        </svg>`;
+    }
+
+    async function renderArenaRPG() {
+        app.innerHTML = `
+        <div class="rpg-hero">
+            <div class="rpg-hero-bg"></div>
+            <div class="rpg-hero-particles" id="rpg-particles"></div>
+            <div class="rpg-hero-inner">
+                <div class="rpg-title-icon">⚔️</div>
+                <h1>Arena <span>RPG</span></h1>
+                <p>Cada guerreiro forjado pelas últimas 20 batalhas — stats reais, ranks únicos</p>
+            </div>
+        </div>
+        <div class="rpg-legend">
+            ${RPG_CLASSES.map(c => `<div class="rpg-legend-item"><span class="rpg-legend-icon" style="color:${c.color}">${c.icon}</span><span class="rpg-legend-name" style="color:${c.color}">${c.name}</span></div>`).join('')}
+        </div>
+        <div class="rpg-grid" id="rpg-grid">
+            ${PLAYERS.map((_,i) => `<div class="rpg-card rpg-card-loading" data-rpg="${i}">
+                <div class="rpg-card-skel"><div class="skel-pulse" style="width:80px;height:80px;border-radius:50%;margin:0 auto 12px"></div><div class="skel-pulse" style="width:60%;height:16px;margin:0 auto 8px;border-radius:4px"></div><div class="skel-pulse" style="width:40%;height:12px;margin:0 auto;border-radius:4px"></div></div>
+            </div>`).join('')}
+        </div>`;
+
+        // Particles
+        initParticles(document.getElementById('rpg-particles'));
+
+        // Load each player and render RPG card
+        const promises = PLAYERS.map(async (p, i) => {
+            try {
+                const d = await loadPlayer(i);
+                const mt = Array.isArray(d.matches) ? d.matches : [];
+                const puuid = d.account?.puuid;
+                if (!puuid || !mt.length) return renderRPGCardEmpty(i, p, d);
+                const stats = calcRPGStats(mt, puuid);
+                if (!stats) return renderRPGCardEmpty(i, p, d);
+                renderRPGCard(i, p, d, stats);
+            } catch(_) {
+                renderRPGCardEmpty(i, p, null);
+            }
+        });
+        await Promise.all(promises);
+    }
+
+    function renderRPGCardEmpty(i, p, d) {
+        const card = document.querySelector(`[data-rpg="${i}"]`);
+        if (!card) return;
+        card.classList.remove('rpg-card-loading');
+        const ic = d ? playerIcon(i, d.summoner?.profileIconId) : 5885;
+        card.innerHTML = `
+            <div class="rpg-card-avatar"><img src="${profImg(ic)}" alt=""></div>
+            <div class="rpg-card-name">${d?.account?.gameName || p.name}</div>
+            <div class="rpg-card-empty">Sem dados suficientes</div>`;
+    }
+
+    function renderRPGCard(i, p, d, stats) {
+        const card = document.querySelector(`[data-rpg="${i}"]`);
+        if (!card) return;
+        card.classList.remove('rpg-card-loading');
+        card.classList.add(`rpg-class-${stats.rpgClass.id}`);
+        card.style.setProperty('--class-color', stats.rpgClass.color);
+        card.style.setProperty('--rank-glow', stats.rank.glow);
+
+        const ic = playerIcon(i, d.summoner?.profileIconId);
+        const champName = stats.topChampId ? (CMAP[stats.topChampId] || null) : null;
+        const splashUrl = champName ? `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champName}_0.jpg` : '';
+
+        const statBars = [
+            { key:'atk', label:'ATK', icon:'⚔️', desc:'Dano/min' },
+            { key:'def', label:'DEF', icon:'🛡️', desc:'Sobrevivência' },
+            { key:'agi', label:'AGI', icon:'🗡️', desc:'KDA' },
+            { key:'int', label:'INT', icon:'👁️', desc:'Visão' },
+            { key:'for', label:'FOR', icon:'👑', desc:'Ouro/min' },
+            { key:'sab', label:'SAB', icon:'✨', desc:'Winrate' },
+        ];
+
+        card.innerHTML = `
+            ${splashUrl ? `<div class="rpg-card-splash" style="background-image:url('${splashUrl}')"></div>` : ''}
+            <div class="rpg-card-rank-badge" style="background:${stats.rank.color}">${stats.rank.name}</div>
+            <div class="rpg-card-class-badge" style="background:${stats.rpgClass.color}">${stats.rpgClass.icon} ${stats.rpgClass.name}</div>
+            <div class="rpg-card-header">
+                <div class="rpg-card-avatar rpg-avatar-ring" style="--ring-color:${stats.rpgClass.color}">
+                    <img src="${profImg(ic)}" alt="">
+                </div>
+                <div class="rpg-card-name">${d.account?.gameName || p.name}</div>
+                <div class="rpg-card-title" style="color:${stats.rpgClass.color}">${stats.rpgClass.desc}</div>
+            </div>
+            <div class="rpg-card-power">
+                <div class="rpg-power-label">PODER</div>
+                <div class="rpg-power-value" style="color:${stats.rank.color}">${stats.power}</div>
+                <div class="rpg-power-bar"><div class="rpg-power-fill" style="width:${stats.power}%;background:linear-gradient(90deg,${stats.rpgClass.color},${stats.rank.color})"></div></div>
+            </div>
+            <div class="rpg-card-radar">${rpgRadarSVG(stats, stats.rpgClass.color)}</div>
+            <div class="rpg-card-stats">
+                ${statBars.map(s => `<div class="rpg-stat-row">
+                    <span class="rpg-stat-icon">${s.icon}</span>
+                    <span class="rpg-stat-label">${s.label}</span>
+                    <div class="rpg-stat-bar"><div class="rpg-stat-fill" style="width:${stats[s.key]}%;background:${stats.rpgClass.color}"></div></div>
+                    <span class="rpg-stat-val">${stats[s.key]}</span>
+                </div>`).join('')}
+            </div>
+            <div class="rpg-card-raw">
+                <div class="rpg-raw-item"><span>KDA</span><b>${stats.raw.avgKDA}</b></div>
+                <div class="rpg-raw-item"><span>DPM</span><b>${stats.raw.avgDPM}</b></div>
+                <div class="rpg-raw-item"><span>GPM</span><b>${stats.raw.avgGPM}</b></div>
+                <div class="rpg-raw-item"><span>Visão</span><b>${stats.raw.avgVision}</b></div>
+                <div class="rpg-raw-item"><span>CS</span><b>${stats.raw.avgCS}</b></div>
+                <div class="rpg-raw-item"><span>WR</span><b>${stats.raw.winRate}%</b></div>
+            </div>
+            <div class="rpg-card-footer">
+                <span>${stats.raw.games} batalhas • ${stats.raw.wins}V ${stats.raw.games - stats.raw.wins}D</span>
+                ${champName ? `<span>Main: ${champName}</span>` : ''}
+            </div>`;
+
+        // Animate stat bars after render
+        setTimeout(() => {
+            card.querySelectorAll('.rpg-stat-fill').forEach(el => {
+                el.style.transition = 'width 1s cubic-bezier(0.4,0,0.2,1)';
+            });
+            card.querySelector('.rpg-power-fill').style.transition = 'width 1.2s cubic-bezier(0.4,0,0.2,1)';
+        }, 50);
+
+        // 3D tilt effect
+        card.addEventListener('mousemove', e => {
+            const rect = card.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width - 0.5;
+            const y = (e.clientY - rect.top) / rect.height - 0.5;
+            card.style.transform = `perspective(800px) rotateY(${x*12}deg) rotateX(${-y*12}deg) scale3d(1.02,1.02,1.02)`;
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = '';
+        });
     }
 
     // ======================== TEAM BUILDER ========================
