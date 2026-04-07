@@ -2852,9 +2852,16 @@
             _chatRef = db.ref('chat').orderByChild('ts').limitToLast(100);
             _chatRef.on('value', snap => {
                 _chatMessages = [];
-                snap.forEach(child => _chatMessages.push({ _key: child.key, ...child.val() }));
+                snap.forEach(child => {
+                    const val = child.val();
+                    if (val && val.text) _chatMessages.push({ _key: child.key, ...val, ts: val.ts || Date.now() });
+                });
                 _chatMessages.sort((a, b) => (a.ts || 0) - (b.ts || 0));
                 renderChatMessages();
+            }, err => {
+                console.warn('Chat listen error:', err.message);
+                const box = $('chat-box');
+                if (box) box.innerHTML = `<p class="chat-empty" style="color:#ef5350;">Erro ao carregar chat: ${err.message.includes('PERMISSION_DENIED')?'Regras do Firebase expiraram':'Erro de conexão'}</p>`;
             });
         } else {
             const box = $('chat-box');
@@ -2903,15 +2910,37 @@
         if (!user || !db) return;
         const input = $('chat-input');
         if (!input || !input.value.trim()) return;
+        const text = input.value.trim();
+        input.value = '';
+        input.disabled = true;
+        const btn = document.querySelector('.chat-send');
+        if (btn) btn.disabled = true;
         const msg = {
             idx: user.idx,
             name: PLAYERS[user.idx]?.name || '???',
-            text: input.value.trim(),
-            ts: Date.now()
+            text: text,
+            ts: firebase.database.ServerValue.TIMESTAMP
         };
-        db.ref('chat').push(msg).catch(e => console.warn('Chat error:', e.message));
-        input.value = '';
-        input.focus();
+        db.ref('chat').push(msg).then(() => {
+            input.disabled = false;
+            if (btn) btn.disabled = false;
+            input.focus();
+        }).catch(e => {
+            console.warn('Chat error:', e.message);
+            input.disabled = false;
+            if (btn) btn.disabled = false;
+            input.value = text; // restore text on failure
+            // Show error
+            const box = $('chat-box');
+            if (box) {
+                const err = document.createElement('div');
+                err.className = 'chat-error';
+                err.textContent = 'Erro ao enviar: ' + (e.message.includes('PERMISSION_DENIED') ? 'Regras do Firebase expiraram. Atualize para modo aberto.' : e.message);
+                box.appendChild(err);
+                box.scrollTop = box.scrollHeight;
+                setTimeout(() => err.remove(), 5000);
+            }
+        });
     };
 
     // ======================== PRESENCE (quem está online) ========================

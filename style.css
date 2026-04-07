@@ -924,6 +924,7 @@ body::after {
 .chat-online { display: inline-flex; align-items: center; gap: 6px; font-size: .75em; color: #4caf50; margin-top: 6px; }
 .chat-box { background: var(--card); border-radius: 14px; padding: 16px; min-height: 420px; max-height: 60vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
 .chat-empty { color: var(--dim); text-align: center; padding: 40px; font-size: 0.9em; }
+.chat-error { color: #ef5350; font-size: 0.75em; text-align: center; padding: 8px; background: rgba(239,83,80,0.1); border-radius: 6px; margin-top: 8px; animation: fi 0.3s ease; }
 .chat-msg { display: flex; align-items: flex-start; gap: 10px; max-width: 85%; animation: fadeInMsg 0.2s ease; }
 @keyframes fadeInMsg { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 .chat-me { align-self: flex-end; flex-direction: row-reverse; }
