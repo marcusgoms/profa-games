@@ -4275,14 +4275,6 @@
                 ${stats.flaws.length ? `<div class="rpg-traits-col rpg-flaws"><div class="rpg-traits-title flaws-title">Defeitos</div>${stats.flaws.map(f => `<div class="rpg-trait rpg-flaw"><span>${f.icon}</span> ${f.text}</div>`).join('')}</div>` : ''}
             </div>
 
-            <div class="rpg-card-raw">
-                <div class="rpg-raw-item"><span>KDA</span><b>${stats.raw.avgKDA}</b></div>
-                <div class="rpg-raw-item"><span>DPM</span><b>${stats.raw.avgDPM}</b></div>
-                <div class="rpg-raw-item"><span>GPM</span><b>${stats.raw.avgGPM}</b></div>
-                <div class="rpg-raw-item"><span>Visao</span><b>${stats.raw.avgVision}</b></div>
-                <div class="rpg-raw-item"><span>CS</span><b>${stats.raw.avgCS}</b></div>
-                <div class="rpg-raw-item"><span>WR</span><b>${stats.raw.winRate}%</b></div>
-            </div>
             <div class="rpg-card-footer">
                 <span>${stats.raw.games} batalhas &bull; ${stats.raw.wins}V ${stats.raw.games - stats.raw.wins}D</span>
                 ${champName ? `<span>Main: ${champName}</span>` : ''}
