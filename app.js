@@ -1347,6 +1347,15 @@
             const ic = playerIcon(idx, s.profileIconId), lv = s.summonerLevel || '?';
             const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
             const flex = le.find(e => e.queueType === 'RANKED_FLEX_SR');
+            // RPG class theme on profile
+            const rpgData = calcRPGStats(mt, a.puuid);
+            if (rpgData) {
+                const pv = document.querySelector('.pv');
+                if (pv) {
+                    pv.style.setProperty('--profile-accent', rpgData.rpgClass.color);
+                    pv.classList.add('rpg-themed');
+                }
+            }
             const puuid = a.puuid || '';
 
             // ==================== AGGREGATE STATS ====================
@@ -2885,9 +2894,16 @@
         const sortedByWR = [...playerStats].filter(s=>s.games>0).sort((a,b)=>b.wr-a.wr);
         const sortedByGames = [...playerStats].sort((a,b)=>b.games-a.games);
 
-        // Achievements
+        // Compute all advanced data
         const achievements = computeAchievements(allData);
         saveAchievements(achievements);
+        const highlights = detectHighlights(allData);
+        const interactions = analyzeSquadInteractions(allData);
+        const shame = computeWallOfShame(allData);
+        const weeklyStats = computeWeeklyRanking(allData);
+        const weekSortedLP = [...weeklyStats].filter(s=>s.games>0).sort((a,b)=>b.lpChange-a.lpChange);
+        const weekSortedGames = [...weeklyStats].filter(s=>s.games>0).sort((a,b)=>b.games-a.games);
+        const weekSortedKDA = [...weeklyStats].filter(s=>s.games>0).sort((a,b)=>b.kda-a.kda);
 
         $('dash-content').innerHTML = `
         <div class="dash-grid">
@@ -2958,6 +2974,64 @@
             </div>
         </div>
 
+        ${highlights.length ? `<div class="dash-section">
+            <h3>Highlights da Semana</h3>
+            <div class="dash-highlights">${highlights.slice(0,8).map(h => `<div class="dash-hl-card" onclick="location.hash='profile/${h.idx}'">
+                <span class="dash-hl-icon">${h.icon}</span>
+                <div class="dash-hl-info">
+                    <div class="dash-hl-player">${h.player} <small style="color:var(--dim)">(${h.champ})</small></div>
+                    <div class="dash-hl-desc">${h.desc}</div>
+                    <div class="dash-hl-score">${h.kills}/${h.deaths} &bull; ${fmtAgo(h.ts)}</div>
+                </div>
+            </div>`).join('')}</div>
+        </div>` : ''}
+
+        <div class="dash-section">
+            <h3>Ranking Semanal</h3>
+            <div class="dash-week-tabs">
+                <span class="dash-week-tab on" onclick="showWeekTab('lp',this)">LP Ganho</span>
+                <span class="dash-week-tab" onclick="showWeekTab('games',this)">Mais Jogou</span>
+                <span class="dash-week-tab" onclick="showWeekTab('kda',this)">Melhor KDA</span>
+            </div>
+            <div id="dash-week-lp" class="dash-rank-list">${weekSortedLP.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${['🥇','🥈','🥉'][i]||i+1+'º'}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val" style="color:${s.lpChange>0?'#4caf50':s.lpChange<0?'#ef5350':'var(--dim)'}">${s.lpChange>0?'+':''}${s.lpChange} LP</span><span class="dash-rank-wr">${s.games} jogos</span></div>`).join('')||'<p style="color:var(--dim);text-align:center;font-size:.85em;">Sem dados</p>'}</div>
+            <div id="dash-week-games" class="dash-rank-list" style="display:none">${weekSortedGames.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${['🥇','🥈','🥉'][i]||i+1+'º'}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val">${s.games} jogos</span><span class="dash-rank-wr">${s.wr}% WR</span></div>`).join('')||'<p style="color:var(--dim);text-align:center;font-size:.85em;">Sem dados</p>'}</div>
+            <div id="dash-week-kda" class="dash-rank-list" style="display:none">${weekSortedKDA.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${['🥇','🥈','🥉'][i]||i+1+'º'}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val">${s.kda.toFixed(2)} KDA</span><span class="dash-rank-wr">${s.kills}/${s.deaths}/${s.assists}</span></div>`).join('')||'<p style="color:var(--dim);text-align:center;font-size:.85em;">Sem dados</p>'}</div>
+        </div>
+
+        ${shame.length ? `<div class="dash-section">
+            <h3>Mural da Vergonha</h3>
+            <p style="color:var(--dim);font-size:.8em;margin-bottom:12px;">A pior partida da semana de cada um</p>
+            <div class="shame-grid">${shame.map(s => `<div class="shame-card" onclick="location.hash='profile/${s.idx}'">
+                <img src="${champImg(s.champId)}" class="shame-champ-img">
+                <div class="shame-info">
+                    <div class="shame-name">${s.name}</div>
+                    <div class="shame-score ${s.win?'':'shame-loss'}">${s.kills}/${s.deaths}/${s.assists} <small>(${s.champ})</small></div>
+                    <div class="shame-cs">${s.cs} CS &bull; ${fmtAgo(s.ts)}</div>
+                </div>
+                <div class="shame-skull">💀</div>
+                <div class="shame-reactions" id="shame-react-${s.idx}"></div>
+            </div>`).join('')}</div>
+        </div>` : ''}
+
+        ${interactions.duos.length ? `<div class="dash-section">
+            <h3>Duo Stats</h3>
+            <p style="color:var(--dim);font-size:.8em;margin-bottom:12px;">Quando jogam juntos no mesmo time</p>
+            <div class="dash-rank-list">${interactions.duos.slice(0,10).map((d,i) => {
+                const n1=allData[d.p1]?.account?.gameName||PLAYERS[d.p1].name, n2=allData[d.p2]?.account?.gameName||PLAYERS[d.p2].name;
+                const wr=d.games?(d.wins/d.games*100).toFixed(0):0;
+                return `<div class="dash-rank-item"><span class="dash-rank-pos">${i+1}</span><span class="dash-rank-name">${n1} + ${n2}</span><span class="dash-rank-val" style="color:${wr>=55?'#4caf50':wr<=45?'#ef5350':'var(--dim)'}">${wr}% WR</span><span class="dash-rank-wr">${d.games} jogos</span></div>`;
+            }).join('')}</div>
+        </div>` : ''}
+
+        ${interactions.rivals.length ? `<div class="dash-section">
+            <h3>Rivalidades Internas</h3>
+            <p style="color:var(--dim);font-size:.8em;margin-bottom:12px;">Quando se enfrentaram em times opostos</p>
+            <div class="dash-rank-list">${interactions.rivals.slice(0,10).map((r,i) => {
+                const n1=allData[r.p1]?.account?.gameName||PLAYERS[r.p1].name, n2=allData[r.p2]?.account?.gameName||PLAYERS[r.p2].name;
+                return `<div class="dash-rank-item"><span class="dash-rank-pos">⚔️</span><span class="dash-rank-name">${n1} vs ${n2}</span><span class="dash-rank-val">${r.p1wins} — ${r.p2wins}</span><span class="dash-rank-wr">${r.games} jogos</span></div>`;
+            }).join('')}</div>
+        </div>` : ''}
+
         <div class="dash-section">
             <h3>Histórico de LP</h3>
             <div id="dash-lp-chart"><p style="color:var(--dim);text-align:center;font-size:.85em;">Carregando...</p></div>
@@ -3026,6 +3100,36 @@
             }).catch(() => {});
         }
 
+        // Weekly tab switching
+        window.showWeekTab = function(tab, el) {
+            document.querySelectorAll('.dash-week-tab').forEach(t => t.classList.remove('on'));
+            if (el) el.classList.add('on');
+            ['lp','games','kda'].forEach(t => { const e=$(`dash-week-${t}`); if(e) e.style.display = t===tab ? '' : 'none'; });
+        };
+
+        // Shame reactions
+        if (db) {
+            shame.forEach(s => {
+                const el = $(`shame-react-${s.idx}`);
+                if (!el) return;
+                const emojis = ['😂','💀','🤡','😭','🔥'];
+                el.innerHTML = emojis.map(e => `<button class="shame-react-btn" onclick="reactShame(${s.idx},'${e}')" title="Reagir">${e}</button>`).join('') + '<span class="shame-react-counts" id="shame-counts-${s.idx}"></span>';
+                // Load existing reactions
+                db.ref(`shameReactions/${getWeekId()}/${s.idx}`).on('value', snap => {
+                    const data = snap.val() || {};
+                    const counts = {};
+                    Object.values(data).forEach(r => { counts[r] = (counts[r]||0)+1; });
+                    const ce = document.getElementById(`shame-counts-${s.idx}`);
+                    if (ce) ce.innerHTML = Object.entries(counts).map(([e,c]) => `<span class="shame-count">${e}${c}</span>`).join('');
+                });
+            });
+        }
+        window.reactShame = function(playerIdx, emoji) {
+            const user = getLoggedUser();
+            if (!user || !db) return;
+            db.ref(`shameReactions/${getWeekId()}/${playerIdx}/${user.idx}`).set(emoji).catch(()=>{});
+        };
+
         // Load feed
         loadFeed(20).then(items => {
             const feedEl = $('dash-feed');
@@ -3041,52 +3145,229 @@
         });
     }
 
-    // ======================== ACHIEVEMENTS ========================
+    // ======================== ACHIEVEMENTS (EXPANDED) ========================
     function computeAchievements(allData) {
         const badges = [];
-        let bestStreak = { name:'', count:0 };
-        let bestKDA = { name:'', val:0 };
-        let mostPentas = { name:'', count:0 };
-        let mostGames = { name:'', count:0 };
-        let bestCS = { name:'', val:0 };
-        let first10 = { name:'', count:0 };
+        let bestStreak={name:'',count:0}, bestKDA={name:'',val:0}, mostPentas={name:'',count:0};
+        let mostGames={name:'',count:0}, bestCS={name:'',val:0}, first10={name:'',count:0};
+        let bestVision={name:'',val:0}, mostFirstBlood={name:'',count:0}, bestDPM={name:'',val:0};
+        let mostTurrets={name:'',count:0}, mostDragon={name:'',count:0}, mostBaron={name:'',count:0};
+        let leastDeaths={name:'',val:999}, mostQuadra={name:'',count:0}, mostTriple={name:'',count:0};
+        let longestGame={name:'',val:0}, bestComeback={name:'',val:false};
+        let mostAssists={name:'',val:0}, soloCarry={name:'',val:false};
 
         PLAYERS.forEach((p, i) => {
             const d = allData[i]; if (!d?.matches?.length) return;
             const name = d.account?.gameName || p.name;
-            let streak=0, maxStreak=0, k=0, dd=0, a=0, pentas=0, cs=0;
-            const sorted = [...d.matches].sort((a,b)=>(a.info?.gameCreation||0)-(b.info?.gameCreation||0));
+            const puuid = d.account?.puuid;
+            let streak=0, maxStreak=0, k=0, dd=0, a=0, pentas=0, cs=0, vis=0, fb=0, dmg=0, dur=0;
+            let turrets=0, dragon=0, baron=0, quadra=0, triple=0, assists=0;
+            const sorted = [...d.matches].sort((a2,b2)=>(a2.info?.gameCreation||0)-(b2.info?.gameCreation||0));
             sorted.forEach(m => {
-                const mp = m.info?.participants?.find(x=>x.puuid===d.account?.puuid); if(!mp) return;
+                const mp = m.info?.participants?.find(x=>x.puuid===puuid); if(!mp) return;
                 if (mp.win) { streak++; maxStreak=Math.max(maxStreak,streak); } else streak=0;
                 k+=mp.kills||0; dd+=mp.deaths||0; a+=mp.assists||0;
                 cs+=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
-                if (mp.pentaKills) pentas+=mp.pentaKills;
-                if ((mp.kills||0)>=10 && (mp.deaths||0)===0) first10.count++;
+                vis+=mp.visionScore||0; dmg+=mp.totalDamageDealtToChampions||0;
+                dur+=m.info?.gameDuration||0;
+                if(mp.pentaKills) pentas+=mp.pentaKills;
+                if(mp.quadraKills) quadra+=mp.quadraKills;
+                if(mp.tripleKills) triple+=mp.tripleKills;
+                if(mp.firstBloodKill) fb++;
+                turrets+=mp.turretKills||0; dragon+=mp.dragonKills||0; baron+=mp.baronKills||0;
+                assists+=mp.assists||0;
+                if((mp.kills||0)>=10 && (mp.deaths||0)===0) first10.count++;
+                // Solo carry: 15+ kills and win
+                if(mp.win && (mp.kills||0)>=15) soloCarry={name,val:true};
+                // Longest game
+                if(m.info?.gameDuration>longestGame.val) longestGame={name,val:m.info.gameDuration};
             });
             const n = d.matches.length;
             const kda = dd>0?(k+a)/dd:k+a;
             const avgCS = n>0?cs/n:0;
-            if (maxStreak > bestStreak.count) bestStreak = { name, count:maxStreak };
-            if (kda > bestKDA.val) bestKDA = { name, val:kda };
-            if (pentas > mostPentas.count) mostPentas = { name, count:pentas };
-            if (n > mostGames.count) mostGames = { name, count:n };
-            if (avgCS > bestCS.val) bestCS = { name, val:avgCS };
+            const avgVis = n>0?vis/n:0;
+            const avgDPM = n>0&&dur>0?(dmg/n)/((dur/n)/60):0;
+            const avgDeaths = n>0?dd/n:999;
+            if(maxStreak>bestStreak.count) bestStreak={name,count:maxStreak};
+            if(kda>bestKDA.val) bestKDA={name,val:kda};
+            if(pentas>mostPentas.count) mostPentas={name,count:pentas};
+            if(n>mostGames.count) mostGames={name,count:n};
+            if(avgCS>bestCS.val) bestCS={name,val:avgCS};
+            if(avgVis>bestVision.val) bestVision={name,val:avgVis};
+            if(fb>mostFirstBlood.count) mostFirstBlood={name,count:fb};
+            if(avgDPM>bestDPM.val) bestDPM={name,val:avgDPM};
+            if(turrets>mostTurrets.count) mostTurrets={name,count:turrets};
+            if(dragon>mostDragon.count) mostDragon={name,count:dragon};
+            if(baron>mostBaron.count) mostBaron={name,count:baron};
+            if(avgDeaths<leastDeaths.val) leastDeaths={name,val:avgDeaths};
+            if(quadra>mostQuadra.count) mostQuadra={name,count:quadra};
+            if(triple>mostTriple.count) mostTriple={name,count:triple};
+            if(assists>mostAssists.val) mostAssists={name,val:assists};
         });
 
-        badges.push({ icon:'🔥', title:'Maior Winstreak', desc:`${bestStreak.count} vitórias seguidas`, player:bestStreak.name, unlocked:bestStreak.count>=3 });
-        badges.push({ icon:'⚔️', title:'Melhor KDA', desc:`${bestKDA.val.toFixed(1)} KDA`, player:bestKDA.name, unlocked:bestKDA.val>=3 });
-        badges.push({ icon:'💀', title:'Pentakill!', desc:mostPentas.count>0?`${mostPentas.count} pentas`:'Ninguém fez penta ainda', player:mostPentas.name, unlocked:mostPentas.count>0 });
-        badges.push({ icon:'🎮', title:'Viciado', desc:`${mostGames.count} partidas jogadas`, player:mostGames.name, unlocked:mostGames.count>=10 });
-        badges.push({ icon:'🌾', title:'Rei do Farm', desc:`${bestCS.val.toFixed(0)} CS médio`, player:bestCS.name, unlocked:bestCS.val>=150 });
-        badges.push({ icon:'👑', title:'Perfeito 10/0', desc:first10.count>0?'Jogou 10+ kills sem morrer':'Ninguém conseguiu ainda', player:'', unlocked:first10.count>0 });
-
-        // Prediction badges
-        const predKeys = [];
-        for (let k=0; k<localStorage.length; k++) { const key=localStorage.key(k); if (key?.startsWith('pred_')) predKeys.push(key); }
-        badges.push({ icon:'🎯', title:'Vidente', desc:`${predKeys.length} palpites feitos`, player:'', unlocked:predKeys.length>=5 });
-
+        badges.push({icon:'🔥',title:'Maior Winstreak',desc:`${bestStreak.count} vitórias seguidas`,player:bestStreak.name,unlocked:bestStreak.count>=3});
+        badges.push({icon:'⚔️',title:'Melhor KDA',desc:`${bestKDA.val.toFixed(1)} KDA`,player:bestKDA.name,unlocked:bestKDA.val>=3});
+        badges.push({icon:'💀',title:'Pentakill!',desc:mostPentas.count>0?`${mostPentas.count} pentas`:'Ninguém fez penta',player:mostPentas.name,unlocked:mostPentas.count>0});
+        badges.push({icon:'🎮',title:'Viciado',desc:`${mostGames.count} partidas`,player:mostGames.name,unlocked:mostGames.count>=10});
+        badges.push({icon:'🌾',title:'Rei do Farm',desc:`${bestCS.val.toFixed(0)} CS médio`,player:bestCS.name,unlocked:bestCS.val>=150});
+        badges.push({icon:'👑',title:'Perfeito 10/0',desc:first10.count>0?'10+ kills sem morrer':'Ninguém conseguiu',player:'',unlocked:first10.count>0});
+        badges.push({icon:'👁️',title:'Oráculo',desc:`${bestVision.val.toFixed(1)} visão média`,player:bestVision.name,unlocked:bestVision.val>=25});
+        badges.push({icon:'🗡️',title:'First Blood King',desc:`${mostFirstBlood.count} first bloods`,player:mostFirstBlood.name,unlocked:mostFirstBlood.count>=3});
+        badges.push({icon:'💥',title:'DPS Monster',desc:`${bestDPM.val.toFixed(0)} DPM`,player:bestDPM.name,unlocked:bestDPM.val>=500});
+        badges.push({icon:'🏰',title:'Demolidor',desc:`${mostTurrets.count} torres destruídas`,player:mostTurrets.name,unlocked:mostTurrets.count>=5});
+        badges.push({icon:'🐉',title:'Dragão Slayer',desc:`${mostDragon.count} dragões`,player:mostDragon.name,unlocked:mostDragon.count>=3});
+        badges.push({icon:'👿',title:'Baron Nashor',desc:`${mostBaron.count} barons`,player:mostBaron.name,unlocked:mostBaron.count>=1});
+        badges.push({icon:'🛡️',title:'Imortal',desc:`${leastDeaths.val.toFixed(1)} mortes/jogo`,player:leastDeaths.name,unlocked:leastDeaths.val<3});
+        badges.push({icon:'4️⃣',title:'Quadrakill',desc:`${mostQuadra.count} quadras`,player:mostQuadra.name,unlocked:mostQuadra.count>=1});
+        badges.push({icon:'3️⃣',title:'Triple Kill',desc:`${mostTriple.count} triples`,player:mostTriple.name,unlocked:mostTriple.count>=3});
+        badges.push({icon:'🤝',title:'Team Player',desc:`${mostAssists.val} assists totais`,player:mostAssists.name,unlocked:mostAssists.val>=50});
+        badges.push({icon:'💪',title:'Solo Carry',desc:soloCarry.val?'15+ kills e vitória':'Ninguém conseguiu',player:soloCarry.name,unlocked:soloCarry.val});
+        badges.push({icon:'⏰',title:'Maratonista',desc:longestGame.val?`${Math.floor(longestGame.val/60)}min mais longo`:'?',player:longestGame.name,unlocked:longestGame.val>=2400});
+        const predKeys=[];for(let kk=0;kk<localStorage.length;kk++){const key=localStorage.key(kk);if(key?.startsWith('pred_'))predKeys.push(key);}
+        badges.push({icon:'🎯',title:'Vidente',desc:`${predKeys.length} palpites`,player:'',unlocked:predKeys.length>=5});
         return badges;
+    }
+
+    // ======================== AUTO HIGHLIGHTS ========================
+    function detectHighlights(allData) {
+        const highlights = [];
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i]; if (!d?.matches?.length) return;
+            const name = d.account?.gameName || p.name;
+            const puuid = d.account?.puuid;
+            const weekMs = 7 * 24 * 60 * 60 * 1000;
+            const cutoff = Date.now() - weekMs;
+            d.matches.forEach(m => {
+                if ((m.info?.gameCreation||0) < cutoff) return;
+                const mp = m.info?.participants?.find(x => x.puuid === puuid); if (!mp) return;
+                const champ = CMAP[mp.championId] || '?';
+                if (mp.pentaKills > 0) highlights.push({ type:'pentakill', icon:'💀', player:name, idx:i, champ, desc:`PENTAKILL de ${champ}!`, kills:mp.kills, deaths:mp.deaths, ts:m.info.gameCreation });
+                if (mp.kills >= 20) highlights.push({ type:'massacre', icon:'🗡️', player:name, idx:i, champ, desc:`${mp.kills} kills com ${champ}!`, kills:mp.kills, deaths:mp.deaths, ts:m.info.gameCreation });
+                if (mp.deaths === 0 && mp.kills >= 5) highlights.push({ type:'perfect', icon:'👑', player:name, idx:i, champ, desc:`${mp.kills}/${mp.deaths}/${mp.assists} perfeito!`, kills:mp.kills, deaths:mp.deaths, ts:m.info.gameCreation });
+                if (mp.visionScore >= 60) highlights.push({ type:'vision', icon:'👁️', player:name, idx:i, champ, desc:`${mp.visionScore} de visão!`, kills:mp.kills, deaths:mp.deaths, ts:m.info.gameCreation });
+                const cs = (mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
+                const mins = (m.info?.gameDuration||1)/60;
+                if (cs/mins >= 9) highlights.push({ type:'farm', icon:'🌾', player:name, idx:i, champ, desc:`${(cs/mins).toFixed(1)} CS/min!`, kills:mp.kills, deaths:mp.deaths, ts:m.info.gameCreation });
+            });
+        });
+        return highlights.sort((a,b) => b.ts - a.ts).slice(0, 20);
+    }
+
+    // ======================== DUO STATS & RIVALRY ========================
+    function analyzeSquadInteractions(allData) {
+        const duos = {}, rivals = {};
+        for (let i = 0; i < PLAYERS.length; i++) {
+            for (let j = i + 1; j < PLAYERS.length; j++) {
+                duos[`${i}-${j}`] = { p1: i, p2: j, games: 0, wins: 0, k1: 0, k2: 0, d1: 0, d2: 0 };
+                rivals[`${i}-${j}`] = { p1: i, p2: j, games: 0, p1wins: 0, p2wins: 0 };
+            }
+        }
+        const puuids = PLAYERS.map((_, i) => allData[i]?.account?.puuid).filter(Boolean);
+        // Build match index
+        const matchMap = {};
+        PLAYERS.forEach((_, i) => {
+            const d = allData[i]; if (!d?.matches) return;
+            d.matches.forEach(m => {
+                const mid = m.metadata?.matchId; if (!mid) return;
+                if (!matchMap[mid]) matchMap[mid] = m;
+            });
+        });
+        // Scan each match for squad member pairs
+        Object.values(matchMap).forEach(m => {
+            if (!m.info?.participants) return;
+            const squad = [];
+            m.info.participants.forEach(pp => {
+                const idx = PLAYERS.findIndex((_, i) => allData[i]?.account?.puuid === pp.puuid);
+                if (idx >= 0) squad.push({ idx, pp });
+            });
+            if (squad.length < 2) return;
+            for (let a = 0; a < squad.length; a++) {
+                for (let b = a + 1; b < squad.length; b++) {
+                    const i = Math.min(squad[a].idx, squad[b].idx), j = Math.max(squad[a].idx, squad[b].idx);
+                    const pa = squad[a].idx === i ? squad[a].pp : squad[b].pp;
+                    const pb = squad[a].idx === i ? squad[b].pp : squad[a].pp;
+                    const sameTeam = pa.teamId === pb.teamId;
+                    if (sameTeam) {
+                        const key = `${i}-${j}`;
+                        duos[key].games++;
+                        if (pa.win) duos[key].wins++;
+                        duos[key].k1 += pa.kills || 0; duos[key].d1 += pa.deaths || 0;
+                        duos[key].k2 += pb.kills || 0; duos[key].d2 += pb.deaths || 0;
+                    } else {
+                        const key = `${i}-${j}`;
+                        rivals[key].games++;
+                        if (pa.win) rivals[key].p1wins++; else rivals[key].p2wins++;
+                    }
+                }
+            }
+        });
+        return {
+            duos: Object.values(duos).filter(d => d.games > 0).sort((a, b) => b.games - a.games),
+            rivals: Object.values(rivals).filter(r => r.games > 0).sort((a, b) => b.games - a.games)
+        };
+    }
+
+    // ======================== WALL OF SHAME ========================
+    function computeWallOfShame(allData) {
+        const shame = [];
+        const weekMs = 7*24*60*60*1000, cutoff = Date.now() - weekMs;
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i]; if (!d?.matches?.length) return;
+            const name = d.account?.gameName || p.name;
+            const puuid = d.account?.puuid;
+            let worst = null, worstScore = Infinity;
+            d.matches.forEach(m => {
+                if ((m.info?.gameCreation||0) < cutoff) return;
+                const mp = m.info?.participants?.find(x => x.puuid === puuid); if (!mp) return;
+                const k=mp.kills||0, dd=mp.deaths||0, a=mp.assists||0;
+                const score = (k+a)/Math.max(dd,1) - (dd*0.5); // lower = worse
+                if (score < worstScore) {
+                    worstScore = score;
+                    worst = { name, idx:i, kills:k, deaths:dd, assists:a, champ:CMAP[mp.championId]||'?', champId:mp.championId, win:mp.win, cs:(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0), ts:m.info.gameCreation };
+                }
+            });
+            if (worst && worst.deaths >= 3) shame.push(worst);
+        });
+        return shame.sort((a,b) => (a.kills+a.assists)/Math.max(a.deaths,1) - (b.kills+b.assists)/Math.max(b.deaths,1));
+    }
+
+    // ======================== WEEKLY RANKING ========================
+    function computeWeeklyRanking(allData) {
+        const weekMs = 7*24*60*60*1000, cutoff = Date.now() - weekMs;
+        const stats = [];
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i]; if (!d) return;
+            const name = d.account?.gameName || p.name;
+            const puuid = d.account?.puuid;
+            let games=0, wins=0, kills=0, deaths=0, assists=0, pentas=0;
+            (d.matches||[]).forEach(m => {
+                if ((m.info?.gameCreation||0) < cutoff) return;
+                const mp = m.info?.participants?.find(x => x.puuid === puuid); if (!mp) return;
+                games++; if(mp.win) wins++;
+                kills+=mp.kills||0; deaths+=mp.deaths||0; assists+=mp.assists||0;
+                pentas+=mp.pentaKills||0;
+            });
+            // LP change this week
+            const solo = d.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const currentLP = solo ? calcTotalLP(solo.tier, solo.rank, solo.leaguePoints||0) : 0;
+            const lpHist = JSON.parse(localStorage.getItem('soloq_history')||'{}');
+            const weekDates = Object.keys(lpHist).sort();
+            let weekStartLP = currentLP;
+            for (const dt of weekDates) {
+                const dtMs = new Date(dt).getTime();
+                if (dtMs >= cutoff && lpHist[dt]?.[name] !== undefined) { weekStartLP = lpHist[dt][name]; break; }
+            }
+            const lpChange = currentLP - weekStartLP;
+            const kda = deaths > 0 ? (kills+assists)/deaths : kills+assists;
+            stats.push({ name, idx:i, games, wins, kills, deaths, assists, pentas, kda, lpChange, wr: games?(wins/games*100).toFixed(0):'0' });
+        });
+        return stats;
+    }
+
+    function calcTotalLP(tier, rank, lp) {
+        const tiers = {IRON:0,BRONZE:400,SILVER:800,GOLD:1200,PLATINUM:1600,EMERALD:2000,DIAMOND:2400,MASTER:2800,GRANDMASTER:3200,CHALLENGER:3600};
+        const ranks = {IV:0,III:100,II:200,I:300};
+        return (tiers[tier]||0) + (ranks[rank]||0) + (lp||0);
     }
 
     // ======================== RPG ARENA ========================
@@ -3318,33 +3599,57 @@
                 <div class="rpg-title-icon">⚔️</div>
                 <h1>Arena <span>RPG</span></h1>
                 <p>Cada guerreiro forjado pelas últimas 20 batalhas — stats reais, ranks únicos</p>
+                <div class="rpg-hero-actions">
+                    <button class="rpg-action-btn" onclick="showBattle()">⚔️ Batalha 1v1</button>
+                    <button class="rpg-action-btn" onclick="showSquadPredictions()">🎯 Palpites</button>
+                </div>
             </div>
         </div>
         <div class="rpg-legend">
             ${RPG_CLASSES.map(c => `<div class="rpg-legend-item"><span class="rpg-legend-icon" style="color:${c.color}">${c.icon}</span><span class="rpg-legend-name" style="color:${c.color}">${c.name}</span></div>`).join('')}
         </div>
+        <div class="rpg-evo-section">
+            <h3>Evolução de Poder</h3>
+            <div id="rpg-evo-chart"><div class="ld"><div class="sp"></div></div></div>
+        </div>
         <div class="rpg-grid" id="rpg-grid">
-            ${PLAYERS.map((_,i) => `<div class="rpg-card rpg-card-loading" data-rpg="${i}">
+            ${PLAYERS.map((_,i) => `<div class="rpg-card rpg-card-loading rpg-card-enter" data-rpg="${i}" style="--enter-i:${i}">
                 <div class="rpg-card-skel"><div class="skel-pulse" style="width:80px;height:80px;border-radius:50%;margin:0 auto 12px"></div><div class="skel-pulse" style="width:60%;height:16px;margin:0 auto 8px;border-radius:4px"></div><div class="skel-pulse" style="width:40%;height:12px;margin:0 auto;border-radius:4px"></div></div>
             </div>`).join('')}
         </div>`;
 
         initParticles(document.getElementById('rpg-particles'));
 
+        const allRPGStats = [];
         const promises = PLAYERS.map(async (p, i) => {
             try {
                 const d = await loadPlayer(i);
                 const mt = Array.isArray(d.matches) ? d.matches : [];
                 const puuid = d.account?.puuid;
-                if (!puuid || !mt.length) return renderRPGCardEmpty(i, p, d);
+                if (!puuid || !mt.length) { allRPGStats[i]=null; return renderRPGCardEmpty(i, p, d); }
                 const stats = calcRPGStats(mt, puuid);
-                if (!stats) return renderRPGCardEmpty(i, p, d);
-                renderRPGCard(i, p, d, stats);
+                if (!stats) { allRPGStats[i]=null; return renderRPGCardEmpty(i, p, d); }
+                stats.idx = i;
+                allRPGStats[i] = stats;
+                // Compute inventory
+                const inventory = computePlayerInventory(mt, puuid);
+                renderRPGCard(i, p, d, stats, inventory);
             } catch(_) {
+                allRPGStats[i]=null;
                 renderRPGCardEmpty(i, p, null);
             }
         });
         await Promise.all(promises);
+
+        // Save weekly RPG snapshot
+        saveRPGSnapshot(allRPGStats.filter(Boolean));
+
+        // Load and render evolution chart
+        const evoChart = document.getElementById('rpg-evo-chart');
+        if (evoChart) {
+            const history = await loadRPGHistory();
+            renderEvolutionChart(evoChart, history);
+        }
     }
 
     function renderRPGCardEmpty(i, p, d) {
@@ -3358,7 +3663,7 @@
             <div class="rpg-card-empty">Sem dados suficientes para forjar guerreiro</div>`;
     }
 
-    function renderRPGCard(i, p, d, stats) {
+    function renderRPGCard(i, p, d, stats, inventory) {
         const card = document.querySelector(`[data-rpg="${i}"]`);
         if (!card) return;
         card.classList.remove('rpg-card-loading');
@@ -3418,6 +3723,7 @@
                 <div class="rpg-raw-item"><span>CS</span><b>${stats.raw.avgCS}</b></div>
                 <div class="rpg-raw-item"><span>WR</span><b>${stats.raw.winRate}%</b></div>
             </div>
+            ${inventory?.length ? `<div class="rpg-inventory"><span class="rpg-inv-label">Equipamento</span><div class="rpg-inv-items">${inventory.map(item => `<img src="${itemImg(item.id)}" class="rpg-inv-item" title="${item.cnt}x comprado">`).join('')}</div></div>` : ''}
             <div class="rpg-card-footer">
                 <span>${stats.raw.games} batalhas &bull; ${stats.raw.wins}V ${stats.raw.games - stats.raw.wins}D</span>
                 ${champName ? `<span>Main: ${champName}</span>` : ''}
@@ -3448,6 +3754,275 @@
             if (fig) fig.style.transform = '';
         });
     }
+
+    // ======================== BATTLE 1v1 ========================
+    window.showBattle = function() {
+        const modal = document.createElement('div');
+        modal.id = 'battle-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `<div class="modal-box battle-box">
+            <button class="modal-close" onclick="document.getElementById('battle-modal').remove()">&times;</button>
+            <div class="modal-header"><h2>Batalha 1v1</h2><p>Escolha dois guerreiros para duelar!</p></div>
+            <div class="battle-select">
+                <select id="battle-p1" class="battle-sel">${PLAYERS.map((p,i)=>`<option value="${i}">${p.name}</option>`).join('')}</select>
+                <span class="battle-vs-text">VS</span>
+                <select id="battle-p2" class="battle-sel">${PLAYERS.map((p,i)=>`<option value="${i}" ${i===1?'selected':''}>${p.name}</option>`).join('')}</select>
+            </div>
+            <button class="battle-start-btn" onclick="startBattle()">LUTAR!</button>
+            <div id="battle-arena"></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+    };
+
+    window.startBattle = async function() {
+        const i1 = parseInt(document.getElementById('battle-p1').value);
+        const i2 = parseInt(document.getElementById('battle-p2').value);
+        if (i1 === i2) return;
+        const arena = document.getElementById('battle-arena');
+        arena.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        const [d1, d2] = await Promise.all([loadPlayer(i1), loadPlayer(i2)]);
+        const mt1=Array.isArray(d1.matches)?d1.matches:[], mt2=Array.isArray(d2.matches)?d2.matches:[];
+        const s1 = calcRPGStats(mt1, d1.account?.puuid);
+        const s2 = calcRPGStats(mt2, d2.account?.puuid);
+        if (!s1 || !s2) { arena.innerHTML = '<p style="color:var(--dim);text-align:center;">Dados insuficientes</p>'; return; }
+
+        // Compare stats
+        const cats = ['atk','def','agi','int','for','sab'];
+        let score1=0, score2=0;
+        const results = cats.map(c => {
+            const v1=s1[c], v2=s2[c];
+            if(v1>v2) { score1++; return {cat:c,winner:1}; }
+            else if(v2>v1) { score2++; return {cat:c,winner:2}; }
+            return {cat:c,winner:0};
+        });
+        const winner = score1>score2 ? 1 : score2>score1 ? 2 : (s1.power>s2.power?1:s2.power>s1.power?2:0);
+        const n1=d1.account?.gameName||PLAYERS[i1].name, n2=d2.account?.gameName||PLAYERS[i2].name;
+        const ic1=playerIcon(i1,d1.summoner?.profileIconId), ic2=playerIcon(i2,d2.summoner?.profileIconId);
+
+        // Save battle to Firebase
+        if(db) db.ref('battles').push({p1:i1,p2:i2,winner:winner===1?i1:winner===2?i2:'draw',s1:score1,s2:score2,ts:Date.now()}).catch(()=>{});
+
+        const catIcons = {atk:'⚔️',def:'🛡️',agi:'🗡️',int:'👁️',for:'👑',sab:'✨'};
+        const catNames = {atk:'ATK',def:'DEF',agi:'AGI',int:'INT',for:'FOR',sab:'SAB'};
+
+        arena.innerHTML = `
+        <div class="battle-field">
+            <div class="battle-fighter battle-f-left ${winner===1?'battle-winner':''}${winner===2?' battle-loser':''}">
+                <div class="battle-fighter-avatar" style="border-color:${s1.rpgClass.color}"><img src="${profImg(ic1)}"></div>
+                <div class="battle-fighter-name">${n1}</div>
+                <div class="battle-fighter-class" style="color:${s1.rpgClass.color}">${s1.rpgClass.icon} ${s1.rpgClass.name}</div>
+                <div class="battle-fighter-power">${s1.power}</div>
+            </div>
+            <div class="battle-center">
+                <div class="battle-score">${score1} — ${score2}</div>
+                <div class="battle-result" style="color:${winner===1?s1.rpgClass.color:winner===2?s2.rpgClass.color:'var(--dim)'}">${winner===1?n1+' VENCE!':winner===2?n2+' VENCE!':'EMPATE!'}</div>
+            </div>
+            <div class="battle-fighter battle-f-right ${winner===2?'battle-winner':''}${winner===1?' battle-loser':''}">
+                <div class="battle-fighter-avatar" style="border-color:${s2.rpgClass.color}"><img src="${profImg(ic2)}"></div>
+                <div class="battle-fighter-name">${n2}</div>
+                <div class="battle-fighter-class" style="color:${s2.rpgClass.color}">${s2.rpgClass.icon} ${s2.rpgClass.name}</div>
+                <div class="battle-fighter-power">${s2.power}</div>
+            </div>
+        </div>
+        <div class="battle-breakdown">${results.map(r => `<div class="battle-row">
+            <span class="battle-val ${r.winner===1?'battle-win':''}">${s1[r.cat]}</span>
+            <span class="battle-cat">${catIcons[r.cat]} ${catNames[r.cat]}</span>
+            <span class="battle-val ${r.winner===2?'battle-win':''}">${s2[r.cat]}</span>
+        </div>`).join('')}</div>
+        <button class="battle-again-btn" onclick="startBattle()">Lutar de novo!</button>`;
+
+        // Battle animations
+        setTimeout(() => {
+            arena.querySelector('.battle-f-left')?.classList.add('battle-attack');
+            setTimeout(() => arena.querySelector('.battle-f-right')?.classList.add('battle-attack'), 300);
+            setTimeout(() => {
+                arena.querySelector('.battle-f-left')?.classList.remove('battle-attack');
+                arena.querySelector('.battle-f-right')?.classList.remove('battle-attack');
+                if(winner===2) arena.querySelector('.battle-f-left')?.classList.add('battle-hit');
+                if(winner===1) arena.querySelector('.battle-f-right')?.classList.add('battle-hit');
+                playSFX('hit');
+            }, 600);
+            setTimeout(() => playSFX(winner?'victory':'navigate'), 1000);
+        }, 200);
+    };
+
+    // ======================== TEMPORAL EVOLUTION ========================
+    async function saveRPGSnapshot(allStats) {
+        if (!db) return;
+        const week = getWeekId();
+        const data = {};
+        allStats.forEach(s => { if(s) data[s.idx] = { power:s.power, atk:s.atk, def:s.def, agi:s.agi, int:s.int, for:s.for, sab:s.sab }; });
+        db.ref(`rpgHistory/${week}`).set(data).catch(() => {});
+    }
+
+    async function loadRPGHistory() {
+        if (!db) return {};
+        try {
+            const snap = await db.ref('rpgHistory').orderByKey().limitToLast(8).once('value');
+            return snap.val() || {};
+        } catch(_) { return {}; }
+    }
+
+    function renderEvolutionChart(container, history) {
+        const weeks = Object.keys(history).sort();
+        if (weeks.length < 2) { container.innerHTML = '<p style="color:var(--dim);text-align:center;font-size:.85em;">Evolução será exibida após 2 semanas</p>'; return; }
+        const W = 320, H = 160, pad = 30;
+        const pw = (W - pad*2) / (weeks.length - 1);
+        let lines = '';
+        const playerLines = {};
+        PLAYERS.forEach((p, i) => {
+            const pts = weeks.map((w,wi) => {
+                const val = history[w]?.[i]?.power;
+                return val !== undefined ? { x: pad + wi * pw, y: H - pad - (val / 100) * (H - pad*2) } : null;
+            }).filter(Boolean);
+            if (pts.length < 2) return;
+            const rpgStats = calcRPGStats(cache[i]?.matches||[], cache[i]?.account?.puuid);
+            const color = rpgStats?.rpgClass?.color || 'var(--pri)';
+            const pathD = pts.map((pt,k) => `${k===0?'M':'L'}${pt.x},${pt.y}`).join(' ');
+            lines += `<path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" opacity="0.8"/>`;
+            pts.forEach(pt => { lines += `<circle cx="${pt.x}" cy="${pt.y}" r="3" fill="${color}"/>`; });
+            const last = pts[pts.length-1];
+            lines += `<text x="${last.x+5}" y="${last.y+3}" fill="${color}" font-size="8" font-weight="600">${p.name}</text>`;
+        });
+        // Grid
+        let grid = '';
+        for(let v=0;v<=100;v+=25) {
+            const y = H-pad-(v/100)*(H-pad*2);
+            grid += `<line x1="${pad}" y1="${y}" x2="${W-pad}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+            grid += `<text x="${pad-5}" y="${y+3}" fill="rgba(255,255,255,0.3)" font-size="7" text-anchor="end">${v}</text>`;
+        }
+        weeks.forEach((w,wi) => {
+            grid += `<text x="${pad+wi*pw}" y="${H-8}" fill="rgba(255,255,255,0.3)" font-size="7" text-anchor="middle">${w.split('-W')[1]}</text>`;
+        });
+        container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="evo-chart">${grid}${lines}</svg>`;
+    }
+
+    // ======================== INVENTORY (most bought items) ========================
+    function computePlayerInventory(matches, puuid) {
+        const itemCounts = {};
+        matches.forEach(m => {
+            const mp = m.info?.participants?.find(x => x.puuid === puuid); if (!mp) return;
+            for(let s=0;s<=6;s++) {
+                const itemId = mp[`item${s}`];
+                if(itemId && itemId !== 0) itemCounts[itemId] = (itemCounts[itemId]||0)+1;
+            }
+        });
+        return Object.entries(itemCounts).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id,cnt])=>({id,cnt}));
+    }
+
+    // ======================== SQUAD PREDICTIONS ========================
+    window.showSquadPredictions = function() {
+        const modal = document.createElement('div');
+        modal.id = 'squad-pred-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `<div class="modal-box" style="max-width:500px;">
+            <button class="modal-close" onclick="document.getElementById('squad-pred-modal').remove()">&times;</button>
+            <div class="modal-header"><h2>Palpites do Squad</h2><p>Aposte em quem vai performar melhor!</p></div>
+            <div class="modal-body" id="squad-pred-body"><div class="ld"><div class="sp"></div></div></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+        loadSquadPredictions();
+    };
+
+    async function loadSquadPredictions() {
+        const body = document.getElementById('squad-pred-body');
+        if (!body) return;
+        const user = getLoggedUser();
+        // Default predictions
+        const defaultQs = [
+            { id: 'weekly_lp', question: 'Quem vai ganhar mais LP essa semana?', options: PLAYERS.map(p=>p.name) },
+            { id: 'weekly_penta', question: 'Quem vai fazer o próximo pentakill?', options: PLAYERS.map(p=>p.name) },
+            { id: 'weekly_feed', question: 'Quem vai ter mais mortes essa semana?', options: PLAYERS.map(p=>p.name) },
+        ];
+        let preds = defaultQs;
+        // Load votes from Firebase
+        const votes = {};
+        if (db) {
+            try {
+                const snap = await db.ref(`squadPredictions/${getWeekId()}`).once('value');
+                const data = snap.val() || {};
+                Object.assign(votes, data);
+            } catch(_) {}
+        }
+        body.innerHTML = preds.map(pred => {
+            const myVote = votes[pred.id]?.votes?.[user?.idx];
+            const allVotes = votes[pred.id]?.votes || {};
+            const voteCounts = {};
+            Object.values(allVotes).forEach(v => { voteCounts[v] = (voteCounts[v]||0)+1; });
+            const totalVotes = Object.values(voteCounts).reduce((a,b)=>a+b,0);
+            return `<div class="squad-pred-card">
+                <div class="squad-pred-q">${pred.question}</div>
+                <div class="squad-pred-opts">${pred.options.map(opt => {
+                    const cnt = voteCounts[opt]||0;
+                    const pct = totalVotes>0?(cnt/totalVotes*100).toFixed(0):0;
+                    const isMyVote = myVote === opt;
+                    return `<button class="squad-pred-opt ${isMyVote?'voted':''}" onclick="voteSquadPred('${pred.id}','${opt}')" ${!user?'disabled':''}>
+                        <span class="squad-pred-opt-name">${opt}</span>
+                        <div class="squad-pred-bar" style="width:${pct}%;background:${isMyVote?'var(--pri)':'rgba(255,255,255,0.1)'}"></div>
+                        <span class="squad-pred-pct">${cnt>0?pct+'%':''}</span>
+                    </button>`;
+                }).join('')}</div>
+            </div>`;
+        }).join('') + (user ? '' : '<p style="color:var(--dim);text-align:center;font-size:.85em;margin-top:12px;">Faça login para votar</p>');
+    }
+
+    window.voteSquadPred = function(predId, option) {
+        const user = getLoggedUser();
+        if (!user || !db) return;
+        db.ref(`squadPredictions/${getWeekId()}/${predId}/votes/${user.idx}`).set(option).then(() => {
+            loadSquadPredictions();
+        }).catch(() => {});
+    };
+
+    // ======================== SFX SYSTEM (Web Audio) ========================
+    let _audioCtx = null;
+    const _sfxEnabled = localStorage.getItem('profa_sfx') !== '0';
+    function getAudioCtx() {
+        if (!_audioCtx) { try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(_) {} }
+        return _audioCtx;
+    }
+    function playSFX(type) {
+        if (!_sfxEnabled) return;
+        const ctx = getAudioCtx(); if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        gain.gain.value = 0.08;
+        const t = ctx.currentTime;
+        if (type === 'navigate') {
+            osc.frequency.setValueAtTime(600, t);
+            osc.frequency.exponentialRampToValueAtTime(900, t+0.08);
+            gain.gain.exponentialRampToValueAtTime(0.001, t+0.15);
+            osc.start(t); osc.stop(t+0.15);
+        } else if (type === 'hit') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, t);
+            osc.frequency.exponentialRampToValueAtTime(80, t+0.2);
+            gain.gain.setValueAtTime(0.12, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t+0.25);
+            osc.start(t); osc.stop(t+0.25);
+        } else if (type === 'victory') {
+            osc.frequency.setValueAtTime(523, t);
+            osc.frequency.setValueAtTime(659, t+0.12);
+            osc.frequency.setValueAtTime(784, t+0.24);
+            gain.gain.exponentialRampToValueAtTime(0.001, t+0.5);
+            osc.start(t); osc.stop(t+0.5);
+        } else if (type === 'unlock') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(440, t);
+            osc.frequency.setValueAtTime(660, t+0.1);
+            osc.frequency.setValueAtTime(880, t+0.2);
+            gain.gain.exponentialRampToValueAtTime(0.001, t+0.4);
+            osc.start(t); osc.stop(t+0.4);
+        }
+    }
+
+    // SFX on navigation
+    document.addEventListener('click', e => {
+        if (e.target.closest('.nl a, .nav-in a')) playSFX('navigate');
+    });
 
     // ======================== TEAM BUILDER ========================
     function renderTeamBuilder() {
@@ -3585,6 +4160,7 @@
         box.innerHTML = _chatMessages.map(m => {
             const isMe = user?.idx === m.idx;
             const icon = playerIcon(m.idx, null);
+            const key = m._key || '';
             return `<div class="chat-msg ${isMe ? 'chat-me' : ''}">
                 <img src="${profImg(icon)}" class="chat-avatar" onerror="this.style.display='none'">
                 <div class="chat-bubble">
@@ -3593,11 +4169,43 @@
                         <span class="chat-msg-time">${fmtAgo(m.ts)}</span>
                     </div>
                     <div class="chat-msg-text">${escapeHtml(m.text || '')}</div>
+                    <div class="chat-reactions" id="chat-react-${key}">
+                        <div class="chat-react-btns">${['👍','🔥','😂','💀','❤️'].map(e=>`<button class="chat-react-btn" onclick="reactChat('${key}','${e}')">${e}</button>`).join('')}</div>
+                        <div class="chat-react-counts" id="chat-counts-${key}"></div>
+                    </div>
                 </div>
             </div>`;
         }).join('');
         if (wasAtBottom) box.scrollTop = box.scrollHeight;
+        // Load chat reactions
+        if (db) {
+            _chatMessages.forEach(m => {
+                if (!m._key) return;
+                db.ref(`chatReactions/${m._key}`).once('value').then(snap => {
+                    const data = snap.val() || {};
+                    const counts = {};
+                    Object.values(data).forEach(r => { counts[r] = (counts[r]||0)+1; });
+                    const el = document.getElementById(`chat-counts-${m._key}`);
+                    if (el) el.innerHTML = Object.entries(counts).map(([e,c])=>`<span class="chat-count-badge">${e}${c}</span>`).join('');
+                }).catch(()=>{});
+            });
+        }
     }
+
+    window.reactChat = function(msgKey, emoji) {
+        const user = getLoggedUser();
+        if (!user || !db || !msgKey) return;
+        db.ref(`chatReactions/${msgKey}/${user.idx}`).set(emoji).then(() => {
+            // Reload reaction counts
+            db.ref(`chatReactions/${msgKey}`).once('value').then(snap => {
+                const data = snap.val() || {};
+                const counts = {};
+                Object.values(data).forEach(r => { counts[r] = (counts[r]||0)+1; });
+                const el = document.getElementById(`chat-counts-${msgKey}`);
+                if (el) el.innerHTML = Object.entries(counts).map(([e,c])=>`<span class="chat-count-badge">${e}${c}</span>`).join('');
+            });
+        }).catch(()=>{});
+    };
 
     window.sendChat = function() {
         const user = getLoggedUser();
@@ -3743,11 +4351,31 @@
             const msg = `${name} subiu para ${newSolo.tier} ${newSolo.rank}!`;
             postFeedEvent({ type: 'rank_up', player: name, idx: playerIdx, msg });
             sendNotification('Rank Up!', msg);
+            playSFX('victory');
         } else if (newVal < oldVal) {
             const msg = `${name} caiu para ${newSolo.tier} ${newSolo.rank}`;
             postFeedEvent({ type: 'rank_down', player: name, idx: playerIdx, msg });
             sendNotification('Rank Down', msg);
         }
+        // LP milestone notifications
+        const newLP = newSolo.leaguePoints || 0;
+        const oldLP = oldSolo.leaguePoints || 0;
+        if (newLP >= 100 && oldLP < 100) {
+            sendNotification('LP Milestone!', `${name} chegou a ${newLP} LP em ${newSolo.tier} ${newSolo.rank}!`);
+            postFeedEvent({ type: 'lp_milestone', player: name, idx: playerIdx, msg: `${name} atingiu ${newLP} LP!` });
+        }
+        // Detect pentakill from new matches
+        const oldMatches = new Set((Array.isArray(oldData.matches)?oldData.matches:[]).map(m=>m.metadata?.matchId).filter(Boolean));
+        const newMatches = (Array.isArray(newData.matches)?newData.matches:[]).filter(m => m.metadata?.matchId && !oldMatches.has(m.metadata.matchId));
+        newMatches.forEach(m => {
+            const mp = m.info?.participants?.find(x => x.puuid === newData.account?.puuid);
+            if (mp?.pentaKills > 0) {
+                const champName = CMAP[mp.championId] || '?';
+                sendNotification('PENTAKILL!', `${name} fez PENTAKILL de ${champName}!`);
+                postFeedEvent({ type:'pentakill', player:name, idx:playerIdx, msg:`${name} fez PENTAKILL de ${champName}!` });
+                playSFX('unlock');
+            }
+        });
     }
 
     // ======================== NOTIFICAÇÃO DE PARTIDA AO VIVO ========================

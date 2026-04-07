@@ -2255,3 +2255,286 @@ body::after {
     background: linear-gradient(180deg, rgba(102,187,106,0.06) 0%, transparent 35%);
     pointer-events: none; z-index: 1;
 }
+
+/* ======================== RPG ENTRY ANIMATION ======================== */
+.rpg-card-enter {
+    animation: rpgCardEnter 0.6s cubic-bezier(0.22,1,0.36,1) both;
+    animation-delay: calc(var(--enter-i, 0) * 0.1s);
+}
+@keyframes rpgCardEnter {
+    0% { opacity: 0; transform: translateX(-60px) scale(0.9); }
+    100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* ======================== RPG HERO ACTIONS ======================== */
+.rpg-hero-actions {
+    display: flex; gap: 12px; justify-content: center; margin-top: 18px; flex-wrap: wrap;
+}
+.rpg-action-btn {
+    padding: 10px 24px; border-radius: 25px; font-weight: 700;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,255,255,0.15); color: #fff; cursor: pointer;
+    font-size: 0.9em; transition: all 0.3s;
+}
+.rpg-action-btn:hover {
+    background: linear-gradient(135deg, rgba(224,64,251,0.2), rgba(66,165,245,0.15));
+    border-color: rgba(224,64,251,0.4); transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(224,64,251,0.2);
+}
+
+/* ======================== EVOLUTION CHART ======================== */
+.rpg-evo-section {
+    padding: 20px; max-width: 1400px; margin: 0 auto;
+    background: rgba(0,0,0,0.15);
+}
+.rpg-evo-section h3 {
+    text-align: center; color: rgba(255,255,255,0.7); font-size: 1em;
+    margin-bottom: 12px;
+}
+.evo-chart { width: 100%; max-width: 500px; margin: 0 auto; display: block; }
+
+/* ======================== INVENTORY ======================== */
+.rpg-inventory {
+    position: relative; z-index: 2;
+    padding: 6px 16px; display: flex; align-items: center; gap: 8px;
+}
+.rpg-inv-label {
+    font-size: 0.6em; font-weight: 700; color: rgba(255,255,255,0.3);
+    text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
+}
+.rpg-inv-items { display: flex; gap: 4px; flex-wrap: wrap; }
+.rpg-inv-item {
+    width: 24px; height: 24px; border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.rpg-inv-item:hover {
+    transform: scale(1.3); z-index: 5;
+    box-shadow: 0 0 8px rgba(255,255,255,0.2);
+}
+
+/* ======================== BATTLE 1v1 ======================== */
+.battle-box { max-width: 600px; }
+.battle-select {
+    display: flex; align-items: center; gap: 16px; justify-content: center;
+    padding: 16px 0;
+}
+.battle-sel {
+    padding: 10px 16px; border-radius: 10px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: #fff; font-size: 1em; font-weight: 600; cursor: pointer;
+}
+.battle-vs-text {
+    font-size: 1.5em; font-weight: 900; color: #ef5350;
+    text-shadow: 0 0 15px rgba(239,83,80,0.5);
+}
+.battle-start-btn {
+    display: block; margin: 0 auto 20px; padding: 12px 36px;
+    border-radius: 25px; font-weight: 800; font-size: 1.1em;
+    background: linear-gradient(135deg, #e53935, #ff5722);
+    color: #fff; border: none; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(229,57,53,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.battle-start-btn:hover { transform: scale(1.05); box-shadow: 0 6px 30px rgba(229,57,53,0.5); }
+
+.battle-field {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 20px 0; min-height: 160px;
+}
+.battle-fighter {
+    text-align: center; flex: 1; transition: transform 0.4s, opacity 0.4s;
+}
+.battle-fighter-avatar {
+    width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 8px;
+    overflow: hidden; border: 3px solid;
+    box-shadow: 0 0 15px rgba(0,0,0,0.3);
+}
+.battle-fighter-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.battle-fighter-name { font-weight: 700; font-size: 1em; color: #fff; }
+.battle-fighter-class { font-size: 0.78em; margin-top: 2px; }
+.battle-fighter-power {
+    font-size: 1.6em; font-weight: 900; margin-top: 4px;
+    text-shadow: 0 0 10px currentColor;
+}
+.battle-center { text-align: center; padding: 0 10px; }
+.battle-score { font-size: 2em; font-weight: 900; color: #fff; }
+.battle-result {
+    font-size: 1.1em; font-weight: 700; margin-top: 4px;
+    animation: battleResultPulse 0.5s ease-out;
+}
+@keyframes battleResultPulse {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.battle-winner { animation: battleWin 0.5s ease-out; }
+@keyframes battleWin {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+.battle-loser { opacity: 0.5; filter: grayscale(0.5); }
+.battle-attack { animation: battleAttack 0.3s ease-out; }
+@keyframes battleAttack {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(30px); }
+    100% { transform: translateX(0); }
+}
+.battle-f-right.battle-attack { animation-name: battleAttackR; }
+@keyframes battleAttackR {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(-30px); }
+    100% { transform: translateX(0); }
+}
+.battle-hit { animation: battleHit 0.3s ease-out; }
+@keyframes battleHit {
+    0% { filter: brightness(1); }
+    30% { filter: brightness(2) saturate(0); }
+    100% { filter: brightness(1); }
+}
+
+.battle-breakdown {
+    padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.06);
+}
+.battle-row {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 5px 0; font-size: 0.9em;
+}
+.battle-val {
+    width: 40px; text-align: center; font-weight: 600;
+    color: rgba(255,255,255,0.5);
+}
+.battle-val.battle-win { color: #4caf50; font-weight: 800; }
+.battle-cat { width: 70px; text-align: center; font-size: 0.85em; color: var(--dim); }
+.battle-again-btn {
+    display: block; margin: 16px auto 0; padding: 8px 24px;
+    border-radius: 20px; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1); color: #fff;
+    cursor: pointer; font-weight: 600; transition: all 0.2s;
+}
+.battle-again-btn:hover { background: rgba(255,255,255,0.1); }
+
+/* ======================== HIGHLIGHTS ======================== */
+.dash-highlights {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+}
+.dash-hl-card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; border-radius: 10px; cursor: pointer;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+    transition: background 0.2s;
+}
+.dash-hl-card:hover { background: rgba(255,255,255,0.06); }
+.dash-hl-icon { font-size: 1.8em; }
+.dash-hl-player { font-weight: 600; font-size: 0.9em; }
+.dash-hl-desc { font-size: 0.82em; color: var(--pri); font-weight: 600; }
+.dash-hl-score { font-size: 0.72em; color: var(--dim); margin-top: 2px; }
+
+/* ======================== WEEKLY RANKING TABS ======================== */
+.dash-week-tabs {
+    display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.dash-week-tab {
+    padding: 6px 16px; border-radius: 20px; font-size: 0.82em; font-weight: 600;
+    background: rgba(255,255,255,0.05); color: var(--dim); cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.06); transition: all 0.2s;
+}
+.dash-week-tab.on {
+    background: var(--pri); color: var(--bg);
+    border-color: var(--pri);
+}
+.dash-week-tab:hover:not(.on) { background: rgba(255,255,255,0.08); }
+
+/* ======================== WALL OF SHAME ======================== */
+.shame-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+}
+.shame-card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; border-radius: 12px; cursor: pointer;
+    background: linear-gradient(135deg, rgba(239,83,80,0.06), rgba(0,0,0,0.1));
+    border: 1px solid rgba(239,83,80,0.15);
+    transition: all 0.2s; position: relative;
+}
+.shame-card:hover { border-color: rgba(239,83,80,0.3); background: rgba(239,83,80,0.08); }
+.shame-champ-img { width: 42px; height: 42px; border-radius: 8px; }
+.shame-name { font-weight: 700; font-size: 0.9em; }
+.shame-score { font-size: 0.85em; color: var(--dim); }
+.shame-score.shame-loss { color: #ef5350; }
+.shame-cs { font-size: 0.72em; color: var(--dim); }
+.shame-skull {
+    position: absolute; top: 8px; right: 10px; font-size: 1.5em;
+    opacity: 0.3;
+}
+.shame-reactions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.shame-react-btn {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 2px 8px; cursor: pointer; font-size: 0.8em;
+    transition: all 0.2s;
+}
+.shame-react-btn:hover { background: rgba(255,255,255,0.12); transform: scale(1.1); }
+.shame-count {
+    font-size: 0.75em; padding: 2px 6px; background: rgba(255,255,255,0.06);
+    border-radius: 10px; margin-left: 2px;
+}
+
+/* ======================== SQUAD PREDICTIONS ======================== */
+.squad-pred-card {
+    padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.squad-pred-q {
+    font-weight: 700; font-size: 0.95em; margin-bottom: 10px;
+    color: rgba(255,255,255,0.85);
+}
+.squad-pred-opts { display: flex; flex-direction: column; gap: 6px; }
+.squad-pred-opt {
+    position: relative; display: flex; align-items: center;
+    padding: 8px 12px; border-radius: 8px; cursor: pointer;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    color: #fff; font-size: 0.85em; overflow: hidden; transition: all 0.2s;
+}
+.squad-pred-opt:hover { background: rgba(255,255,255,0.06); }
+.squad-pred-opt.voted { border-color: var(--pri); background: rgba(0,212,255,0.08); }
+.squad-pred-opt-name { position: relative; z-index: 2; font-weight: 600; flex: 1; }
+.squad-pred-bar {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    border-radius: 8px; transition: width 0.5s ease;
+    z-index: 1; opacity: 0.3;
+}
+.squad-pred-pct {
+    position: relative; z-index: 2; font-size: 0.8em; color: var(--dim);
+    font-weight: 600;
+}
+
+/* ======================== CHAT REACTIONS ======================== */
+.chat-reactions {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+    margin-top: 4px; padding-top: 4px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+}
+.chat-react-btns {
+    display: flex; gap: 2px; opacity: 0; transition: opacity 0.2s;
+}
+.chat-bubble:hover .chat-react-btns { opacity: 1; }
+.chat-react-btn {
+    background: none; border: none; cursor: pointer; font-size: 0.75em;
+    padding: 1px 3px; border-radius: 6px; transition: all 0.15s;
+}
+.chat-react-btn:hover { background: rgba(255,255,255,0.1); transform: scale(1.3); }
+.chat-react-counts { display: flex; gap: 4px; flex-wrap: wrap; }
+.chat-count-badge {
+    font-size: 0.72em; padding: 1px 6px; background: rgba(255,255,255,0.06);
+    border-radius: 10px; color: rgba(255,255,255,0.7);
+}
+
+/* ======================== RPG THEME ON PROFILE ======================== */
+.pv.rpg-themed {
+    border-top: 2px solid var(--profile-accent, var(--pri));
+}
+.pv.rpg-themed::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 120px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--profile-accent, var(--pri)) 8%, transparent), transparent);
+    pointer-events: none; z-index: 0; border-radius: inherit;
+}
