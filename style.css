@@ -712,6 +712,33 @@ a { text-decoration: none; color: inherit; }
 .radio-track-eq span:nth-child(1) { height: 3px; animation-delay: 0s; }
 .radio-track-eq span:nth-child(2) { height: 6px; animation-delay: 0.15s; }
 .radio-track-eq span:nth-child(3) { height: 4px; animation-delay: 0.3s; }
+.radio-track-del {
+    background: none; border: none; cursor: pointer; font-size: 0.75em; opacity: 0;
+    transition: opacity 0.2s; padding: 2px 4px; filter: grayscale(1);
+}
+.radio-track:hover .radio-track-del { opacity: 0.6; }
+.radio-track-del:hover { opacity: 1 !important; filter: none; }
+.radio-upload-section {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.radio-upload-btn {
+    display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px;
+    background: linear-gradient(135deg, var(--pri), #8b5cf6); color: #fff;
+    border-radius: 6px; font-size: 0.75em; font-weight: 600; cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.radio-upload-btn:hover { transform: scale(1.05); box-shadow: 0 2px 12px rgba(0,212,255,0.3); }
+.radio-upload-hint { font-size: 0.65em; color: rgba(255,255,255,0.35); }
+.radio-empty {
+    text-align: center; padding: 20px 12px; color: rgba(255,255,255,0.3);
+    font-size: 0.8em; line-height: 1.6;
+}
+.radio-st-count {
+    display: inline-block; font-size: 0.6em; background: rgba(255,255,255,0.1);
+    padding: 1px 5px; border-radius: 8px; margin-left: 2px; color: rgba(255,255,255,0.5);
+}
+.radio-station-btn.active .radio-st-count { background: rgba(0,212,255,0.2); color: var(--pri); }
 
 /* ==================== LOL BACKGROUND IMAGES ==================== */
 body::before {

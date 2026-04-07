@@ -2504,76 +2504,69 @@
         `;
     }
 
-    // ======================== PROFA FM — RÁDIO GAMER ========================
-    const RADIO_STATIONS = [
-        { name: 'RPG Chill', icon: '🏰', tracks: [
-            { title:'Minecraft - Sweden (C418)', id:'_3ngiSxVCBs' },
-            { title:'Minecraft - Wet Hands', id:'0RMhjO0FbKY' },
-            { title:'Skyrim - Secunda', id:'V4P_S9OCOMU' },
-            { title:'Skyrim - Streets of Whiterun', id:'qo3VAltxlr8' },
-            { title:'Zelda BOTW - Hateno Village', id:'vBnSP5mFYdo' },
-            { title:'Stardew Valley - Spring', id:'2GYHhU4DRCE' },
-            { title:'Undertale - Home', id:'7TKnwMb3JMw' },
-            { title:'Hollow Knight - Greenpath', id:'gIBEd5TRamE' },
-            { title:'Animal Crossing - 2AM', id:'HX_HVqWUjBo' },
-            { title:'Ori - Naru Embracing Light', id:'3BPjX5XwJVc' },
-        ]},
-        { name: 'Aventura', icon: '⚔️', tracks: [
-            { title:'Zelda - Song of Storms', id:'43IPAGw01IY' },
-            { title:'Mario Galaxy - Gusty Garden', id:'bcZhJDimFtE' },
-            { title:'Chrono Trigger - Wind Scene', id:'RqZaFDA7PXY' },
-            { title:'Final Fantasy X - To Zanarkand', id:'KGMRz0AEDX4' },
-            { title:'Kingdom Hearts - Dearly Beloved', id:'TG1pRNQAByI' },
-            { title:'Persona 5 - Beneath the Mask', id:'gFFOXwniVKw' },
-            { title:'Xenoblade - Gaur Plain', id:'xweRl4LZlmo' },
-            { title:'Pokémon - Lavender Town', id:'JNJJ-QkZ8cM' },
-        ]},
-        { name: 'Batalha', icon: '🔥', tracks: [
-            { title:'Doom - BFG Division', id:'pNkQMtZAMAw' },
-            { title:'Dark Souls - Gwyn Theme', id:'AB6sOhQan9Y' },
-            { title:'Halo - Main Theme', id:'0jXTBAGv9ZQ' },
-            { title:'Metal Gear Rising - Rules of Nature', id:'N3472Q6kvg0' },
-            { title:'Undertale - Megalovania', id:'0FCvzsVlXpQ' },
-            { title:'Cuphead - Floral Fury', id:'YEvEjMJci7s' },
-            { title:'Devil May Cry 5 - Bury the Light', id:'Jrg9KxGNeJY' },
-            { title:'NieR Automata - A Beautiful Song', id:'aq6kv3tfd9g' },
-        ]},
-        { name: 'LoL / Arcane', icon: '🎮', tracks: [
-            { title:'Legends Never Die', id:'4Q46xYqUwZQ' },
-            { title:'Warriors - Imagine Dragons', id:'fmI_Ndrxy14' },
-            { title:'RISE', id:'fB8TyLTD7EE' },
-            { title:'Enemy - Imagine Dragons (Arcane)', id:'D9G1VOjN_84' },
-            { title:'Burn It All Down - Worlds 2021', id:'GCKeCntqnpI' },
-            { title:'Awaken', id:'zF5Ddo9JdpY' },
-            { title:'Phoenix - Worlds 2019', id:'i1IKnWDecwA' },
-            { title:'POP/STARS - K/DA', id:'UOxkGD8qRB4' },
-            { title:'Star Walkin - Worlds 2022', id:'gRNMRRK9f8I' },
-            { title:'Worlds Apart - Worlds 2024', id:'w90m7amBe_s' },
-        ]},
-        { name: 'Lo-Fi Gaming', icon: '🎧', tracks: [
-            { title:'Lo-Fi Zelda - Lost Woods', id:'p2iMojMnpEo' },
-            { title:'Lo-Fi Pokémon - Route 1', id:'qlBHQDhsLBY' },
-            { title:'Lo-Fi Mario - Dire Dire Docks', id:'8y8eRpE4r5g' },
-            { title:'Lo-Fi Minecraft - Sweden', id:'mYKFlbFYqh8' },
-            { title:'Lo-Fi Animal Crossing - Rainy', id:'_38JDGnr0vA' },
-            { title:'Lo-Fi Ghibli - Merry Go Round', id:'rEITNR1r-Rw' },
-            { title:'Lo-Fi Undertale - Snowdin', id:'1i2VDJa5TQE' },
-            { title:'Lo-Fi Stardew - Pelican Town', id:'jqJIF_k3bR4' },
-        ]},
+    // ======================== PROFA FM — RÁDIO GAMER (Firebase Storage) ========================
+    const RADIO_STATION_META = [
+        { name: 'RPG Chill', icon: '🏰', key: 'rpg_chill' },
+        { name: 'Aventura', icon: '⚔️', key: 'aventura' },
+        { name: 'Batalha', icon: '🔥', key: 'batalha' },
+        { name: 'LoL / Arcane', icon: '🎮', key: 'lol_arcane' },
+        { name: 'Lo-Fi Gaming', icon: '🎧', key: 'lofi_gaming' },
     ];
 
+    let _radioStations = RADIO_STATION_META.map(s => ({ ...s, tracks: [] }));
     let _radioStation = parseInt(localStorage.getItem('profa_radio_station')||'0');
     let _radioTrack = parseInt(localStorage.getItem('profa_radio_track')||'0');
     let _radioShuffle = localStorage.getItem('profa_radio_shuffle') === '1';
     let musicPlaying = false;
-    let ytPlayer = null;
-    let _radioSkipCount = 0;
-    const MAX_CONSECUTIVE_SKIPS = 3;
-    const MUSIC_VOL = parseInt(localStorage.getItem('profa_radio_vol')||'15');
+    let _radioLoaded = false;
+    let _radioUploading = false;
+    const MUSIC_VOL = parseInt(localStorage.getItem('profa_radio_vol')||'50');
 
-    function currentStation() { return RADIO_STATIONS[_radioStation] || RADIO_STATIONS[0]; }
+    // Firebase Storage ref
+    const storage = firebase.storage();
+
+    function currentStation() { return _radioStations[_radioStation] || _radioStations[0]; }
     function currentTrack() { return currentStation().tracks[_radioTrack] || currentStation().tracks[0]; }
     function allTracks() { return currentStation().tracks; }
+
+    // HTML5 Audio player
+    const audioPlayer = new Audio();
+    audioPlayer.volume = MUSIC_VOL / 100;
+    audioPlayer.addEventListener('ended', () => { musicNext(); });
+    audioPlayer.addEventListener('play', () => { musicPlaying = true; updateMusicUI(); });
+    audioPlayer.addEventListener('pause', () => { musicPlaying = false; updateMusicUI(); });
+    audioPlayer.addEventListener('error', () => {
+        console.warn('[Radio] Erro ao tocar track, pulando...');
+        musicPlaying = false;
+        const tracks = allTracks();
+        if (tracks.length > 1) setTimeout(musicNext, 1000);
+        else updateMusicUI();
+    });
+
+    // Load tracks from Firebase DB
+    function loadRadioTracks() {
+        const radioRef = db.ref('radio');
+        radioRef.on('value', snap => {
+            const data = snap.val() || {};
+            _radioStations = RADIO_STATION_META.map(s => {
+                const stationData = data[s.key] || {};
+                const tracks = [];
+                Object.keys(stationData).forEach(k => {
+                    const t = stationData[k];
+                    if (t && t.title && t.url) {
+                        tracks.push({ id: k, title: t.title, url: t.url, fileName: t.fileName || '' });
+                    }
+                });
+                tracks.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                return { ...s, tracks };
+            });
+            _radioLoaded = true;
+            // Ajustar index se track atual não existe mais
+            if (_radioTrack >= allTracks().length) _radioTrack = 0;
+            updateMusicUI();
+        });
+    }
+    loadRadioTracks();
 
     // Create floating radio button
     const musicBtn = document.createElement('div');
@@ -2590,95 +2583,89 @@
     function buildRadioPanel() {
         const st = currentStation();
         const tr = currentTrack();
+        const hasTracks = st.tracks.length > 0;
         musicPanel.innerHTML = `
         <div class="radio-header">
             <div class="radio-brand"><span class="radio-logo">📻</span> PROFA FM</div>
             <button class="radio-close" onclick="toggleMusicPanel()">&#215;</button>
         </div>
         <div class="radio-dial">
-            ${RADIO_STATIONS.map((s, i) => `<button class="radio-station-btn ${i===_radioStation?'active':''}" onclick="switchStation(${i})" title="${s.name}"><span class="radio-st-icon">${s.icon}</span><span class="radio-st-name">${s.name}</span></button>`).join('')}
+            ${_radioStations.map((s, i) => `<button class="radio-station-btn ${i===_radioStation?'active':''}" onclick="switchStation(${i})" title="${s.name}"><span class="radio-st-icon">${s.icon}</span><span class="radio-st-name">${s.name}</span><span class="radio-st-count">${s.tracks.length}</span></button>`).join('')}
         </div>
         <div class="radio-now">
             <div class="radio-now-station">${st.icon} ${st.name}</div>
-            <div class="radio-now-track" id="mp-now">${musicPlaying ? tr.title : 'Pausado'}</div>
+            <div class="radio-now-track" id="mp-now">${!hasTracks ? 'Sem músicas' : musicPlaying ? tr.title : 'Pausado'}</div>
             <div class="radio-now-eq ${musicPlaying?'playing':''}"><span></span><span></span><span></span><span></span><span></span></div>
         </div>
         <div class="radio-controls">
-            <button class="radio-ctrl" onclick="musicPrev()" title="Anterior">⏮</button>
-            <button class="radio-ctrl radio-play" id="mp-play" onclick="musicToggle()">${musicPlaying ? '⏸' : '▶'}</button>
-            <button class="radio-ctrl" onclick="musicNext()" title="Próxima">⏭</button>
+            <button class="radio-ctrl" onclick="musicPrev()" title="Anterior" ${!hasTracks?'disabled':''}>⏮</button>
+            <button class="radio-ctrl radio-play" id="mp-play" onclick="musicToggle()" ${!hasTracks?'disabled':''}>${musicPlaying ? '⏸' : '▶'}</button>
+            <button class="radio-ctrl" onclick="musicNext()" title="Próxima" ${!hasTracks?'disabled':''}>⏭</button>
             <button class="radio-ctrl radio-shuffle ${_radioShuffle?'active':''}" onclick="toggleShuffle()" title="Shuffle">🔀</button>
         </div>
         <div class="radio-vol">
             <span class="radio-vol-icon">🔊</span>
-            <input type="range" id="mp-vol-slider" min="0" max="30" value="${MUSIC_VOL}" oninput="musicVol(this.value)">
-            <span class="radio-vol-val" id="radio-vol-val">${MUSIC_VOL}</span>
+            <input type="range" id="mp-vol-slider" min="0" max="100" value="${Math.round(audioPlayer.volume*100)}" oninput="musicVol(this.value)">
+            <span class="radio-vol-val" id="radio-vol-val">${Math.round(audioPlayer.volume*100)}</span>
+        </div>
+        <div class="radio-upload-section">
+            <label class="radio-upload-btn" title="Enviar música (.mp3, .ogg, .wav)">
+                <input type="file" accept="audio/*" multiple style="display:none" onchange="radioUpload(this.files)" ${_radioUploading?'disabled':''}>
+                ${_radioUploading ? '⏳ Enviando...' : '📤 Enviar música'}
+            </label>
+            <span class="radio-upload-hint">Upload para "${st.name}"</span>
         </div>
         <div class="radio-tracklist" id="mp-list">
-            ${st.tracks.map((t,i) => `<div class="radio-track ${i===_radioTrack?'on':''}" onclick="musicPlay(${i})"><span class="radio-track-num">${i+1}</span><span class="radio-track-title">${t.title}</span>${i===_radioTrack && musicPlaying?'<span class="radio-track-eq"><span></span><span></span><span></span></span>':''}</div>`).join('')}
+            ${!hasTracks ? '<div class="radio-empty">Nenhuma música nesta estação.<br>Use o botão acima para enviar arquivos de áudio.</div>' :
+            st.tracks.map((t,i) => `<div class="radio-track ${i===_radioTrack?'on':''}" onclick="musicPlay(${i})"><span class="radio-track-num">${i+1}</span><span class="radio-track-title">${t.title}</span>${i===_radioTrack && musicPlaying?'<span class="radio-track-eq"><span></span><span></span><span></span></span>':''}
+            <button class="radio-track-del" onclick="event.stopPropagation();radioDelete('${st.key}','${t.id}','${t.fileName}')" title="Remover">🗑</button></div>`).join('')}
         </div>`;
     }
     buildRadioPanel();
     document.body.appendChild(musicPanel);
 
-    // Hidden YT iframe
-    const ytDiv = document.createElement('div');
-    ytDiv.id = 'yt-player';
-    ytDiv.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
-    document.body.appendChild(ytDiv);
-
-    // Load YT API
-    const ytScript = document.createElement('script');
-    ytScript.src = 'https://www.youtube.com/iframe_api';
-    document.head.appendChild(ytScript);
-
-    window.onYouTubeIframeAPIReady = function() {
-        ytPlayer = new YT.Player('yt-player', {
-            height: '1', width: '1',
-            videoId: currentTrack().id,
-            playerVars: { autoplay:0, controls:0, disablekb:1, fs:0, modestbranding:1, rel:0 },
-            events: {
-                onReady: () => { ytPlayer.setVolume(MUSIC_VOL); },
-                onStateChange: (e) => {
-                    if (e.data === YT.PlayerState.ENDED) { _radioSkipCount = 0; musicNext(); }
-                    if (e.data === YT.PlayerState.PLAYING) {
-                        _radioSkipCount = 0;
-                        clearTimeout(window._radioSkipTimer);
-                    }
-                    musicPlaying = e.data === YT.PlayerState.PLAYING;
-                    updateMusicUI();
-                },
-                onError: (e) => {
-                    console.warn('[Radio] Video error code', e.data);
-                    _radioSkipCount++;
-                    if (_radioSkipCount < MAX_CONSECUTIVE_SKIPS) {
-                        setTimeout(musicNext, 1500);
-                    } else {
-                        console.warn('[Radio] Muitas falhas seguidas, parando.');
-                        musicPlaying = false;
-                        updateMusicUI();
-                    }
-                }
+    // Upload audio to Firebase Storage + save metadata to DB
+    window.radioUpload = async function(files) {
+        if (!files || files.length === 0) return;
+        _radioUploading = true;
+        updateMusicUI();
+        const stKey = currentStation().key;
+        for (const file of files) {
+            try {
+                const ext = file.name.split('.').pop();
+                const safeName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                const storageRef = storage.ref('radio/' + stKey + '/' + safeName);
+                await storageRef.put(file);
+                const url = await storageRef.getDownloadURL();
+                const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+                await db.ref('radio/' + stKey).push({ title, url, fileName: safeName });
+            } catch (e) {
+                console.error('[Radio] Upload error:', e);
+                alert('Erro ao enviar ' + file.name + ': ' + e.message);
             }
-        });
+        }
+        _radioUploading = false;
+        updateMusicUI();
     };
 
-    // Autoplay on first user interaction
-    function tryAutoplay() {
-        if (ytPlayer?.playVideo && !musicPlaying) ytPlayer.playVideo();
-        document.removeEventListener('click', tryAutoplay);
-        document.removeEventListener('keydown', tryAutoplay);
-        document.removeEventListener('scroll', tryAutoplay);
-    }
-    document.addEventListener('click', tryAutoplay);
-    document.addEventListener('keydown', tryAutoplay);
-    document.addEventListener('scroll', tryAutoplay);
+    // Delete track
+    window.radioDelete = async function(stKey, trackId, fileName) {
+        if (!confirm('Remover esta música?')) return;
+        try {
+            await db.ref('radio/' + stKey + '/' + trackId).remove();
+            if (fileName) {
+                try { await storage.ref('radio/' + stKey + '/' + fileName).delete(); } catch(e) {}
+            }
+        } catch(e) {
+            console.error('[Radio] Delete error:', e);
+        }
+    };
 
     function updateMusicUI() {
         const tr = currentTrack();
         const titleEl = document.getElementById('music-title');
         const btn = document.getElementById('music-btn');
-        if (titleEl) titleEl.textContent = musicPlaying ? tr.title : 'PROFA FM';
+        if (titleEl) titleEl.textContent = musicPlaying ? (tr?.title || 'PROFA FM') : 'PROFA FM';
         if (btn) btn.classList.toggle('playing', musicPlaying);
         buildRadioPanel();
     }
@@ -2692,40 +2679,55 @@
     window.switchStation = function(idx) {
         _radioStation = idx;
         _radioTrack = 0;
-        _radioSkipCount = 0;
         localStorage.setItem('profa_radio_station', String(idx));
         localStorage.setItem('profa_radio_track', '0');
-        if (ytPlayer?.loadVideoById) ytPlayer.loadVideoById(currentTrack().id);
+        audioPlayer.pause();
+        musicPlaying = false;
         updateMusicUI();
     };
 
     window.musicToggle = function() {
-        if (!ytPlayer?.playVideo) return;
-        if (musicPlaying) ytPlayer.pauseVideo(); else ytPlayer.playVideo();
+        const tracks = allTracks();
+        if (!tracks.length) return;
+        if (musicPlaying) {
+            audioPlayer.pause();
+        } else {
+            const tr = currentTrack();
+            if (tr && tr.url) {
+                if (audioPlayer.src !== tr.url) audioPlayer.src = tr.url;
+                audioPlayer.play().catch(e => console.warn('[Radio] Play blocked:', e));
+            }
+        }
     };
     window.musicPlay = function(i) {
-        _radioTrack = i;
-        _radioSkipCount = 0;
-        localStorage.setItem('profa_radio_track', String(i));
-        clearTimeout(window._radioSkipTimer);
-        if (ytPlayer?.loadVideoById) {
-            ytPlayer.loadVideoById(currentTrack().id);
+        const tracks = allTracks();
+        if (!tracks.length) return;
+        _radioTrack = i % tracks.length;
+        localStorage.setItem('profa_radio_track', String(_radioTrack));
+        const tr = currentTrack();
+        if (tr && tr.url) {
+            audioPlayer.src = tr.url;
+            audioPlayer.play().catch(e => console.warn('[Radio] Play blocked:', e));
         }
         updateMusicUI();
     };
     window.musicNext = function() {
+        const tracks = allTracks();
+        if (!tracks.length) return;
         if (_radioShuffle) {
-            musicPlay(Math.floor(Math.random() * allTracks().length));
+            musicPlay(Math.floor(Math.random() * tracks.length));
         } else {
-            musicPlay((_radioTrack + 1) % allTracks().length);
+            musicPlay((_radioTrack + 1) % tracks.length);
         }
     };
     window.musicPrev = function() {
-        musicPlay((_radioTrack - 1 + allTracks().length) % allTracks().length);
+        const tracks = allTracks();
+        if (!tracks.length) return;
+        musicPlay((_radioTrack - 1 + tracks.length) % tracks.length);
     };
     window.musicVol = function(v) {
         const vol = parseInt(v);
-        if (ytPlayer?.setVolume) ytPlayer.setVolume(vol);
+        audioPlayer.volume = vol / 100;
         localStorage.setItem('profa_radio_vol', String(vol));
         const valEl = document.getElementById('radio-vol-val');
         if (valEl) valEl.textContent = vol;
