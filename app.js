@@ -404,6 +404,12 @@
     function playerIcon(idx, defaultIcon) { return getCustomIcon(idx) || defaultIcon || 5885; }
     const modeName= m => ({CLASSIC:"Summoner's Rift",ARAM:'ARAM',TUTORIAL:'Tutorial'})[m]||m||'Normal';
     const rankCls = t => t?`rank-${t.toLowerCase()}`:'';
+    // Get best ranked entry: Solo Q first, Flex as fallback
+    function getBestRanked(league) {
+        const le = Array.isArray(league) ? league : [];
+        return le.find(e => e.queueType === 'RANKED_SOLO_5x5') || le.find(e => e.queueType === 'RANKED_FLEX_SR') || null;
+    }
+    function isFlex(entry) { return entry?.queueType === 'RANKED_FLEX_SR'; }
     const drgEmoji= d => ({ocean:'🌊',infernal:'🔥',cloud:'💨',mountain:'⛰️',elder:'🐲',hextech:'⚡',chemtech:'☣️'})[d]||'🔥';
     const profFB  = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%2316213e%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%238892b0%22 font-size=%2250%22>?</text></svg>`;
     const F       = `onerror="this.onerror=null;this.src='${profFB}'"`;
@@ -620,8 +626,8 @@
         const topCount = Object.entries(champCount).sort((a,b)=>b[1]-a[1])[0]?.[1] || 0;
         const uniqueChamps = Object.keys(champCount).length;
 
-        // Solo rank
-        const solo = Array.isArray(league) ? league.find(e => e.queueType === 'RANKED_SOLO_5x5') : null;
+        // Best rank (Solo Q or Flex fallback)
+        const solo = getBestRanked(league);
         const tier = solo?.tier || '';
 
         // Build pool of applicable analytical comments (corporate-analyst tone, nonsense)
@@ -1203,7 +1209,8 @@
             const p = PLAYERS[i];
             const s = d.summoner || {}, le = Array.isArray(d.league) ? d.league : [], mt = Array.isArray(d.matches) ? d.matches : [];
             const ic = playerIcon(i, s.profileIconId), lv = s.summonerLevel || '?';
-            const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
+            const solo = getBestRanked(le);
+            const isFlexData = isFlex(solo);
             const wr = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
             const recent = mt.length
                 ? [...mt].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))[0]
@@ -1269,7 +1276,7 @@
                 </div>
             </div>
             ${solo
-                ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>`
+                ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}${isFlexData?' <small style="opacity:.6">(Flex)</small>':''}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>`
                 : `<div class="pn">Sem ranked</div>`}
             ${rChId ? `<div class="lr">
                 <img src="${champImg(rChId)}" style="width:22px;height:22px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
@@ -1296,7 +1303,7 @@
                 const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
                 const rankOrder = {I:3,II:2,III:1,IV:0};
                 const totalLP = (tierOrder[solo.tier]||0)*400 + (rankOrder[solo.rank]||0)*100 + (solo.leaguePoints||0);
-                return { name: d.account.gameName||p.name, tier: solo.tier, rank: solo.rank, lp: solo.leaguePoints||0, totalLP, wins: solo.wins||0, losses: solo.losses||0, idx: i, icon: playerIcon(i, s.profileIconId) };
+                return { name: d.account.gameName||p.name, tier: solo.tier, rank: solo.rank, lp: solo.leaguePoints||0, totalLP, wins: solo.wins||0, losses: solo.losses||0, idx: i, icon: playerIcon(i, s.profileIconId), flex: isFlexData };
             }
             return null;
         }
@@ -1444,7 +1451,7 @@
                     <img src="${profImg(d.icon)}" alt="" class="soloq-lc-icon" ${F}>
                     <div>
                         <div class="soloq-lc-name">${d.name}${isNoob?' 🤡':''}</div>
-                        <div class="soloq-lc-tier ${rankCls(d.tier)}">${d.tier} ${d.rank}</div>
+                        <div class="soloq-lc-tier ${rankCls(d.tier)}">${d.tier} ${d.rank}${d.flex?' <small style="opacity:.55;font-weight:400;">(Flex)</small>':''}</div>
                     </div>
                 </div>
                 <div class="soloq-lc-stats">
@@ -1951,10 +1958,11 @@
                 ${tabList.map((t,ti) => `<button class="prof-tab ${ti===0?'on':''}" data-tab="${t.k}" onclick="switchProfTab('${t.k}')">${t.l}</button>`).join('')}
             </div>`;
 
-            const rb = solo
-                ? `<span class="prg ${rankCls(solo.tier)}">${solo.tier} ${solo.rank} &mdash; ${solo.leaguePoints} LP</span>`
+            const mainRank = solo || flex;
+            const rb = mainRank
+                ? `<span class="prg ${rankCls(mainRank.tier)}">${mainRank.tier} ${mainRank.rank} &mdash; ${mainRank.leaguePoints} LP${!solo&&flex?' (Flex)':''}</span>`
                 : `<span class="prg">Não posicionado</span>`;
-            const flexBadge = flex
+            const flexBadge = (solo && flex)
                 ? `<span class="prg prg-flex">${flex.tier} ${flex.rank} Flex</span>`
                 : '';
 
@@ -3106,8 +3114,8 @@
             const [da, ddb] = await Promise.all([loadPlayer(ai), loadPlayer(bi)]);
             const pa = PLAYERS[ai], pb = PLAYERS[bi];
             const leA = Array.isArray(da.league)?da.league:[], leB = Array.isArray(ddb.league)?ddb.league:[];
-            const sa = leA.find(e=>e.queueType==='RANKED_SOLO_5x5');
-            const sb = leB.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const sa = getBestRanked(leA);
+            const sb = getBestRanked(leB);
 
             function pStats(d) {
                 const mt = Array.isArray(d.matches)?d.matches:[], ac = d.account||{};
@@ -3275,7 +3283,7 @@
         PLAYERS.forEach((p, i) => {
             const d = allData[i];
             if (!d) return;
-            const solo = d.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const solo = getBestRanked(d.league);
             if (solo) eloDistro[solo.tier] = (eloDistro[solo.tier]||0)+1;
             let pK=0,pD=0,pA=0,pW=0,pG=0;
             (d.matches||[]).forEach(m => {
@@ -3469,7 +3477,7 @@
                     const first = vals.find(v => v !== undefined), last = vals.filter(v => v !== undefined).pop();
                     const diff = (first !== undefined && last !== undefined) ? last - first : 0;
                     const ps2 = playerStats.find(s => s.name === name);
-                    const solo2 = ps2 ? allData[ps2.idx]?.league?.find(e=>e.queueType==='RANKED_SOLO_5x5') : null;
+                    const solo2 = ps2 ? getBestRanked(allData[ps2.idx]?.league) : null;
                     const color = tierColors2[solo2?.tier] || 'var(--pri)';
                     tableHtml += `<tr><td style="color:${color};font-weight:700;">${name}</td>`;
                     vals.forEach(v => { tableHtml += `<td>${v!==undefined?v:'—'}</td>`; });
@@ -3754,7 +3762,7 @@
                 pentas+=mp.pentaKills||0;
             });
             // LP change this week
-            const solo = d.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+            const solo = getBestRanked(d.league);
             const currentLP = solo ? calcTotalLP(solo.tier, solo.rank, solo.leaguePoints||0) : 0;
             const lpHist = JSON.parse(localStorage.getItem('soloq_history')||'{}');
             const weekDates = Object.keys(lpHist).sort();
@@ -4512,9 +4520,9 @@
                 if (idx === undefined) { el.innerHTML = ''; continue; }
                 const d = cache[idx] || await loadPlayerFast(idx).catch(()=>null);
                 if (!d) { el.innerHTML = '<span style="color:var(--dim);font-size:.8em;">Indisponível</span>'; continue; }
-                const solo = d.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+                const solo = getBestRanked(d.league);
                 const ic = playerIcon(idx, d.summoner?.profileIconId);
-                el.innerHTML = `<img src="${profImg(ic)}" class="tb-icon" ${F}><span class="${rankCls(solo?.tier)}" style="font-weight:700;font-size:.85em;">${solo?solo.tier+' '+solo.rank:'Unranked'}</span>`;
+                el.innerHTML = `<img src="${profImg(ic)}" class="tb-icon" ${F}><span class="${rankCls(solo?.tier)}" style="font-weight:700;font-size:.85em;">${solo?solo.tier+' '+solo.rank+(isFlex(solo)?' <small style="opacity:.5">(F)</small>':''):'Unranked'}</span>`;
             }
 
             // Summary
@@ -4525,7 +4533,7 @@
             let totalLP = 0, count = 0;
             for (const [r, idx] of Object.entries(selected)) {
                 const d = cache[idx];
-                const solo = d?.league?.find(e=>e.queueType==='RANKED_SOLO_5x5');
+                const solo = getBestRanked(d?.league);
                 if (solo) {
                     const tierOrder = {CHALLENGER:9,GRANDMASTER:8,MASTER:7,DIAMOND:6,EMERALD:5,PLATINUM:4,GOLD:3,SILVER:2,BRONZE:1,IRON:0};
                     const rankOrder = {I:3,II:2,III:1,IV:0};
