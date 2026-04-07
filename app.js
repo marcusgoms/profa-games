@@ -624,120 +624,120 @@
         const solo = Array.isArray(league) ? league.find(e => e.queueType === 'RANKED_SOLO_5x5') : null;
         const tier = solo?.tier || '';
 
-        // Build pool of applicable comments
+        // Build pool of applicable analytical comments (corporate-analyst tone, nonsense)
         const pool = [];
         const n = playerName;
 
         // KDA-based
         if (kda >= 5) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} tem um KDA de ${kda.toFixed(1)}. Isso é o que acontece quando você tem a disciplina de um fazendeiro de beterrabas. Fato."` });
-            pool.push({ icon:'🎬', char:'Michael', txt:`"Eu não estou dizendo que ${n} é o melhor jogador do mundo. Estou dizendo que o mundo é o melhor jogador de ${n}. Esperem... isso fez sentido? O KDA fez."` });
+            pool.push({ icon:'📊', txt:`Auditoria trimestral: ${n} opera com KDA de ${kda.toFixed(1)} — índice de eficiência letal que coloca 97% do servidor em situação de compliance negativa. Relatório arquivado.` });
+            pool.push({ icon:'📈', txt:`O board executivo precisa saber: ${n} entrega um KDA de ${kda.toFixed(1)}. Em termos de ROI por teamfight, isso é retorno garantido. Recomendação: manter o ativo.` });
         } else if (kda >= 3) {
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} com KDA de ${kda.toFixed(1)}. Honestamente, é tipo assistir alguém fazer o mínimo... mas com estilo. *olha pra câmera*"` });
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} é o jogador completo. Mata, morre às vezes, assiste bastante... tipo eu numa reunião. Presente, mas contribuindo? Questionável."` });
+            pool.push({ icon:'📋', txt:`${n} apresenta KDA de ${kda.toFixed(1)}. Pelos padrões de consultoria em Summoner's Rift, está no quartil superior de "faz o básico sem destruir a operação". Aceitável.` });
+            pool.push({ icon:'📈', txt:`Análise proprietária indica: KDA de ${kda.toFixed(1)} posiciona ${n} na categoria "Funcionário do Mês". Certificado pendente de aprovação do comitê.` });
         } else if (kda < 1.5) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"KDA de ${kda.toFixed(1)}. Em Schrute Farms, nós chamaríamos ${n} de... o espantalho. Está lá, mas ninguém tem medo."` });
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} tem um KDA que me faz chorar. E olha que eu choro vendo propaganda de margarina. ${kda.toFixed(1)}... isso é nota de prova, não KDA."` });
-            pool.push({ icon:'🧑‍💼', char:'Toby', txt:`"Tecnicamente o KDA de ${n} está dentro dos padrões aceitáveis de—" "NINGUÉM PERGUNTOU, TOBY.""` });
+            pool.push({ icon:'📊', txt:`KDA de ${kda.toFixed(1)}. Caso submetido ao departamento de gestão de riscos. Conclusão: ${n} É o risco. O relatório de 47 páginas está disponível mediante requisição formal.` });
+            pool.push({ icon:'📈', txt:`Reunião de emergência convocada sobre o KDA de ${n}. ${kda.toFixed(1)}. O slide deck tem 3 gráficos e todos apontam pra baixo. Literalmente todos.` });
+            pool.push({ icon:'⚖️', txt:`De acordo com o manual de conduta interna, o KDA de ${n} está tecnicamente dentro dos limites legais de operação. Tecnicamente.` });
         }
 
         // Death-based
         if (avgD >= 8) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} morre em média ${avgD.toFixed(0)} vezes por jogo. Isso não é um jogador, é um minion com skin premium."` });
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} tem um dom. O dom de morrer. Se morrer desse LP, ${n} já era Challenger."` });
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} morre tanto que o respawn mandou cartão de fidelidade. *olha pra câmera* Tipo, com desconto no tempo cinza."` });
+            pool.push({ icon:'📊', txt:`${n} registra ${avgD.toFixed(1)} óbitos operacionais por partida. Em termos corporativos, isso é uma taxa de turnover de 100%. Do próprio corpo.` });
+            pool.push({ icon:'📈', txt:`Avaliação de RH: a média de ${avgD.toFixed(0)} mortes por jogo configura o que especialistas chamam de "demissão involuntária repetida". A cada 4 minutos.` });
+            pool.push({ icon:'📋', txt:`Análise de frequência de mortes de ${n} — ${avgD.toFixed(1)}/partida — sugere que a fonte cinza do respawn deveria cobrar taxa de utilização.` });
         } else if (avgD >= 6) {
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} morre ${avgD.toFixed(0)} vezes por jogo. Isso é tipo... o Kevin derramando chili. Triste, evitável, mas acontece toda vez."` });
+            pool.push({ icon:'📈', txt:`No dashboard de performance, ${n} aparece com ${avgD.toFixed(1)} mortes/jogo. O gráfico foi colorido de vermelho. Não por ser negativo — é que combina com o tema.` });
         } else if (avgD <= 2 && zeroDeathGames >= 2) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} é praticamente imortal. ${zeroDeathGames} jogos sem morrer. Como assistente regional do time, aprovo."` });
+            pool.push({ icon:'📊', txt:`${n} registrou ${zeroDeathGames} partidas com zero baixas. Caso submetido ao departamento de fenômenos inexplicáveis. Status: sob investigação.` });
         }
 
         // Kills-based
         if (avgK >= 10) {
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} matando ${avgK.toFixed(0)} por jogo?! THAT'S WHAT SHE— não, pera, isso é realmente impressionante."` });
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${avgK.toFixed(0)} kills por jogo. ${n} é a águia do time. Eu sou o falcão. Juntos, somos... pássaros mortais."` });
+            pool.push({ icon:'📈', txt:`${n} elimina em média ${avgK.toFixed(1)} oponentes por operação. Pela planilha interna — que tem fórmulas e tudo — isso classifica como "Top Performer". O título oficial é "Destruidor de Metas".` });
+            pool.push({ icon:'📊', txt:`${avgK.toFixed(1)} abates por missão. Isso coloca ${n} no percentil 95 de eliminações. Recomendação da auditoria: promoção imediata para carry designado.` });
         } else if (avgK <= 2) {
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} com ${avgK.toFixed(0)} kills por jogo. Não sei se tá jogando LoL ou fazenda do Facebook. *olha pra câmera*"` });
-            pool.push({ icon:'🧑‍💼', char:'Toby', txt:`"${n}, talvez devêssemos conversar sobre seus objetivos de—" "CALA A BOCA TOBY, NINGUÉM LIGA.""` });
+            pool.push({ icon:'📋', txt:`${n} com ${avgK.toFixed(1)} kills por jogo. Na consultoria, chamamos isso de "presença passiva" — está na reunião, câmera ligada, mas no mute. Permanentemente.` });
+            pool.push({ icon:'⚖️', txt:`Devolutiva agendada com ${n} sobre os indicadores de eliminação. Pauta: "Por que o gráfico de kills parece um eletrocardiograma em linha reta?"` });
         }
 
         // Win rate
         if (wr >= 70) {
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${wr.toFixed(0)}% de winrate. ${n} é o Golden Boy. Ou Girl. Eu sou super progressivo. O ponto é: WINNER."` });
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${wr.toFixed(0)}% WR. Eu teria ${wr.toFixed(0)+1}%, mas reconheço um soldado superior. Temporariamente."` });
+            pool.push({ icon:'📈', txt:`Comunicado ao conselho: ${wr.toFixed(0)}% de winrate. ${n} opera ${((wr-50)/50*100).toFixed(0)}% acima do benchmark do setor. Proposta de bônus trimestral em RP.` });
+            pool.push({ icon:'📊', txt:`${wr.toFixed(0)}% de taxa de sucesso. O benchmark é 50%. ${n} opera 1.${(wr-50).toFixed(0)}x acima do mercado. Análise SWOT confirma: zero fraquezas detectadas. Por enquanto.` });
         } else if (wr <= 30) {
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${wr.toFixed(0)}% de vitória. ${n}... querido... está tudo bem em casa? Quer um abraço? Eu vou te dar um abraço."` });
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} ganhando ${wr.toFixed(0)}% dos jogos é tipo o Michael fazendo discurso — todo mundo torce pra acabar logo."` });
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${wr.toFixed(0)}% de WR. Em qualquer civilização séria, ${n} já teria sido deportado para o TFT."` });
+            pool.push({ icon:'📈', txt:`Caso ${n}: ${wr.toFixed(0)}% de winrate. O gráfico de pizza foi gerado e... a fatia de derrota comeu a pizza inteira. Literalmente. Não sobrou pizza.` });
+            pool.push({ icon:'📋', txt:`O forecast de ${n} projeta ${wr.toFixed(0)}% de conversão. No mundo corporativo, isso geraria uma reunião de crise. Aqui, gera mais uma fila de derrota.` });
+            pool.push({ icon:'📊', txt:`${wr.toFixed(0)}% de WR. Pela metodologia Six Sigma, isso é um desvio de 4σ negativos. Recomendação formal: reestruturação completa do processo decisório.` });
         } else if (wr >= 50 && wr < 55) {
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} com ${wr.toFixed(0)}% WR. Perfeitamente medíocre. É tipo ser o cara que traz bolo pro escritório — ninguém reclama, ninguém aplaude."` });
+            pool.push({ icon:'📋', txt:`${n} mantém ${wr.toFixed(0)}% de WR. Na consultoria chamamos de "estabilidade operacional neutra". Em português: nem fede nem cheira. E tá tudo bem com isso.` });
         }
 
         // Vision
         if (avgVis <= 5) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} com visão score de ${avgVis.toFixed(0)}. Isso explica tudo. É tipo dirigir à noite com os faróis desligados. Na chuva. Vendado."` });
-            pool.push({ icon:'🎬', char:'Michael', txt:`"Ward? ${n} nem sabe o que é uma ward. E honestamente? Eu também não sabia até semana passada. Somos gêmeos."` });
+            pool.push({ icon:'📊', txt:`Setor de inteligência reporta: ${n} com score de visão ${avgVis.toFixed(0)}. Falha crítica de reconhecimento territorial. O mapa é escuro porque ${n} não acende.` });
+            pool.push({ icon:'📈', txt:`Relatório de infraestrutura: cobertura de wards de ${n} classificada como "inexistente". O heatmap gerado ficou... preto. Todo preto. Sem dados pra renderizar.` });
         } else if (avgVis >= 30) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"Visão score de ${avgVis.toFixed(0)}. ${n} vê tudo. Como eu. Eu tenho visão periférica de 240 graus. Isso é genético dos Schrute."` });
+            pool.push({ icon:'📊', txt:`Score de visão: ${avgVis.toFixed(0)}. ${n} opera o sistema de vigilância mais eficiente do squad. O departamento de segurança reconhece a excelência operacional.` });
         }
 
         // CS
         if (avgCS <= 80) {
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} farmando ${avgCS.toFixed(0)} CS por jogo. Nem os minions respeitam ${n} — eles simplesmente passam andando."` });
-            pool.push({ icon:'🎬', char:'Michael', txt:`"Quando eu pergunto pro ${n} sobre CS, ele diz 'CS? Counter Strike?' e eu não sei se tá zuando."` });
+            pool.push({ icon:'📋', txt:`${n} com média de ${avgCS.toFixed(0)} CS/jogo. Análise de produtividade indica operação a 40% da capacidade de farm. O restante é gasto... existindo.` });
+            pool.push({ icon:'📈', txt:`Report de farm de ${n}: ${avgCS.toFixed(0)} CS. O estagiário que plotou o gráfico perguntou se faltavam dados. Não faltavam. É isso mesmo.` });
         } else if (avgCS >= 200) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${avgCS.toFixed(0)} CS por jogo. ${n} é uma máquina de colheita. Como eu na temporada de beterraba. Respeito."` });
+            pool.push({ icon:'📊', txt:`${avgCS.toFixed(0)} CS por operação. Eficiência de extração de recursos no percentil 90. ${n} é o CFO que esse time precisa. Nomeação pendente de aprovação.` });
         }
 
         // Champion pool
         if (topCount >= 6 && games >= 8) {
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} jogou de ${topChamp} ${topCount} vezes nos últimos ${games} jogos. OTP? Não. Obcecado? Definitivamente. *olha pra câmera*"` });
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${topCount} jogos de ${topChamp}. Isso se chama lealdade. Algo que Jim nunca entenderia."` });
+            pool.push({ icon:'📋', txt:`${n} selecionou ${topChamp} em ${topCount} de ${games} operações recentes. Os dados sugerem dependência operacional de ativo único. Índice de diversificação: 0.` });
+            pool.push({ icon:'📊', txt:`${topCount} deployments de ${topChamp}. Concentração de portfólio excede todos os limites prudenciais. Nota do analista: admiro a convicção. É arriscado, mas admiro.` });
         } else if (uniqueChamps >= 8) {
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} jogou ${uniqueChamps} campeões diferentes. É tipo meu humor — imprevisível, caótico, mas no fundo... ainda confuso."` });
+            pool.push({ icon:'📈', txt:`${n} rotacionou ${uniqueChamps} campeões diferentes. No PowerPoint interno isso se chama "Estratégia de Diversificação Agressiva". Ou como o time chama: "não sabe o que quer".` });
         }
 
         // Pentas
         if (pentas > 0) {
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} FEZ UM PENTA! UM PENTA! Alguém tira foto! Isso vai pro mural! ISSO VAI PRO LINKEDIN!"` });
-            pool.push({ icon:'📎', char:'Dwight', txt:`"Pentakill. O equivalente moderno de um guerreiro Schrute derrotando cinco lobos. Com as mãos. No inverno."` });
+            pool.push({ icon:'📈', txt:`COMUNICADO OFICIAL: ${n} registrou um Pentakill. O departamento de marketing foi notificado. Press release, banner e troféu em produção.` });
+            pool.push({ icon:'📊', txt:`Pentakill confirmado e auditado. Eliminação quintupla sequencial em ambiente competitivo. Probabilidade estatística: 0.03%. Mérito operacional: absoluto.` });
         }
 
         // Max deaths in a single game
         if (maxDeaths >= 12) {
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} morreu ${maxDeaths} vezes num jogo. Eu acho que o inimigo colocou ${n} no speed dial."` });
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${maxDeaths} mortes num jogo. ${n}, isso não é inting, é performance art. E como toda arte... ninguém entendeu."` });
+            pool.push({ icon:'📋', txt:`Pico de ${maxDeaths} mortes em uma sessão. Na consultoria, isso é o que chamamos de "evento catastrófico isolado". Exceto que não é isolado. Acontece com frequência.` });
+            pool.push({ icon:'📈', txt:`${maxDeaths} mortes num jogo. Isso foi apresentado no all-hands. A sala ficou em silêncio. Não era respeito. Era choque.` });
         }
 
         // First bloods
         if (firstBloods >= 3) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} pega first blood como se fosse café da manhã. ${firstBloods} vezes em ${games} jogos. Predador nato."` });
+            pool.push({ icon:'📊', txt:`${n} registrou first blood em ${firstBloods} de ${games} operações. Taxa de abertura letal de ${((firstBloods/games)*100).toFixed(0)}%. O departamento de aquisições agressivas aprova.` });
         }
 
         // Damage
         if (avgDmg >= 25000) {
-            pool.push({ icon:'📎', char:'Dwight', txt:`"${n} causa ${(avgDmg/1000).toFixed(0)}K de dano por jogo. Fato: isso é mais dano que uma bazuca num urso. Eu testei."` });
+            pool.push({ icon:'📊', txt:`Output de dano: ${(avgDmg/1000).toFixed(0)}K por partida. ${n} opera como departamento de artilharia pesada. Custo por eliminação: altamente eficiente. Promoção no organograma recomendada.` });
         } else if (avgDmg <= 8000) {
-            pool.push({ icon:'📋', char:'Jim', txt:`"${(avgDmg/1000).toFixed(0)}K de dano por jogo. ${n} tá jogando LoL ou Stardew Valley? Genuinamente perguntando."` });
-            pool.push({ icon:'🎬', char:'Michael', txt:`"O dano de ${n} é tão baixo que os inimigos mandaram mensagem perguntando se tá AFK. Tava não, né ${n}? ...né?"` });
+            pool.push({ icon:'📋', txt:`${(avgDmg/1000).toFixed(0)}K de dano médio. Segundo auditoria de impacto, ${n} causa menos dano que uma ward expirada. E a ward nem ataca.` });
+            pool.push({ icon:'📈', txt:`O dano de ${n} não apareceu no gráfico. Parecia bug. Não era. São ${(avgDmg/1000).toFixed(0)}K. O Excel arredondou pra "irrelevante". Decisão autônoma do software.` });
         }
 
         // Rank
         if (tier === 'IRON') {
-            pool.push({ icon:'🎬', char:'Michael', txt:`"${n} é Ferro. FERRO. Isso significa que... é forte? Ferro é forte. Eu vou com essa interpretação."` });
-            pool.push({ icon:'📎', char:'Dwight', txt:`"Iron. O rank mais baixo. Em qualquer sociedade funcional, ${n} seria exilado para jogar Minecraft."` });
+            pool.push({ icon:'📈', txt:`${n} está classificado como Iron. Na escala corporativa, isso equivale a estagiário de outro departamento que entrou pela porta errada.` });
+            pool.push({ icon:'📊', txt:`Rank: Iron. Classificação mínima do sistema. Análise de 200 páginas conclui que o potencial de crescimento é... estatisticamente o único caminho possível.` });
         } else if (tier === 'CHALLENGER') {
-            pool.push({ icon:'🎬', char:'Michael', txt:`"CHALLENGER?! ${n} É CHALLENGER? E eu nem sabia?! Eu preciso de um autógrafo. AGORA. Onde assina?"` });
+            pool.push({ icon:'📈', txt:`${n} atingiu Challenger. O equivalente a CEO do servidor. E-mail corporativo em distribuição para toda a base. Com cópia oculta pro arquivo.` });
         } else if (tier === 'BRONZE') {
-            pool.push({ icon:'📋', char:'Jim', txt:`"${n} é Bronze. Não no jogo — como medalha olímpica. Terceiro lugar de baixo pra cima. Mas ei, pódio é pódio."` });
+            pool.push({ icon:'📋', txt:`${n} opera no tier Bronze. Na metodologia OKR, o resultado-chave atingido foi... existir no ranking. O objetivo mínimo viável está tecnicamente cumprido.` });
         }
 
         // Generic fallbacks
-        pool.push({ icon:'🎬', char:'Michael', txt:`"${n} é como pizza de escritório. Não é gourmet, mas todo mundo quer. E reclama. Mas come."` });
-        pool.push({ icon:'📎', char:'Dwight', txt:`"Eu analisei as stats de ${n} e posso confirmar: é um jogador. No sentido mais literal e não-elogioso da palavra."` });
-        pool.push({ icon:'📋', char:'Jim', txt:`"Assistir ${n} jogar é tipo assistir o Michael aprender Excel. Você sabe que vai dar errado, mas não consegue parar de olhar."` });
-        pool.push({ icon:'🧑‍💼', char:'Toby', txt:`"Eu preparei um relatório detalhado sobre o desempenho de ${n}—" "TOBY, PELA ÚLTIMA VEZ, VAI PRA ANNEX!""` });
-        pool.push({ icon:'🎬', char:'Michael', txt:`"Se o time fosse The Office, ${n} seria... não o Toby. Qualquer um menos o Toby. Talvez um Kevin? Com potencial!"` });
+        pool.push({ icon:'📈', txt:`Análise 360° de ${n} concluída. Resultado do comitê: desempenho classificado como "dentro das expectativas". Que expectativas? Não foram definidas. Mas está dentro.` });
+        pool.push({ icon:'📊', txt:`Due diligence das métricas de ${n} finalizada. Os indicadores estão todos... presentes. No sentido de que existem números. A qualidade é um debate em aberto.` });
+        pool.push({ icon:'📋', txt:`Relatório final sobre ${n}: "Está jogando." Fim do relatório. Três páginas de capa, índice e bibliografia pra essa conclusão.` });
+        pool.push({ icon:'⚖️', txt:`Parecer de compliance sobre os KPIs de ${n} com base nas diretrizes do capítulo 7, seção 3.2.1. Resultado: inconclusivo. Como sempre.` });
+        pool.push({ icon:'📈', txt:`Se esse squad fosse uma empresa, ${n} seria o departamento que ninguém sabe o que faz, mas todo trimestre entrega um relatório. Que ninguém lê.` });
 
         // Pick 1 random based on a daily seed (changes once per day per player)
         const daySeed = Math.floor(Date.now() / 86400000) + (playerName.charCodeAt(0)||0);
@@ -1280,7 +1280,7 @@
             ${(() => {
                 const comment = generateOfficeComment(d.account?.gameName||p.name, mt, d.account, d.league);
                 return comment ? `<div class="office-comment">
-                    <div class="office-comment-char"><span class="office-comment-icon">${comment.icon}</span> ${comment.char}</div>
+                    <div class="office-comment-char"><span class="office-comment-icon">${comment.icon}</span> Análise de Performance</div>
                     <div class="office-comment-txt">${comment.txt}</div>
                 </div>` : '';
             })()}
