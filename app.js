@@ -1515,13 +1515,14 @@
         data.forEach(d => {
             dates.forEach(dt => { if (history[dt]?.[d.name] !== undefined) allVals.push(history[dt][d.name]); });
         });
-        // Snap range to elo boundaries
+        // Snap range to only the elo tiers where players actually are
         const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
-        // Find the tier below min and tier above max
         let minTierIdx = Math.max(0, Math.floor(rawMin / 400));
-        let maxTierIdx = Math.min(tierList.length - 1, Math.floor(rawMax / 400) + 1);
-        const minY = minTierIdx * 400;
-        const maxY = (maxTierIdx + 1) * 400;
+        let maxTierIdx = Math.min(tierList.length - 1, Math.floor(rawMax / 400));
+        // Ensure at least 1 tier gap for readability
+        if (minTierIdx === maxTierIdx && minTierIdx > 0) minTierIdx--;
+        const minY = minTierIdx * 400 - 50; // small padding below lowest elo
+        const maxY = (maxTierIdx + 1) * 400 + 50; // small padding above highest elo
         const rangeY = maxY - minY || 400;
 
         const xStep = dates.length > 1 ? cw / (dates.length - 1) : cw;
@@ -1661,7 +1662,7 @@
             const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
             const flex = le.find(e => e.queueType === 'RANKED_FLEX_SR');
             // RPG class theme on profile
-            const rpgData = calcRPGStats(mt, a.puuid);
+            const rpgData = calcRPGStats(mt, a.puuid, d.league);
             if (rpgData) {
                 const pv = document.querySelector('.pv');
                 if (pv) {
@@ -3866,7 +3867,7 @@
         return r;
     }
 
-    function calcRPGStats(matches, puuid) {
+    function calcRPGStats(matches, puuid, league) {
         const recent = [...matches]
             .filter(m => m?.info?.participants)
             .sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))
@@ -3898,17 +3899,33 @@
         const winRate = (wins/n)*100;
 
         // Normalize stats to 0-100 scale (approximate benchmarks)
-        const atk = Math.min(100, (avgDPM / 800) * 100);       // DPM: 800+ = max
-        const def = Math.min(100, Math.max(0, (1 - (deaths/n)/8) * 100)); // Low deaths = high def
-        const agi = Math.min(100, (avgKDA / 6) * 100);         // KDA: 6+ = max
-        const int = Math.min(100, (avgVision / 40) * 100);     // Vision: 40+ = max
-        const fr = Math.min(100, (avgGPM / 500) * 100);        // GPM: 500+ = max
-        const sab = Math.min(100, winRate);                     // Win rate direct
+        let atk = Math.min(100, (avgDPM / 800) * 100);       // DPM: 800+ = max
+        let def = Math.min(100, Math.max(0, (1 - (deaths/n)/8) * 100)); // Low deaths = high def
+        let agi = Math.min(100, (avgKDA / 6) * 100);         // KDA: 6+ = max
+        let int_stat = Math.min(100, (avgVision / 40) * 100);     // Vision: 40+ = max
+        let fr = Math.min(100, (avgGPM / 500) * 100);        // GPM: 500+ = max
+        let sab = Math.min(100, winRate);                     // Win rate direct
 
-        const power = ((atk + def + agi + int + fr + sab) / 6);
+        // Elo bonus: ranked tier boosts all stats proportionally
+        const ranked = getBestRanked(Array.isArray(league) ? league : []);
+        let eloBonus = 0;
+        if (ranked) {
+            const tierVal = {IRON:0,BRONZE:1,SILVER:2,GOLD:3,PLATINUM:4,EMERALD:5,DIAMOND:6,MASTER:7,GRANDMASTER:8,CHALLENGER:9};
+            const rankVal = {IV:0,III:1,II:2,I:3};
+            const eloScore = (tierVal[ranked.tier]||0)*4 + (rankVal[ranked.rank]||0); // 0-39
+            eloBonus = (eloScore / 39) * 15; // Up to +15 bonus across stats
+        }
+        atk = Math.min(100, atk + eloBonus);
+        def = Math.min(100, def + eloBonus);
+        agi = Math.min(100, agi + eloBonus);
+        int_stat = Math.min(100, int_stat + eloBonus);
+        fr = Math.min(100, fr + eloBonus);
+        sab = Math.min(100, sab + eloBonus);
+
+        const power = ((atk + def + agi + int_stat + fr + sab) / 6);
 
         // Determine class by dominant stat
-        const statMap = { atk, def, agi, int, for: fr, sab };
+        const statMap = { atk, def, agi, int: int_stat, for: fr, sab };
         let dominant = 'atk', dominantVal = 0;
         for (const [k,v] of Object.entries(statMap)) {
             if (v > dominantVal) { dominantVal = v; dominant = k; }
@@ -3918,7 +3935,7 @@
 
         // Virtudes e Defeitos baseados nos stats
         const virtues = [], flaws = [];
-        const ra = Math.round(atk), rd = Math.round(def), rag = Math.round(agi), ri = Math.round(int), rf = Math.round(fr), rs = Math.round(sab);
+        const ra = Math.round(atk), rd = Math.round(def), rag = Math.round(agi), ri = Math.round(int_stat), rf = Math.round(fr), rs = Math.round(sab);
         if (ra >= 70) virtues.push({ icon:'⚔️', text:'Dano devastador' });
         else if (ra < 30) flaws.push({ icon:'⚔️', text:'Dano fraco' });
         if (rd >= 70) virtues.push({ icon:'🛡️', text:'Sobrevivente nato' });
@@ -4094,6 +4111,9 @@
                 <p>Cada guerreiro forjado pelas últimas 20 batalhas — stats reais, ranks únicos</p>
                 <div class="rpg-hero-actions">
                     <button class="rpg-action-btn" onclick="showBattle()">⚔️ Batalha 1v1</button>
+                    <button class="rpg-action-btn" onclick="showTeamBattle()">👥 Times</button>
+                    <button class="rpg-action-btn" onclick="showTournament()">🏆 Torneio</button>
+                    <button class="rpg-action-btn" onclick="showRankingLadder()">📊 Ranking</button>
                     <button class="rpg-action-btn" onclick="showSquadPredictions()">🎯 Palpites</button>
                 </div>
             </div>
@@ -4145,7 +4165,7 @@
                 const mt = Array.isArray(d.matches) ? d.matches : [];
                 const puuid = d.account?.puuid;
                 if (!puuid || !mt.length) { allRPGStats[i]=null; return renderRPGCardEmpty(i, p, d); }
-                const stats = calcRPGStats(mt, puuid);
+                const stats = calcRPGStats(mt, puuid, d.league);
                 if (!stats) { allRPGStats[i]=null; return renderRPGCardEmpty(i, p, d); }
                 stats.idx = i;
                 allRPGStats[i] = stats;
@@ -4303,8 +4323,8 @@
         arena.innerHTML = '<div class="ld"><div class="sp"></div></div>';
         const [d1, d2] = await Promise.all([loadPlayer(i1), loadPlayer(i2)]);
         const mt1=Array.isArray(d1.matches)?d1.matches:[], mt2=Array.isArray(d2.matches)?d2.matches:[];
-        const s1 = calcRPGStats(mt1, d1.account?.puuid);
-        const s2 = calcRPGStats(mt2, d2.account?.puuid);
+        const s1 = calcRPGStats(mt1, d1.account?.puuid, d1.league);
+        const s2 = calcRPGStats(mt2, d2.account?.puuid, d2.league);
         if (!s1 || !s2) { arena.innerHTML = '<p style="color:var(--dim);text-align:center;">Dados insuficientes</p>'; return; }
 
         // Compare stats
@@ -4367,6 +4387,303 @@
         }, 200);
     };
 
+    // ======================== TEAM BATTLE ========================
+    window.showTeamBattle = function() {
+        const modal = document.createElement('div');
+        modal.id = 'team-battle-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `<div class="modal-box battle-box" style="max-width:700px;">
+            <button class="modal-close" onclick="document.getElementById('team-battle-modal').remove()">&times;</button>
+            <div class="modal-header"><h2>⚔️ Batalha em Equipe</h2><p>Divida o squad em dois times e descubra quem vence!</p></div>
+            <div class="team-battle-mode">
+                <button class="rpg-action-btn" onclick="randomTeamBattle()" style="margin:6px;">🎲 Times Aleatórios</button>
+                <button class="rpg-action-btn" onclick="draftTeamBattle()" style="margin:6px;">📋 Escolher Times</button>
+            </div>
+            <div id="team-battle-arena"></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+    };
+
+    window.randomTeamBattle = async function() {
+        const arena = document.getElementById('team-battle-arena');
+        if (!arena) return;
+        arena.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        // Shuffle players and split
+        const indices = PLAYERS.map((_,i) => i);
+        for (let i = indices.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [indices[i],indices[j]]=[indices[j],indices[i]]; }
+        const half = Math.ceil(indices.length / 2);
+        const team1 = indices.slice(0, half);
+        const team2 = indices.slice(half);
+        await executeTeamBattle(arena, team1, team2);
+    };
+
+    window.draftTeamBattle = function() {
+        const arena = document.getElementById('team-battle-arena');
+        if (!arena) return;
+        arena.innerHTML = `
+        <div class="team-draft">
+            <div class="team-draft-col">
+                <h3 style="color:#4fc3f7;">Time Azul</h3>
+                <div id="draft-team1" class="draft-pool"></div>
+            </div>
+            <div class="team-draft-col">
+                <h3 style="color:#ef5350;">Time Vermelho</h3>
+                <div id="draft-team2" class="draft-pool"></div>
+            </div>
+        </div>
+        <div class="draft-available">
+            <p style="color:var(--dim);font-size:.85em;margin-bottom:8px;">Clique para adicionar ao time (alterna entre Azul/Vermelho)</p>
+            <div id="draft-players">${PLAYERS.map((p,i) => `<button class="draft-player-btn" data-idx="${i}" onclick="toggleDraftPlayer(${i})">${p.name}</button>`).join('')}</div>
+        </div>
+        <button class="battle-start-btn" onclick="startDraftBattle()" style="margin-top:12px;">BATALHAR!</button>`;
+    };
+
+    const _draftState = { team1: new Set(), team2: new Set() };
+    window.toggleDraftPlayer = function(idx) {
+        const btn = document.querySelector(`.draft-player-btn[data-idx="${idx}"]`);
+        if (_draftState.team1.has(idx)) {
+            _draftState.team1.delete(idx);
+            _draftState.team2.add(idx);
+            btn.className = 'draft-player-btn draft-red';
+        } else if (_draftState.team2.has(idx)) {
+            _draftState.team2.delete(idx);
+            btn.className = 'draft-player-btn';
+        } else {
+            _draftState.team1.add(idx);
+            btn.className = 'draft-player-btn draft-blue';
+        }
+        // Update visual pools
+        const t1El = document.getElementById('draft-team1');
+        const t2El = document.getElementById('draft-team2');
+        if (t1El) t1El.innerHTML = [..._draftState.team1].map(i => `<span class="draft-tag draft-blue">${PLAYERS[i].name}</span>`).join('') || '<span style="color:var(--dim);font-size:.8em;">Nenhum</span>';
+        if (t2El) t2El.innerHTML = [..._draftState.team2].map(i => `<span class="draft-tag draft-red">${PLAYERS[i].name}</span>`).join('') || '<span style="color:var(--dim);font-size:.8em;">Nenhum</span>';
+    };
+
+    window.startDraftBattle = async function() {
+        if (_draftState.team1.size < 1 || _draftState.team2.size < 1) return;
+        const arena = document.getElementById('team-battle-arena');
+        if (!arena) return;
+        arena.innerHTML = '<div class="ld"><div class="sp"></div></div>';
+        await executeTeamBattle(arena, [..._draftState.team1], [..._draftState.team2]);
+        _draftState.team1.clear();
+        _draftState.team2.clear();
+    };
+
+    async function executeTeamBattle(arena, team1, team2) {
+        const allData = await Promise.all(PLAYERS.map((_,i) => loadPlayer(i).catch(()=>null)));
+        const getStats = (idx) => {
+            const d = allData[idx];
+            if (!d) return null;
+            const mt = Array.isArray(d.matches)?d.matches:[];
+            return calcRPGStats(mt, d.account?.puuid, d.league);
+        };
+
+        const stats1 = team1.map(i => ({ idx: i, stats: getStats(i) })).filter(x => x.stats);
+        const stats2 = team2.map(i => ({ idx: i, stats: getStats(i) })).filter(x => x.stats);
+        if (!stats1.length || !stats2.length) { arena.innerHTML = '<p style="color:var(--dim);text-align:center;">Dados insuficientes</p>'; return; }
+
+        // Team power = average power of members
+        const teamPower1 = stats1.reduce((s,x) => s + x.stats.power, 0) / stats1.length;
+        const teamPower2 = stats2.reduce((s,x) => s + x.stats.power, 0) / stats2.length;
+
+        // Compare each stat category as team averages
+        const cats = ['atk','def','agi','int','for','sab'];
+        const catIcons = {atk:'⚔️',def:'🛡️',agi:'🗡️',int:'👁️',for:'👑',sab:'✨'};
+        const catNames = {atk:'ATK',def:'DEF',agi:'AGI',int:'INT',for:'FOR',sab:'SAB'};
+        let score1=0, score2=0;
+        const results = cats.map(c => {
+            const avg1 = stats1.reduce((s,x) => s + x.stats[c], 0) / stats1.length;
+            const avg2 = stats2.reduce((s,x) => s + x.stats[c], 0) / stats2.length;
+            if (avg1 > avg2) { score1++; return {cat:c,winner:1,v1:avg1.toFixed(0),v2:avg2.toFixed(0)}; }
+            else if (avg2 > avg1) { score2++; return {cat:c,winner:2,v1:avg1.toFixed(0),v2:avg2.toFixed(0)}; }
+            return {cat:c,winner:0,v1:avg1.toFixed(0),v2:avg2.toFixed(0)};
+        });
+        const winner = score1>score2 ? 1 : score2>score1 ? 2 : (teamPower1>teamPower2?1:teamPower2>teamPower1?2:0);
+
+        // Save to Firebase
+        if(db) db.ref('teamBattles').push({team1:team1,team2:team2,winner,s1:score1,s2:score2,ts:Date.now()}).catch(()=>{});
+
+        const renderTeamSide = (members, color, isWinner) => `
+            <div class="tb-team-side ${isWinner?'battle-winner':''}">
+                <div class="tb-team-members">${members.map(m => {
+                    const d = allData[m.idx];
+                    const ic = playerIcon(m.idx, d?.summoner?.profileIconId);
+                    return `<div class="tb-team-member">
+                        <img src="${profImg(ic)}" class="tb-member-icon" style="border-color:${m.stats.rpgClass.color}">
+                        <span class="tb-member-name">${d?.account?.gameName||PLAYERS[m.idx].name}</span>
+                        <span class="tb-member-power" style="color:${m.stats.rank.color}">${m.stats.power}</span>
+                    </div>`;
+                }).join('')}</div>
+                <div class="tb-team-power" style="color:${color}">${(members.reduce((s,m)=>s+m.stats.power,0)/members.length).toFixed(0)}</div>
+            </div>`;
+
+        arena.innerHTML = `
+        <div class="team-battle-field">
+            ${renderTeamSide(stats1, '#4fc3f7', winner===1)}
+            <div class="battle-center">
+                <div class="battle-score">${score1} — ${score2}</div>
+                <div class="battle-result" style="color:${winner===1?'#4fc3f7':winner===2?'#ef5350':'var(--dim)'}">${winner===1?'TIME AZUL VENCE!':winner===2?'TIME VERMELHO VENCE!':'EMPATE!'}</div>
+            </div>
+            ${renderTeamSide(stats2, '#ef5350', winner===2)}
+        </div>
+        <div class="battle-breakdown">${results.map(r => `<div class="battle-row">
+            <span class="battle-val ${r.winner===1?'battle-win':''}">${r.v1}</span>
+            <span class="battle-cat">${catIcons[r.cat]} ${catNames[r.cat]}</span>
+            <span class="battle-val ${r.winner===2?'battle-win':''}">${r.v2}</span>
+        </div>`).join('')}</div>
+        <button class="battle-again-btn" onclick="randomTeamBattle()">🎲 Sortear de novo!</button>`;
+        playSFX(winner ? 'victory' : 'navigate');
+    }
+
+    // ======================== TOURNAMENT (BRACKET) ========================
+    window.showTournament = function() {
+        const modal = document.createElement('div');
+        modal.id = 'tournament-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `<div class="modal-box battle-box" style="max-width:800px;">
+            <button class="modal-close" onclick="document.getElementById('tournament-modal').remove()">&times;</button>
+            <div class="modal-header"><h2>🏆 Torneio</h2><p>Bracket automático com todos os guerreiros!</p></div>
+            <div id="tournament-arena"><div class="ld"><div class="sp"></div></div></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+        runTournament();
+    };
+
+    async function runTournament() {
+        const arena = document.getElementById('tournament-arena');
+        if (!arena) return;
+        const allData = await Promise.all(PLAYERS.map((_,i) => loadPlayer(i).catch(()=>null)));
+        // Build participants with stats
+        let participants = [];
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i];
+            if (!d) return;
+            const mt = Array.isArray(d.matches)?d.matches:[];
+            const stats = calcRPGStats(mt, d.account?.puuid, d.league);
+            if (stats) participants.push({ idx: i, name: d.account?.gameName||p.name, stats, icon: playerIcon(i, d.summoner?.profileIconId) });
+        });
+        if (participants.length < 2) { arena.innerHTML = '<p style="color:var(--dim);text-align:center;">Jogadores insuficientes</p>'; return; }
+
+        // Shuffle participants
+        for (let i = participants.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [participants[i],participants[j]]=[participants[j],participants[i]]; }
+
+        // Run bracket rounds
+        const rounds = [];
+        let current = [...participants];
+        while (current.length > 1) {
+            const round = [];
+            for (let i = 0; i < current.length; i += 2) {
+                if (i + 1 < current.length) {
+                    const p1 = current[i], p2 = current[i+1];
+                    const cats = ['atk','def','agi','int','for','sab'];
+                    let s1=0, s2=0;
+                    cats.forEach(c => { if(p1.stats[c]>p2.stats[c]) s1++; else if(p2.stats[c]>p1.stats[c]) s2++; });
+                    const winner = s1>s2 ? p1 : s2>s1 ? p2 : (p1.stats.power>=p2.stats.power?p1:p2);
+                    round.push({ p1, p2, winner, s1, s2 });
+                } else {
+                    // Bye - auto-advance
+                    round.push({ p1: current[i], p2: null, winner: current[i], s1: 0, s2: 0 });
+                }
+            }
+            rounds.push(round);
+            current = round.map(r => r.winner);
+        }
+
+        const champion = current[0];
+
+        // Save to Firebase
+        if(db) db.ref('tournaments').push({champion:champion.idx,participants:participants.map(p=>p.idx),ts:Date.now()}).catch(()=>{});
+
+        // Render bracket
+        let bracketHTML = '<div class="tournament-bracket">';
+        rounds.forEach((round, ri) => {
+            bracketHTML += `<div class="tournament-round"><div class="tournament-round-title">${ri === rounds.length-1 ? 'Final' : ri === rounds.length-2 ? 'Semifinal' : 'Rodada '+(ri+1)}</div>`;
+            round.forEach(match => {
+                const p1Win = match.winner === match.p1;
+                const p2Win = match.p2 && match.winner === match.p2;
+                bracketHTML += `<div class="tournament-match">
+                    <div class="tournament-player ${p1Win?'tournament-winner':''}" style="border-color:${match.p1.stats.rpgClass.color}">
+                        <img src="${profImg(match.p1.icon)}" class="tournament-icon">
+                        <span>${match.p1.name}</span>
+                        <span class="tournament-pwr">${match.p1.stats.power}</span>
+                    </div>
+                    ${match.p2 ? `<div class="tournament-vs">${match.s1}-${match.s2}</div>
+                    <div class="tournament-player ${p2Win?'tournament-winner':''}" style="border-color:${match.p2.stats.rpgClass.color}">
+                        <img src="${profImg(match.p2.icon)}" class="tournament-icon">
+                        <span>${match.p2.name}</span>
+                        <span class="tournament-pwr">${match.p2.stats.power}</span>
+                    </div>` : '<div class="tournament-vs">BYE</div>'}
+                </div>`;
+            });
+            bracketHTML += '</div>';
+        });
+        bracketHTML += '</div>';
+
+        arena.innerHTML = `
+        <div class="tournament-champion">
+            <div class="tournament-crown">🏆</div>
+            <img src="${profImg(champion.icon)}" class="tournament-champ-icon" style="border-color:${champion.stats.rpgClass.color}">
+            <div class="tournament-champ-name" style="color:${champion.stats.rank.color}">${champion.name}</div>
+            <div class="tournament-champ-class" style="color:${champion.stats.rpgClass.color}">${champion.stats.rpgClass.icon} ${champion.stats.rpgClass.name} — Poder ${champion.stats.power}</div>
+        </div>
+        ${bracketHTML}
+        <button class="battle-again-btn" onclick="runTournament()">🔄 Novo Torneio</button>`;
+        playSFX('victory');
+    }
+
+    // ======================== RANKING LADDER ========================
+    window.showRankingLadder = function() {
+        const modal = document.createElement('div');
+        modal.id = 'ladder-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `<div class="modal-box" style="max-width:550px;">
+            <button class="modal-close" onclick="document.getElementById('ladder-modal').remove()">&times;</button>
+            <div class="modal-header"><h2>📊 Ranking Arena</h2><p>Classificação geral por Poder (com bônus de elo)</p></div>
+            <div id="ladder-body"><div class="ld"><div class="sp"></div></div></div>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+        loadRankingLadder();
+    };
+
+    async function loadRankingLadder() {
+        const body = document.getElementById('ladder-body');
+        if (!body) return;
+        const allData = await Promise.all(PLAYERS.map((_,i) => loadPlayer(i).catch(()=>null)));
+        const entries = [];
+        PLAYERS.forEach((p, i) => {
+            const d = allData[i];
+            if (!d) return;
+            const mt = Array.isArray(d.matches)?d.matches:[];
+            const stats = calcRPGStats(mt, d.account?.puuid, d.league);
+            if (stats) {
+                const ranked = getBestRanked(Array.isArray(d.league)?d.league:[]);
+                entries.push({ idx: i, name: d.account?.gameName||p.name, stats, icon: playerIcon(i, d.summoner?.profileIconId), ranked });
+            }
+        });
+        entries.sort((a,b) => b.stats.power - a.stats.power);
+
+        const medals = ['🥇','🥈','🥉'];
+        body.innerHTML = `<div class="ladder-list">${entries.map((e, pos) => {
+            const tierStr = e.ranked ? `${e.ranked.tier} ${e.ranked.rank}` : 'Unranked';
+            return `<div class="ladder-row ${pos<3?'ladder-top':''}">
+                <span class="ladder-pos">${pos<3?medals[pos]:(pos+1)+'º'}</span>
+                <img src="${profImg(e.icon)}" class="ladder-icon" style="border-color:${e.stats.rpgClass.color}">
+                <div class="ladder-info">
+                    <span class="ladder-name">${e.name}</span>
+                    <span class="ladder-class" style="color:${e.stats.rpgClass.color}">${e.stats.rpgClass.icon} ${e.stats.rpgClass.name}</span>
+                </div>
+                <div class="ladder-elo" style="font-size:.75em;color:var(--dim);">${tierStr}</div>
+                <div class="ladder-power">
+                    <span class="ladder-rank-badge" style="color:${e.stats.rank.color}">${e.stats.rank.name}</span>
+                    <span class="ladder-power-val" style="color:${e.stats.rank.color}">${e.stats.power}</span>
+                </div>
+            </div>`;
+        }).join('')}</div>`;
+    }
+
     // ======================== TEMPORAL EVOLUTION ========================
     async function saveRPGSnapshot(allStats) {
         if (!db) return;
@@ -4397,7 +4714,7 @@
                 return val !== undefined ? { x: pad + wi * pw, y: H - pad - (val / 100) * (H - pad*2) } : null;
             }).filter(Boolean);
             if (pts.length < 2) return;
-            const rpgStats = calcRPGStats(cache[i]?.matches||[], cache[i]?.account?.puuid);
+            const rpgStats = calcRPGStats(cache[i]?.matches||[], cache[i]?.account?.puuid, cache[i]?.league);
             const color = rpgStats?.rpgClass?.color || 'var(--pri)';
             const pathD = pts.map((pt,k) => `${k===0?'M':'L'}${pt.x},${pt.y}`).join(' ');
             lines += `<path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" opacity="0.8"/>`;
