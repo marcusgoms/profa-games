@@ -3225,6 +3225,90 @@
         </svg>`;
     }
 
+    // Class-specific weapon/item SVGs for the 3D character
+    const CLASS_WEAPONS = {
+        warrior: `<svg viewBox="0 0 40 80" class="char-weapon char-weapon-sword"><path d="M18 5 L22 5 L23 50 L20 55 L17 50 Z" fill="#c0c0c0" stroke="#888" stroke-width="0.5"/><path d="M12 50 L28 50 L26 54 L14 54 Z" fill="#8d6e63"/><path d="M17 54 L23 54 L22 70 L18 70 Z" fill="#5d4037"/><path d="M19 8 L21 8 L21.5 45 L18.5 45 Z" fill="rgba(255,255,255,0.3)"/></svg>`,
+        assassin: `<svg viewBox="0 0 40 80" class="char-weapon char-weapon-dagger"><path d="M19 10 L21 10 L22 45 L20 50 L18 45 Z" fill="#b0bec5" stroke="#78909c" stroke-width="0.5"/><path d="M16 45 L24 45 L22 48 L18 48 Z" fill="#6a1b9a"/><path d="M18 48 L22 48 L21 62 L19 62 Z" fill="#4a148c"/></svg>`,
+        guardian: `<svg viewBox="0 0 60 70" class="char-weapon char-weapon-shield"><path d="M10 8 L50 8 L50 15 Q50 55 30 65 Q10 55 10 15 Z" fill="#1565c0" stroke="#0d47a1" stroke-width="1.5"/><path d="M15 13 L45 13 L45 18 Q45 50 30 58 Q15 50 15 18 Z" fill="#1976d2"/><path d="M25 20 L35 20 L35 40 L30 45 L25 40 Z" fill="#ffd740" opacity="0.8"/><circle cx="30" cy="30" r="5" fill="#ffd740" opacity="0.6"/></svg>`,
+        oracle: `<svg viewBox="0 0 40 80" class="char-weapon char-weapon-staff"><line x1="20" y1="8" x2="20" y2="72" stroke="#5d4037" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="10" r="7" fill="none" stroke="#00acc1" stroke-width="1.5"/><circle cx="20" cy="10" r="3" fill="#00e5ff" class="char-orb"/></svg>`,
+        sovereign: `<svg viewBox="0 0 50 50" class="char-weapon char-weapon-crown"><path d="M8 35 L14 15 L20 28 L25 10 L30 28 L36 15 L42 35 Z" fill="#fdd835" stroke="#f9a825" stroke-width="1"/><rect x="8" y="35" width="34" height="6" rx="2" fill="#f9a825"/><circle cx="14" cy="17" r="2" fill="#e53935"/><circle cx="25" cy="12" r="2.5" fill="#1e88e5"/><circle cx="36" cy="17" r="2" fill="#66bb6a"/></svg>`,
+        sage: `<svg viewBox="0 0 50 60" class="char-weapon char-weapon-book"><rect x="8" y="10" width="34" height="42" rx="2" fill="#2e7d32" stroke="#1b5e20" stroke-width="1"/><rect x="10" y="12" width="30" height="38" rx="1" fill="#388e3c"/><line x1="25" y1="14" x2="25" y2="48" stroke="#1b5e20" stroke-width="1"/><path d="M14 20 L22 20 M14 25 L22 25 M14 30 L22 30" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/><circle cx="32" cy="30" r="5" fill="#ffd740" opacity="0.5"/></svg>`,
+    };
+
+    // Build a CSS 3D character body (humanoid figure) for the card
+    function buildCharacterHTML(stats, ic, classId, rankColor) {
+        const cc = stats.rpgClass.color;
+        // Body proportions scaled by stats
+        const bodyScale = 0.8 + (stats.power / 100) * 0.4; // 0.8 to 1.2
+        const shoulderW = 28 + (stats.atk / 100) * 14; // wider shoulders for ATK
+        const legH = 40 + (stats.agi / 100) * 10; // longer legs for AGI
+
+        // Armor detail level based on rank
+        const armorOpacity = 0.3 + (stats.power / 100) * 0.7;
+        const weaponHTML = CLASS_WEAPONS[classId] || '';
+
+        return `
+        <div class="char-scene">
+            <div class="char-body-wrap" style="--cc:${cc};--rc:${rankColor};--body-scale:${bodyScale}">
+                <!-- Aura/glow behind character -->
+                <div class="char-aura" style="background:radial-gradient(ellipse, ${cc}30 0%, transparent 70%)"></div>
+                <!-- Floating particles around character -->
+                <div class="char-particles">
+                    <span style="--d:0;--x:-20px;--color:${cc}"></span>
+                    <span style="--d:1s;--x:25px;--color:${cc}"></span>
+                    <span style="--d:2s;--x:-10px;--color:${rankColor}"></span>
+                    <span style="--d:0.5s;--x:15px;--color:${rankColor}"></span>
+                </div>
+                <!-- The 3D character -->
+                <div class="char-figure">
+                    <!-- Head -->
+                    <div class="char-head">
+                        <div class="char-face">
+                            <img src="${profImg(ic)}" alt="" class="char-face-img">
+                        </div>
+                        <div class="char-helmet" style="border-color:${cc}"></div>
+                        ${classId === 'sovereign' ? `<div class="char-crown-wrap">${CLASS_WEAPONS.sovereign}</div>` : ''}
+                    </div>
+                    <!-- Neck -->
+                    <div class="char-neck" style="background:${cc}"></div>
+                    <!-- Torso/Body -->
+                    <div class="char-torso" style="--sw:${shoulderW}px">
+                        <div class="char-chest" style="background:linear-gradient(180deg, ${cc}cc, ${cc}88)"></div>
+                        <div class="char-armor-detail" style="opacity:${armorOpacity}">
+                            <div class="char-armor-symbol">${stats.rpgClass.icon}</div>
+                        </div>
+                        <div class="char-belt" style="background:${cc}"></div>
+                    </div>
+                    <!-- Arms -->
+                    <div class="char-arms">
+                        <div class="char-arm char-arm-l" style="background:linear-gradient(180deg, ${cc}aa, ${cc}66)">
+                            <div class="char-hand char-hand-l"></div>
+                        </div>
+                        <div class="char-arm char-arm-r" style="background:linear-gradient(180deg, ${cc}aa, ${cc}66)">
+                            <div class="char-hand char-hand-r"></div>
+                            ${classId !== 'sovereign' ? `<div class="char-held-item">${weaponHTML}</div>` : ''}
+                        </div>
+                    </div>
+                    <!-- Legs -->
+                    <div class="char-legs" style="--lh:${legH}px">
+                        <div class="char-leg char-leg-l" style="background:linear-gradient(180deg, ${cc}66, ${cc}33)">
+                            <div class="char-boot" style="background:${cc}"></div>
+                        </div>
+                        <div class="char-leg char-leg-r" style="background:linear-gradient(180deg, ${cc}66, ${cc}33)">
+                            <div class="char-boot" style="background:${cc}"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Ground shadow -->
+                <div class="char-shadow"></div>
+                <!-- Pedestal -->
+                <div class="char-pedestal" style="border-color:${cc}40">
+                    <div class="char-pedestal-glow" style="background:${cc}"></div>
+                </div>
+            </div>
+        </div>`;
+    }
+
     async function renderArenaRPG() {
         app.innerHTML = `
         <div class="rpg-hero">
@@ -3245,10 +3329,8 @@
             </div>`).join('')}
         </div>`;
 
-        // Particles
         initParticles(document.getElementById('rpg-particles'));
 
-        // Load each player and render RPG card
         const promises = PLAYERS.map(async (p, i) => {
             try {
                 const d = await loadPlayer(i);
@@ -3273,7 +3355,7 @@
         card.innerHTML = `
             <div class="rpg-card-avatar"><img src="${profImg(ic)}" alt=""></div>
             <div class="rpg-card-name">${d?.account?.gameName || p.name}</div>
-            <div class="rpg-card-empty">Sem dados suficientes</div>`;
+            <div class="rpg-card-empty">Sem dados suficientes para forjar guerreiro</div>`;
     }
 
     function renderRPGCard(i, p, d, stats) {
@@ -3289,69 +3371,81 @@
         const splashUrl = champName ? `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champName}_0.jpg` : '';
 
         const statBars = [
-            { key:'atk', label:'ATK', icon:'⚔️', desc:'Dano/min' },
-            { key:'def', label:'DEF', icon:'🛡️', desc:'Sobrevivência' },
-            { key:'agi', label:'AGI', icon:'🗡️', desc:'KDA' },
-            { key:'int', label:'INT', icon:'👁️', desc:'Visão' },
-            { key:'for', label:'FOR', icon:'👑', desc:'Ouro/min' },
-            { key:'sab', label:'SAB', icon:'✨', desc:'Winrate' },
+            { key:'atk', label:'ATK', icon:'⚔️' },
+            { key:'def', label:'DEF', icon:'🛡️' },
+            { key:'agi', label:'AGI', icon:'🗡️' },
+            { key:'int', label:'INT', icon:'👁️' },
+            { key:'for', label:'FOR', icon:'👑' },
+            { key:'sab', label:'SAB', icon:'✨' },
         ];
 
         card.innerHTML = `
             ${splashUrl ? `<div class="rpg-card-splash" style="background-image:url('${splashUrl}')"></div>` : ''}
             <div class="rpg-card-rank-badge" style="background:${stats.rank.color}">${stats.rank.name}</div>
             <div class="rpg-card-class-badge" style="background:${stats.rpgClass.color}">${stats.rpgClass.icon} ${stats.rpgClass.name}</div>
-            <div class="rpg-card-header">
-                <div class="rpg-card-avatar rpg-avatar-ring" style="--ring-color:${stats.rpgClass.color}">
-                    <img src="${profImg(ic)}" alt="">
-                </div>
+
+            <!-- 3D CHARACTER BODY -->
+            ${buildCharacterHTML(stats, ic, stats.rpgClass.id, stats.rank.color)}
+
+            <div class="rpg-card-name-plate">
                 <div class="rpg-card-name">${d.account?.gameName || p.name}</div>
                 <div class="rpg-card-title" style="color:${stats.rpgClass.color}">${stats.rpgClass.desc}</div>
             </div>
+
             <div class="rpg-card-power">
                 <div class="rpg-power-label">PODER</div>
                 <div class="rpg-power-value" style="color:${stats.rank.color}">${stats.power}</div>
                 <div class="rpg-power-bar"><div class="rpg-power-fill" style="width:${stats.power}%;background:linear-gradient(90deg,${stats.rpgClass.color},${stats.rank.color})"></div></div>
             </div>
-            <div class="rpg-card-radar">${rpgRadarSVG(stats, stats.rpgClass.color)}</div>
-            <div class="rpg-card-stats">
-                ${statBars.map(s => `<div class="rpg-stat-row">
-                    <span class="rpg-stat-icon">${s.icon}</span>
-                    <span class="rpg-stat-label">${s.label}</span>
-                    <div class="rpg-stat-bar"><div class="rpg-stat-fill" style="width:${stats[s.key]}%;background:${stats.rpgClass.color}"></div></div>
-                    <span class="rpg-stat-val">${stats[s.key]}</span>
-                </div>`).join('')}
+
+            <div class="rpg-card-body-lower">
+                <div class="rpg-card-radar">${rpgRadarSVG(stats, stats.rpgClass.color)}</div>
+                <div class="rpg-card-stats">
+                    ${statBars.map(s => `<div class="rpg-stat-row">
+                        <span class="rpg-stat-icon">${s.icon}</span>
+                        <span class="rpg-stat-label">${s.label}</span>
+                        <div class="rpg-stat-bar"><div class="rpg-stat-fill" style="width:${stats[s.key]}%;background:${stats.rpgClass.color}"></div></div>
+                        <span class="rpg-stat-val">${stats[s.key]}</span>
+                    </div>`).join('')}
+                </div>
             </div>
+
             <div class="rpg-card-raw">
                 <div class="rpg-raw-item"><span>KDA</span><b>${stats.raw.avgKDA}</b></div>
                 <div class="rpg-raw-item"><span>DPM</span><b>${stats.raw.avgDPM}</b></div>
                 <div class="rpg-raw-item"><span>GPM</span><b>${stats.raw.avgGPM}</b></div>
-                <div class="rpg-raw-item"><span>Visão</span><b>${stats.raw.avgVision}</b></div>
+                <div class="rpg-raw-item"><span>Visao</span><b>${stats.raw.avgVision}</b></div>
                 <div class="rpg-raw-item"><span>CS</span><b>${stats.raw.avgCS}</b></div>
                 <div class="rpg-raw-item"><span>WR</span><b>${stats.raw.winRate}%</b></div>
             </div>
             <div class="rpg-card-footer">
-                <span>${stats.raw.games} batalhas • ${stats.raw.wins}V ${stats.raw.games - stats.raw.wins}D</span>
+                <span>${stats.raw.games} batalhas &bull; ${stats.raw.wins}V ${stats.raw.games - stats.raw.wins}D</span>
                 ${champName ? `<span>Main: ${champName}</span>` : ''}
             </div>`;
 
-        // Animate stat bars after render
+        // Animate stat bars
         setTimeout(() => {
             card.querySelectorAll('.rpg-stat-fill').forEach(el => {
                 el.style.transition = 'width 1s cubic-bezier(0.4,0,0.2,1)';
             });
-            card.querySelector('.rpg-power-fill').style.transition = 'width 1.2s cubic-bezier(0.4,0,0.2,1)';
+            const pf = card.querySelector('.rpg-power-fill');
+            if (pf) pf.style.transition = 'width 1.2s cubic-bezier(0.4,0,0.2,1)';
         }, 50);
 
-        // 3D tilt effect
+        // 3D tilt on whole card
         card.addEventListener('mousemove', e => {
             const rect = card.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width - 0.5;
             const y = (e.clientY - rect.top) / rect.height - 0.5;
-            card.style.transform = `perspective(800px) rotateY(${x*12}deg) rotateX(${-y*12}deg) scale3d(1.02,1.02,1.02)`;
+            card.style.transform = `perspective(1000px) rotateY(${x*10}deg) rotateX(${-y*10}deg) scale3d(1.02,1.02,1.02)`;
+            // Character reacts to mouse — slight lean
+            const fig = card.querySelector('.char-figure');
+            if (fig) fig.style.transform = `rotateY(${x*15}deg) translateX(${x*5}px)`;
         });
         card.addEventListener('mouseleave', () => {
             card.style.transform = '';
+            const fig = card.querySelector('.char-figure');
+            if (fig) fig.style.transform = '';
         });
     }
 
