@@ -2504,54 +2504,122 @@
         `;
     }
 
-    // ======================== MUSIC PLAYER ========================
-    const PLAYLIST = [
-        { title:'Legends Never Die', id:'4Q46xYqUwZQ' },
-        { title:'Warriors', id:'fmI_Ndrxy14' },
-        { title:'RISE', id:'fB8TyLTD7EE' },
-        { title:'Enemy (Arcane)', id:'F5tSoaJ93ac' },
-        { title:'Playground (Arcane)', id:'WBN1GvX4eFE' },
-        { title:'Guns for Hire (Arcane)', id:'r4jJGBHv04g' },
-        { title:'Burn It All Down', id:'GCKeCntqnpI' },
-        { title:'Awaken', id:'zF5Ddo9JdpY' },
+    // ======================== PROFA FM — RÁDIO GAMER ========================
+    const RADIO_STATIONS = [
+        { name: 'RPG Chill', icon: '🏰', tracks: [
+            { title:'Minecraft - Sweden (C418)', id:'_3ngiSxVCBs' },
+            { title:'Minecraft - Wet Hands', id:'mukiMaOSLEs' },
+            { title:'Minecraft - Mice on Venus', id:'DZ47H84Bc-8' },
+            { title:'Zelda - Great Fairy Fountain', id:'wFOHCOcCOb4' },
+            { title:'Zelda - Hateno Village', id:'YVBbXQnMQFk' },
+            { title:'Skyrim - Secunda', id:'JRjqQ9jmFuQ' },
+            { title:'Skyrim - Far Horizons', id:'pPWVfCtnGyg' },
+            { title:'Stardew Valley - Spring', id:'jRhMQ5yxpig' },
+            { title:'Undertale - Home', id:'lsoLYWTzqSY' },
+            { title:'Animal Crossing - 7PM', id:'rmixgNTiHc0' },
+        ]},
+        { name: 'Aventura', icon: '⚔️', tracks: [
+            { title:'Zelda BOTW - Main Theme', id:'cPWBG4MkAag' },
+            { title:'Mario Galaxy - Gusty Garden', id:'WcHHuhUOjkU' },
+            { title:'Hollow Knight - City of Tears', id:'1unm0LS10ao' },
+            { title:'Ori - Light of Nibel', id:'kN_LvY97Rco' },
+            { title:'Chrono Trigger - Wind Scene', id:'RqZaFDA7PXY' },
+            { title:'Final Fantasy X - To Zanarkand', id:'h-0G_FI61a8' },
+            { title:'Kingdom Hearts - Dearly Beloved', id:'TG1pRNQAByI' },
+            { title:'Persona 5 - Beneath the Mask', id:'gFFOXwniS54' },
+        ]},
+        { name: 'Batalha', icon: '🔥', tracks: [
+            { title:'Doom Eternal - The Only Thing', id:'LDjuz2PDWMU' },
+            { title:'Metal Gear - Snake Eater', id:'_CbFAZ2ztlE' },
+            { title:'Dark Souls - Gwyn', id:'AB6sOhQan9Y' },
+            { title:'Halo - Main Theme', id:'0jXTBAGv9ZQ' },
+            { title:'God of War - Memories of Mother', id:'6XANySBZ0aU' },
+            { title:'Nier Automata - Weight of World', id:'Egn_VNVKzI4' },
+            { title:'Cuphead - Die House', id:'HQVJ6GnBDKg' },
+            { title:'Megalovania - Undertale', id:'ZcoqR9Bwx1s' },
+        ]},
+        { name: 'LoL / Arcane', icon: '🎮', tracks: [
+            { title:'Legends Never Die', id:'4Q46xYqUwZQ' },
+            { title:'Warriors', id:'fmI_Ndrxy14' },
+            { title:'RISE', id:'fB8TyLTD7EE' },
+            { title:'Enemy (Arcane)', id:'F5tSoaJ93ac' },
+            { title:'Playground (Arcane)', id:'WBN1GvX4eFE' },
+            { title:'Guns for Hire (Arcane)', id:'r4jJGBHv04g' },
+            { title:'Burn It All Down', id:'GCKeCntqnpI' },
+            { title:'Awaken', id:'zF5Ddo9JdpY' },
+            { title:'Phoenix', id:'i1IKnWDecwA' },
+            { title:'POP/STARS', id:'UOxkGD8qRB4' },
+        ]},
+        { name: 'Lo-Fi Gaming', icon: '🎧', tracks: [
+            { title:'Pokémon Center Lo-Fi', id:'x0BjOaZcCmo' },
+            { title:'Mario Lo-Fi Chill', id:'sPbVYnFoG7Y' },
+            { title:'Zelda Lo-Fi Mix', id:'GdzrrWA8e7A' },
+            { title:'Undertale Lo-Fi', id:'E6PUBxO3fLQ' },
+            { title:'Animal Crossing Lo-Fi', id:'7bDFD_WoWME' },
+            { title:'Genshin Impact - Liyue', id:'t1O7LpOTBfM' },
+            { title:'Terraria - Day', id:'Na0w3Mz1WEU' },
+            { title:'Celeste - Resurrections', id:'iDVM9KED560' },
+        ]},
     ];
-    let musicIdx = parseInt(localStorage.getItem('profa_music_idx')||'0') % PLAYLIST.length;
+
+    let _radioStation = parseInt(localStorage.getItem('profa_radio_station')||'0');
+    let _radioTrack = parseInt(localStorage.getItem('profa_radio_track')||'0');
+    let _radioShuffle = localStorage.getItem('profa_radio_shuffle') === '1';
     let musicPlaying = false;
     let ytPlayer = null;
-    const MUSIC_VOL = 15; // 0-100, suave
+    const MUSIC_VOL = parseInt(localStorage.getItem('profa_radio_vol')||'15');
 
-    // Create floating music button
+    function currentStation() { return RADIO_STATIONS[_radioStation] || RADIO_STATIONS[0]; }
+    function currentTrack() { return currentStation().tracks[_radioTrack] || currentStation().tracks[0]; }
+    function allTracks() { return currentStation().tracks; }
+
+    // Create floating radio button
     const musicBtn = document.createElement('div');
     musicBtn.id = 'music-btn';
-    musicBtn.className = 'music-btn';
-    musicBtn.innerHTML = `<span class="music-icon">&#9835;</span><span class="music-title" id="music-title">Musica</span>`;
+    musicBtn.className = 'radio-btn';
+    musicBtn.innerHTML = `<div class="radio-btn-eq"><span></span><span></span><span></span></div><span class="radio-btn-text" id="music-title">PROFA FM</span>`;
     document.body.appendChild(musicBtn);
 
-    // Music panel
+    // Radio panel
     const musicPanel = document.createElement('div');
     musicPanel.id = 'music-panel';
-    musicPanel.className = 'music-panel';
+    musicPanel.className = 'radio-panel';
     musicPanel.style.display = 'none';
-    musicPanel.innerHTML = `
-        <div class="mp-header">
-            <span class="mp-label">LoL / Arcane OST</span>
-            <button class="mp-close" onclick="toggleMusicPanel()">&#215;</button>
+    function buildRadioPanel() {
+        const st = currentStation();
+        const tr = currentTrack();
+        musicPanel.innerHTML = `
+        <div class="radio-header">
+            <div class="radio-brand"><span class="radio-logo">📻</span> PROFA FM</div>
+            <button class="radio-close" onclick="toggleMusicPanel()">&#215;</button>
         </div>
-        <div class="mp-now" id="mp-now">Clique play para ouvir</div>
-        <div class="mp-controls">
-            <button class="mp-btn" id="mp-prev" onclick="musicPrev()">&#9664;&#9664;</button>
-            <button class="mp-btn mp-play" id="mp-play" onclick="musicToggle()">&#9654;</button>
-            <button class="mp-btn" id="mp-next" onclick="musicNext()">&#9654;&#9654;</button>
+        <div class="radio-dial">
+            ${RADIO_STATIONS.map((s, i) => `<button class="radio-station-btn ${i===_radioStation?'active':''}" onclick="switchStation(${i})" title="${s.name}"><span class="radio-st-icon">${s.icon}</span><span class="radio-st-name">${s.name}</span></button>`).join('')}
         </div>
-        <div class="mp-vol">
-            <span style="font-size:.7em;color:var(--dim);">Vol</span>
+        <div class="radio-now">
+            <div class="radio-now-station">${st.icon} ${st.name}</div>
+            <div class="radio-now-track" id="mp-now">${musicPlaying ? tr.title : 'Pausado'}</div>
+            <div class="radio-now-eq ${musicPlaying?'playing':''}"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="radio-controls">
+            <button class="radio-ctrl" onclick="musicPrev()" title="Anterior">⏮</button>
+            <button class="radio-ctrl radio-play" id="mp-play" onclick="musicToggle()">${musicPlaying ? '⏸' : '▶'}</button>
+            <button class="radio-ctrl" onclick="musicNext()" title="Próxima">⏭</button>
+            <button class="radio-ctrl radio-shuffle ${_radioShuffle?'active':''}" onclick="toggleShuffle()" title="Shuffle">🔀</button>
+        </div>
+        <div class="radio-vol">
+            <span class="radio-vol-icon">🔊</span>
             <input type="range" id="mp-vol-slider" min="0" max="30" value="${MUSIC_VOL}" oninput="musicVol(this.value)">
+            <span class="radio-vol-val" id="radio-vol-val">${MUSIC_VOL}</span>
         </div>
-        <div class="mp-list" id="mp-list">${PLAYLIST.map((t,i) => `<div class="mp-track ${i===musicIdx?'on':''}" data-i="${i}" onclick="musicPlay(${i})">${t.title}</div>`).join('')}</div>
-    `;
+        <div class="radio-tracklist" id="mp-list">
+            ${st.tracks.map((t,i) => `<div class="radio-track ${i===_radioTrack?'on':''}" onclick="musicPlay(${i})"><span class="radio-track-num">${i+1}</span><span class="radio-track-title">${t.title}</span>${i===_radioTrack && musicPlaying?'<span class="radio-track-eq"><span></span><span></span><span></span></span>':''}</div>`).join('')}
+        </div>`;
+    }
+    buildRadioPanel();
     document.body.appendChild(musicPanel);
 
-    // Hidden YT iframe container
+    // Hidden YT iframe
     const ytDiv = document.createElement('div');
     ytDiv.id = 'yt-player';
     ytDiv.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
@@ -2565,13 +2633,10 @@
     window.onYouTubeIframeAPIReady = function() {
         ytPlayer = new YT.Player('yt-player', {
             height: '1', width: '1',
-            videoId: PLAYLIST[musicIdx].id,
-            playerVars: { autoplay:1, controls:0, disablekb:1, fs:0, modestbranding:1, rel:0 },
+            videoId: currentTrack().id,
+            playerVars: { autoplay:0, controls:0, disablekb:1, fs:0, modestbranding:1, rel:0 },
             events: {
-                onReady: () => {
-                    ytPlayer.setVolume(MUSIC_VOL);
-                    ytPlayer.playVideo();
-                },
+                onReady: () => { ytPlayer.setVolume(MUSIC_VOL); },
                 onStateChange: (e) => {
                     if (e.data === YT.PlayerState.ENDED) musicNext();
                     musicPlaying = e.data === YT.PlayerState.PLAYING;
@@ -2580,11 +2645,10 @@
             }
         });
     };
-    // Autoplay on first user interaction (browsers block autoplay without interaction)
+
+    // Autoplay on first user interaction
     function tryAutoplay() {
-        if (ytPlayer?.playVideo && !musicPlaying) {
-            ytPlayer.playVideo();
-        }
+        if (ytPlayer?.playVideo && !musicPlaying) ytPlayer.playVideo();
         document.removeEventListener('click', tryAutoplay);
         document.removeEventListener('keydown', tryAutoplay);
         document.removeEventListener('scroll', tryAutoplay);
@@ -2594,15 +2658,12 @@
     document.addEventListener('scroll', tryAutoplay);
 
     function updateMusicUI() {
-        const playBtn = document.getElementById('mp-play');
-        const nowEl = document.getElementById('mp-now');
+        const tr = currentTrack();
         const titleEl = document.getElementById('music-title');
         const btn = document.getElementById('music-btn');
-        if (playBtn) playBtn.innerHTML = musicPlaying ? '&#9646;&#9646;' : '&#9654;';
-        if (nowEl) nowEl.textContent = musicPlaying ? PLAYLIST[musicIdx].title : 'Pausado';
-        if (titleEl) titleEl.textContent = musicPlaying ? PLAYLIST[musicIdx].title : 'Musica';
+        if (titleEl) titleEl.textContent = musicPlaying ? tr.title : 'PROFA FM';
         if (btn) btn.classList.toggle('playing', musicPlaying);
-        document.querySelectorAll('.mp-track').forEach((el,i) => el.classList.toggle('on', i===musicIdx));
+        buildRadioPanel();
     }
 
     window.toggleMusicPanel = function() {
@@ -2611,19 +2672,47 @@
     };
     musicBtn.addEventListener('click', toggleMusicPanel);
 
-    window.musicToggle = function() {
-        if (!ytPlayer?.playVideo) return;
-        if (musicPlaying) { ytPlayer.pauseVideo(); } else { ytPlayer.playVideo(); }
-    };
-    window.musicPlay = function(i) {
-        musicIdx = i;
-        localStorage.setItem('profa_music_idx', String(i));
-        if (ytPlayer?.loadVideoById) { ytPlayer.loadVideoById(PLAYLIST[i].id); }
+    window.switchStation = function(idx) {
+        _radioStation = idx;
+        _radioTrack = 0;
+        localStorage.setItem('profa_radio_station', String(idx));
+        localStorage.setItem('profa_radio_track', '0');
+        if (ytPlayer?.loadVideoById) ytPlayer.loadVideoById(currentTrack().id);
         updateMusicUI();
     };
-    window.musicNext = function() { musicPlay((musicIdx+1)%PLAYLIST.length); };
-    window.musicPrev = function() { musicPlay((musicIdx-1+PLAYLIST.length)%PLAYLIST.length); };
-    window.musicVol = function(v) { if (ytPlayer?.setVolume) ytPlayer.setVolume(parseInt(v)); };
+
+    window.musicToggle = function() {
+        if (!ytPlayer?.playVideo) return;
+        if (musicPlaying) ytPlayer.pauseVideo(); else ytPlayer.playVideo();
+    };
+    window.musicPlay = function(i) {
+        _radioTrack = i;
+        localStorage.setItem('profa_radio_track', String(i));
+        if (ytPlayer?.loadVideoById) ytPlayer.loadVideoById(currentTrack().id);
+        updateMusicUI();
+    };
+    window.musicNext = function() {
+        if (_radioShuffle) {
+            musicPlay(Math.floor(Math.random() * allTracks().length));
+        } else {
+            musicPlay((_radioTrack + 1) % allTracks().length);
+        }
+    };
+    window.musicPrev = function() {
+        musicPlay((_radioTrack - 1 + allTracks().length) % allTracks().length);
+    };
+    window.musicVol = function(v) {
+        const vol = parseInt(v);
+        if (ytPlayer?.setVolume) ytPlayer.setVolume(vol);
+        localStorage.setItem('profa_radio_vol', String(vol));
+        const valEl = document.getElementById('radio-vol-val');
+        if (valEl) valEl.textContent = vol;
+    };
+    window.toggleShuffle = function() {
+        _radioShuffle = !_radioShuffle;
+        localStorage.setItem('profa_radio_shuffle', _radioShuffle ? '1' : '0');
+        updateMusicUI();
+    };
 
     // ======================== THEME TOGGLE ========================
     function applyTheme(t) {
