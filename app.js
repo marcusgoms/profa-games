@@ -2032,7 +2032,7 @@
             app.innerHTML = `<div class="section-wrap-sm">
                 <div class="prof-topbar">
                     <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
-                    <button class="prof-refresh-btn" id="prof-refresh-btn" onclick="checkNewMatches(${idx})">&#128260; Verificar partidas novas</button>
+                    <button class="prof-refresh-btn" id="prof-refresh-btn" onclick="checkNewMatches(${idx})">&#128260; Verificar ao vivo e partidas</button>
                 </div>
                 ${liveBanner}
                 <div class="pv">
@@ -5618,52 +5618,82 @@
         const hasSomePlayers = PLAYERS.some((_, i) => cache[i]?.account?.puuid);
         if (apiExpired || !hasSomePlayers) return;
         _liveCheckRunning = true;
-        console.log('[Live] Verificando jogadores em partida...');
-        let found = 0;
-        for (let i = 0; i < PLAYERS.length; i++) {
-            const d = cache[i];
-            if (!d?.account?.puuid) continue;
-            const p = PLAYERS[i], pl = plat(p.region);
-            try {
-                const resp = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${d.account.puuid}`, {
-                    headers: { 'X-Riot-Token': RIOT_KEY }
-                });
-                if (resp.status === 429) { console.warn('[Live] Rate limited, aguardando...'); await new Promise(r => setTimeout(r, 5000)); continue; }
-                if (resp.status === 403 || resp.status === 401) { console.warn('[Live] API key inválida'); break; }
-                if (resp.ok) {
-                    const gameData = await resp.json().catch(() => null);
-                    let liveChampId = null;
-                    if (gameData?.participants) {
-                        const me = gameData.participants.find(x => x.puuid === d.account.puuid);
-                        if (me) liveChampId = me.championId;
+        try {
+            console.log('[Live] Verificando jogadores em partida...');
+            let found = 0;
+            for (let i = 0; i < PLAYERS.length; i++) {
+                const d = cache[i];
+                if (!d?.account?.puuid) { console.log(`[Live] ${PLAYERS[i].name} — sem puuid, pulando`); continue; }
+                const p = PLAYERS[i], pl = plat(p.region);
+                try {
+                    console.log(`[Live] Checando ${p.name}...`);
+                    const resp = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${d.account.puuid}`, {
+                        headers: { 'X-Riot-Token': RIOT_KEY }
+                    });
+                    console.log(`[Live] ${p.name} — status ${resp.status}`);
+                    if (resp.status === 429) {
+                        console.warn(`[Live] Rate limited em ${p.name}, aguardando 5s...`);
+                        await new Promise(r => setTimeout(r, 5000));
+                        // Retry this player once
+                        const resp2 = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${d.account.puuid}`, {
+                            headers: { 'X-Riot-Token': RIOT_KEY }
+                        });
+                        console.log(`[Live] ${p.name} retry — status ${resp2.status}`);
+                        if (!resp2.ok) continue;
+                        const gameData2 = await resp2.json().catch(() => null);
+                        if (gameData2) {
+                            let liveChampId = null;
+                            const me = gameData2.participants?.find(x => x.puuid === d.account.puuid);
+                            if (me) liveChampId = me.championId;
+                            _liveAlerts[i] = { champId: liveChampId, gameData: gameData2 };
+                            found++;
+                            updateCardLive(i);
+                            const pName = d.account.gameName || p.name;
+                            const champName = CMAP[liveChampId] || '';
+                            if (!_liveAlerts[i]?._notified) {
+                                if (getNotifPrefs().live) showToast('🎮', `<b>${pName}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora!`, () => showLiveMatch(i));
+                                _liveAlerts[i]._notified = true;
+                            }
+                        }
+                        continue;
                     }
-                    const wasAlerted = !!_liveAlerts[i];
-                    _liveAlerts[i] = { champId: liveChampId, gameData };
-                    found++;
-                    console.log(`[Live] ${p.name} está em jogo! Campeão: ${CMAP[liveChampId] || liveChampId || '?'}`);
-                    if (!wasAlerted) {
-                        const pName = d.account.gameName || p.name;
-                        const champName = CMAP[liveChampId] || '';
-                        const idx = i;
-                        if (getNotifPrefs().live) showToast('🎮', `<b>${pName}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora!`, () => showLiveMatch(idx));
-                        postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${pName} está em partida agora!${champName ? ` (${champName})` : ''}` });
-                        sendNotification('Em Jogo!', `${pName} está jogando de ${champName || 'campeão'}!`, null, 'live');
-                    }
-                    updateCardLive(i);
-                } else {
-                    if (_liveAlerts[i]) {
-                        console.log(`[Live] ${p.name} saiu da partida — buscando resultado...`);
-                        delete _liveAlerts[i];
+                    if (resp.status === 403 || resp.status === 401) { console.warn('[Live] API key inválida'); break; }
+                    if (resp.ok) {
+                        const gameData = await resp.json().catch(() => null);
+                        let liveChampId = null;
+                        if (gameData?.participants) {
+                            const me = gameData.participants.find(x => x.puuid === d.account.puuid);
+                            if (me) liveChampId = me.championId;
+                        }
+                        const wasAlerted = !!_liveAlerts[i];
+                        _liveAlerts[i] = { champId: liveChampId, gameData };
+                        found++;
+                        console.log(`[Live] ${p.name} está em jogo! Campeão: ${CMAP[liveChampId] || liveChampId || '?'}`);
+                        if (!wasAlerted) {
+                            const pName = d.account.gameName || p.name;
+                            const champName = CMAP[liveChampId] || '';
+                            const idx = i;
+                            if (getNotifPrefs().live) showToast('🎮', `<b>${pName}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora!`, () => showLiveMatch(idx));
+                            postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${pName} está em partida agora!${champName ? ` (${champName})` : ''}` });
+                            sendNotification('Em Jogo!', `${pName} está jogando de ${champName || 'campeão'}!`, null, 'live');
+                        }
                         updateCardLive(i);
-                        // Game ended: refresh player data to pick up new match result
-                        setTimeout(() => refreshPlayer(i), 15000); // wait 15s for Riot API to process match
+                    } else {
+                        // 404 = not in game
+                        if (_liveAlerts[i]) {
+                            console.log(`[Live] ${p.name} saiu da partida — buscando resultado...`);
+                            delete _liveAlerts[i];
+                            updateCardLive(i);
+                            setTimeout(() => refreshPlayer(i), 15000);
+                        }
                     }
-                }
-            } catch(e) { console.warn(`[Live] Erro ao checar ${p.name}:`, e.message); }
-            await new Promise(r => setTimeout(r, 1200));
+                } catch(e) { console.warn(`[Live] Erro ao checar ${p.name}:`, e.message); }
+                await new Promise(r => setTimeout(r, 1500));
+            }
+            console.log(`[Live] Check completo. ${found} jogador(es) em partida.`);
+        } finally {
+            _liveCheckRunning = false;
         }
-        console.log(`[Live] Check completo. ${found} jogador(es) em partida.`);
-        _liveCheckRunning = false;
     }
 
     // showInGameAlert removed — now uses unified toast bar
@@ -5937,6 +5967,37 @@
             if (!d?.account?.puuid) throw new Error('Dados não disponíveis');
             const p = PLAYERS[playerIdx], cl = clust(p.region), pl = plat(p.region);
             const puuid = d.account.puuid;
+
+            // Check if player is in a live game
+            if (btn) btn.innerHTML = '&#8987; Checando ao vivo...';
+            try {
+                const liveResp = await fetch(`https://${pl}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${puuid}`, {
+                    headers: { 'X-Riot-Token': RIOT_KEY }
+                });
+                if (liveResp.ok) {
+                    const gameData = await liveResp.json().catch(() => null);
+                    let liveChampId = null;
+                    if (gameData?.participants) {
+                        const me = gameData.participants.find(x => x.puuid === puuid);
+                        if (me) liveChampId = me.championId;
+                    }
+                    const wasAlerted = !!_liveAlerts[playerIdx];
+                    _liveAlerts[playerIdx] = { champId: liveChampId, gameData };
+                    updateCardLive(playerIdx);
+                    const pName = d.account.gameName || p.name;
+                    const champName = CMAP[liveChampId] || '';
+                    if (!wasAlerted) {
+                        if (getNotifPrefs().live) showToast('🎮', `<b>${pName}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora!`, () => showLiveMatch(playerIdx));
+                    } else {
+                        showToast('🎮', `<b>${pName}</b> continua em partida${champName ? ` (${champName})` : ''}.`);
+                    }
+                } else if (_liveAlerts[playerIdx]) {
+                    delete _liveAlerts[playerIdx];
+                    updateCardLive(playerIdx);
+                }
+            } catch(e) { console.warn('[CheckNew] Live check error:', e.message); }
+            await new Promise(r => setTimeout(r, 1200));
+
             // Fetch only last 2 match IDs
             const ids = await riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=2`);
             if (!ids?.length) { showToast('📋', 'Nenhuma partida encontrada.'); return; }
@@ -5944,7 +6005,7 @@
             const newIds = ids.filter(id => !oldIds.has(id));
             if (!newIds.length) {
                 showToast('✅', `<b>${d.account.gameName||p.name}</b> — Nenhuma partida nova.`);
-                if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; Verificar partidas novas'; }
+                if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; Verificar ao vivo e partidas'; }
                 return;
             }
             // Fetch new matches
@@ -5988,7 +6049,7 @@
             console.warn('[CheckNew]', e);
             showToast('⚠️', 'Erro ao verificar: ' + (e.message||'tente novamente'));
         }
-        if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; Verificar partidas novas'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; Verificar ao vivo e partidas'; }
     };
 
     // Show live match for a player (called from profile or card)
