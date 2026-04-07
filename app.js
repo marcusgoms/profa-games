@@ -2548,6 +2548,7 @@
         const radioRef = db.ref('radio');
         radioRef.on('value', snap => {
             const data = snap.val() || {};
+            console.log('[Radio] Firebase data:', Object.keys(data), JSON.stringify(data).substring(0, 200));
             _radioStations = RADIO_STATION_META.map(s => {
                 const stationData = data[s.key] || {};
                 const tracks = [];
@@ -2630,21 +2631,32 @@
         _radioUploading = true;
         updateMusicUI();
         const stKey = currentStation().key;
+        let uploaded = 0;
         for (const file of files) {
             try {
-                const ext = file.name.split('.').pop();
+                console.log('[Radio] Enviando:', file.name, '(' + (file.size/1024/1024).toFixed(1) + 'MB)');
                 const safeName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
                 const storageRef = storage.ref('radio/' + stKey + '/' + safeName);
-                await storageRef.put(file);
-                const url = await storageRef.getDownloadURL();
+                const snapshot = await storageRef.put(file, { contentType: file.type });
+                console.log('[Radio] Upload concluído, obtendo URL...');
+                const url = await snapshot.ref.getDownloadURL();
+                console.log('[Radio] URL obtida:', url);
                 const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
                 await db.ref('radio/' + stKey).push({ title, url, fileName: safeName });
+                console.log('[Radio] Salvo no DB!');
+                uploaded++;
             } catch (e) {
                 console.error('[Radio] Upload error:', e);
-                alert('Erro ao enviar ' + file.name + ': ' + e.message);
+                if (e.code === 'storage/unauthorized' || e.code === 'storage/unauthenticated') {
+                    alert('Erro de permissão no Firebase Storage!\n\nVá no Firebase Console > Storage > Rules e coloque:\n\nrules_version = \'2\';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /{allPaths=**} {\n      allow read, write: if true;\n    }\n  }\n}');
+                    break;
+                } else {
+                    alert('Erro ao enviar "' + file.name + '": ' + e.message);
+                }
             }
         }
         _radioUploading = false;
+        if (uploaded > 0) alert(uploaded + ' música(s) enviada(s) com sucesso!');
         updateMusicUI();
     };
 
