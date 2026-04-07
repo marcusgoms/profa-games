@@ -200,9 +200,10 @@
     // ======================== PROFILE SETTINGS ========================
     window.switchProfTab = function(tab) {
         document.querySelectorAll('.prof-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-        const s = $('prof-tab-stats'), c = $('prof-tab-config');
-        if (s) s.style.display = tab === 'stats' ? '' : 'none';
-        if (c) c.style.display = tab === 'config' ? '' : 'none';
+        ['overview','champions','matches','config'].forEach(t => {
+            const el = $('prof-tab-' + t);
+            if (el) el.style.display = t === tab ? '' : 'none';
+        });
     };
 
     window.pickIcon = function(idx, iconId) {
@@ -1080,101 +1081,288 @@
             const { account:a, summoner:s, league:le, mastery:ma, matches:mt } = d;
             const ic = playerIcon(idx, s.profileIconId), lv = s.summonerLevel || '?';
             const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
+            const flex = le.find(e => e.queueType === 'RANKED_FLEX_SR');
+            const puuid = a.puuid;
 
+            // ==================== AGGREGATE STATS ====================
             let tv=0, td=0; le.forEach(e => { tv+=e.wins||0; td+=e.losses||0; });
             const tg=tv+td, wr2=tg>0?((tv/tg)*100).toFixed(1):'—';
-            let tk=0,tkd=0,ta=0,tcs=0;
-            mt.forEach(m => { const mp=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; tk+=mp.kills||0; tkd+=mp.deaths||0; ta+=mp.assists||0; tcs+=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0); });
-            const kda = mt.length ? ((tk+ta)/Math.max(tkd,1)).toFixed(1) : '—';
-            const acs = mt.length ? (tcs/mt.length)|0 : 0;
+            let tk=0,tkd=0,ta=0,tcs=0,tDmg=0,tGold=0,tVision=0,tDur=0;
+            let tDoubleKills=0,tTripleKills=0,tQuadraKills=0,tPentaKills=0;
+            let tFirstBlood=0,tTurretKills=0,tDragon=0,tBaron=0;
+            let maxKills=0,maxDeaths=0,maxCS=0,maxDmg=0,maxGold=0;
+            let bestKDAMatch=null, bestKDAVal=0;
 
-            const stats = `<div class="ps">
+            // Champion stats aggregation
+            const champStats = {};
+            // Role distribution
+            const roleCounts = {};
+            // Recent form (last 20)
+            const sm = [...mt].sort((a2,b2) => (b2.info?.gameCreation||0)-(a2.info?.gameCreation||0));
+            const recentForm = [];
+
+            sm.forEach((m, mIdx) => {
+                const mp = m.info?.participants?.find(x=>x.puuid===puuid) || {};
+                const win = m.info?.teams?.find(t=>t.teamId===mp.teamId)?.win;
+                const k=mp.kills||0, dd=mp.deaths||0, as2=mp.assists||0;
+                const cs=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
+                const dmg=mp.totalDamageDealtToChampions||0;
+                const gold=mp.goldEarned||0;
+                const vis=mp.visionScore||0;
+                const dur=m.info?.gameDuration||0;
+
+                tk+=k; tkd+=dd; ta+=as2; tcs+=cs; tDmg+=dmg; tGold+=gold; tVision+=vis; tDur+=dur;
+                tDoubleKills+=mp.doubleKills||0; tTripleKills+=mp.tripleKills||0;
+                tQuadraKills+=mp.quadraKills||0; tPentaKills+=mp.pentaKills||0;
+                if(mp.firstBloodKill) tFirstBlood++;
+                tTurretKills+=mp.turretKills||0;
+                tDragon+=mp.dragonKills||0; tBaron+=mp.baronKills||0;
+
+                if(k>maxKills) maxKills=k;
+                if(dd>maxDeaths) maxDeaths=dd;
+                if(cs>maxCS) maxCS=cs;
+                if(dmg>maxDmg) maxDmg=dmg;
+                if(gold>maxGold) maxGold=gold;
+
+                const mkda = (k+as2)/Math.max(dd,1);
+                if(mkda>bestKDAVal && mt.length>1) { bestKDAVal=mkda; bestKDAMatch={k,d:dd,a:as2,champ:mp.championId,win}; }
+
+                // Champion stats
+                const cid = mp.championId;
+                if(cid) {
+                    if(!champStats[cid]) champStats[cid]={id:cid,games:0,wins:0,kills:0,deaths:0,assists:0,cs:0,dmg:0,gold:0};
+                    const cs2 = champStats[cid];
+                    cs2.games++; if(win) cs2.wins++; cs2.kills+=k; cs2.deaths+=dd; cs2.assists+=as2; cs2.cs+=cs; cs2.dmg+=dmg; cs2.gold+=gold;
+                }
+
+                // Role
+                const role = mp.teamPosition || mp.individualPosition || 'UNKNOWN';
+                if(role && role!=='UNKNOWN' && role!=='') roleCounts[role] = (roleCounts[role]||0)+1;
+
+                // Recent form (last 20)
+                if(mIdx < 20) recentForm.push(win ? 1 : 0);
+            });
+
+            const kda = mt.length ? ((tk+ta)/Math.max(tkd,1)).toFixed(2) : '—';
+            const acs = mt.length ? (tcs/mt.length)|0 : 0;
+            const avgDmg = mt.length ? (tDmg/mt.length)|0 : 0;
+            const avgGold = mt.length ? (tGold/mt.length)|0 : 0;
+            const avgVision = mt.length ? (tVision/mt.length).toFixed(1) : 0;
+            const avgDur = mt.length ? (tDur/mt.length)|0 : 0;
+            const avgKP = mt.length && tk+ta > 0 ? ((tk+ta)/Math.max(mt.length,1)).toFixed(1) : '0';
+
+            // ==================== RECENT FORM BAR ====================
+            let formHtml = '';
+            if (recentForm.length >= 2) {
+                const recentWins = recentForm.filter(x=>x).length;
+                const recentWR = ((recentWins/recentForm.length)*100).toFixed(0);
+                // Streak
+                let streak = 0, streakType = recentForm[0] ? 'W' : 'L';
+                for (const r of recentForm) { if((r&&streakType==='W')||(!r&&streakType==='L')) streak++; else break; }
+                const streakTxt = streak >= 2 ? `${streak}${streakType}` : '';
+                const streakCls = streakType==='W' ? 'streak-w' : 'streak-l';
+                formHtml = `<div class="prof-form">
+                    <div class="prof-form-header">
+                        <span>Forma Recente (${recentForm.length} jogos)</span>
+                        <span class="prof-form-wr">${recentWR}% WR${streakTxt ? ` <span class="${streakCls}">${streakTxt}</span>` : ''}</span>
+                    </div>
+                    <div class="prof-form-bar">${recentForm.map(w => `<div class="prof-form-dot ${w?'w':'l'}"></div>`).join('')}</div>
+                </div>`;
+            }
+
+            // ==================== STATS GRID (EXPANDED) ====================
+            const stats = `<div class="ps prof-stats-expanded">
                 <div class="pst"><div class="sm">Nível</div><div class="sv">${lv}</div></div>
                 <div class="pst"><div class="sm">Partidas</div><div class="sv">${tg}</div><div class="ss">${tv}V ${td}D</div></div>
-                <div class="pst"><div class="sm">Win Rate</div><div class="sv">${wr2}%</div></div>
-                <div class="pst"><div class="sm">KDA</div><div class="sv">${kda}</div><div class="ss">${tk}/${tkd}/${ta}</div></div>
-                <div class="pst"><div class="sm">CS Médio</div><div class="sv">${acs}</div></div>
+                <div class="pst"><div class="sm">Win Rate</div><div class="sv ${tg>0&&(tv/tg)>=0.55?'sv-good':tg>0&&(tv/tg)<0.45?'sv-bad':''}">${wr2}%</div></div>
+                <div class="pst"><div class="sm">KDA</div><div class="sv ${parseFloat(kda)>=3?'sv-good':parseFloat(kda)<2?'sv-bad':''}">${kda}</div><div class="ss">${tk}/${tkd}/${ta}</div></div>
+                <div class="pst"><div class="sm">CS Médio</div><div class="sv">${acs}</div><div class="ss">Rec. ${maxCS}</div></div>
+                <div class="pst"><div class="sm">Dano Médio</div><div class="sv">${fmtGold(avgDmg)}</div><div class="ss">Rec. ${fmtGold(maxDmg)}</div></div>
+                <div class="pst"><div class="sm">Ouro Médio</div><div class="sv">${fmtGold(avgGold)}</div><div class="ss">Rec. ${fmtGold(maxGold)}</div></div>
+                <div class="pst"><div class="sm">Visão Média</div><div class="sv">${avgVision}</div></div>
+                <div class="pst"><div class="sm">Partida Média</div><div class="sv">${fmtDur(avgDur)}</div></div>
+                <div class="pst"><div class="sm">Participação</div><div class="sv">${avgKP}</div><div class="ss">K+A / jogo</div></div>
             </div>`;
 
+            // ==================== MULTI-KILLS & HIGHLIGHTS ====================
+            let highlights = '';
+            const hlItems = [];
+            if(tPentaKills) hlItems.push(`<div class="hl-item hl-penta"><span class="hl-val">${tPentaKills}</span><span class="hl-label">Penta Kill${tPentaKills>1?'s':''}</span></div>`);
+            if(tQuadraKills) hlItems.push(`<div class="hl-item hl-quadra"><span class="hl-val">${tQuadraKills}</span><span class="hl-label">Quadra Kill${tQuadraKills>1?'s':''}</span></div>`);
+            if(tTripleKills) hlItems.push(`<div class="hl-item hl-triple"><span class="hl-val">${tTripleKills}</span><span class="hl-label">Triple Kill${tTripleKills>1?'s':''}</span></div>`);
+            if(tDoubleKills) hlItems.push(`<div class="hl-item hl-double"><span class="hl-val">${tDoubleKills}</span><span class="hl-label">Double Kill${tDoubleKills>1?'s':''}</span></div>`);
+            if(tFirstBlood) hlItems.push(`<div class="hl-item hl-fb"><span class="hl-val">${tFirstBlood}</span><span class="hl-label">First Blood${tFirstBlood>1?'s':''}</span></div>`);
+            if(maxKills>=10) hlItems.push(`<div class="hl-item hl-record"><span class="hl-val">${maxKills}</span><span class="hl-label">Recorde Kills</span></div>`);
+            if(bestKDAMatch && bestKDAVal>=5) hlItems.push(`<div class="hl-item hl-kda"><span class="hl-val">${bestKDAVal.toFixed(1)}</span><span class="hl-label">Melhor KDA</span></div>`);
+            if(hlItems.length) {
+                highlights = `<div class="sx"><h3>Destaques</h3><div class="hl-grid">${hlItems.join('')}</div></div>`;
+            }
+
+            // ==================== RANKED SECTION ====================
             let ranked = '';
             if (le.length) {
                 const qn = {'RANKED_SOLO_5x5':'Solo/Duo','RANKED_FLEX_SR':'Flex 5v5'};
-                ranked = '<div class="sx"><h3>🏆 Ranked</h3>';
+                ranked = '<div class="sx"><h3>Ranked</h3><div class="ranked-grid">';
                 for (const e of le) {
                     const w2 = ((e.wins/(e.wins+e.losses))*100).toFixed(0);
-                    ranked += `<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.04);">
-                        <div style="font-size:.75em;color:var(--dim);text-transform:uppercase;font-weight:600;">${qn[e.queueType]||e.queueType}</div>
-                        <div class="${rankCls(e.tier)}" style="font-size:1.4em;font-weight:900;">${e.tier} ${e.rank} &mdash; ${e.leaguePoints} LP</div>
-                        <div style="font-size:.85em;color:var(--dim);">${e.wins}V ${e.losses}D (${w2}% WR)</div>
-                        ${e.hotStreak?'<span style="font-size:.75em;color:#ef5350;">🔥 Hot Streak</span>':''}${e.veteran?' <span style="font-size:.75em;color:#c89b3c;">Veterano</span>':''}</div>`;
+                    const tierIcon = e.tier ? e.tier.charAt(0)+e.tier.slice(1).toLowerCase() : '?';
+                    const totalGames = e.wins+e.losses;
+                    const wrColor = parseInt(w2)>=55?'#4caf50':parseInt(w2)<45?'#ef5350':'var(--dim)';
+                    ranked += `<div class="ranked-card">
+                        <div class="ranked-queue">${qn[e.queueType]||e.queueType}</div>
+                        <div class="ranked-main">
+                            <div class="ranked-tier ${rankCls(e.tier)}">${e.tier} ${e.rank}</div>
+                            <div class="ranked-lp">${e.leaguePoints} LP</div>
+                        </div>
+                        <div class="ranked-bar-wrap">
+                            <div class="ranked-bar" style="width:${Math.min(e.leaguePoints,100)}%"></div>
+                        </div>
+                        <div class="ranked-details">
+                            <span>${e.wins}V ${e.losses}D</span>
+                            <span style="color:${wrColor};font-weight:700;">${w2}% WR</span>
+                            <span>${totalGames} jogos</span>
+                        </div>
+                        <div class="ranked-tags">
+                            ${e.hotStreak?'<span class="ranked-tag hot">Hot Streak</span>':''}
+                            ${e.veteran?'<span class="ranked-tag vet">Veterano</span>':''}
+                            ${e.freshBlood?'<span class="ranked-tag fresh">Novato</span>':''}
+                            ${e.inactive?'<span class="ranked-tag inactive">Inativo</span>':''}
+                        </div>
+                    </div>`;
                 }
-                ranked += '</div>';
+                ranked += '</div></div>';
             }
 
+            // ==================== CHAMPION POOL ====================
+            let champPool = '';
+            const champArr = Object.values(champStats).sort((a2,b2) => b2.games-a2.games);
+            if (champArr.length) {
+                const topChamps = champArr.slice(0, 8);
+                const maxGames = topChamps[0]?.games || 1;
+                champPool = `<div class="sx"><h3>Pool de Campeões</h3><div class="champ-pool">`;
+                for (const c of topChamps) {
+                    const cwr = ((c.wins/c.games)*100).toFixed(0);
+                    const ckda = ((c.kills+c.assists)/Math.max(c.deaths,1)).toFixed(1);
+                    const cAvgDmg = fmtGold((c.dmg/c.games)|0);
+                    const barW = ((c.games/maxGames)*100).toFixed(0);
+                    const wrClr = parseInt(cwr)>=60?'#4caf50':parseInt(cwr)>=50?'var(--pri)':'#ef5350';
+                    champPool += `<div class="champ-row">
+                        <img src="${champImg(c.id)}" class="champ-row-img" onerror="this.style.opacity='0.3'" loading="lazy">
+                        <div class="champ-row-info">
+                            <div class="champ-row-name">${CMAP[c.id]||'?'}</div>
+                            <div class="champ-row-bar-wrap"><div class="champ-row-bar" style="width:${barW}%;background:${wrClr};"></div></div>
+                        </div>
+                        <div class="champ-row-stats">
+                            <span class="champ-row-games">${c.games} jogos</span>
+                            <span class="champ-row-wr" style="color:${wrClr}">${cwr}%</span>
+                            <span class="champ-row-kda">${ckda} KDA</span>
+                        </div>
+                    </div>`;
+                }
+                champPool += '</div></div>';
+            }
+
+            // ==================== ROLE DISTRIBUTION ====================
+            let roleSection = '';
+            const roleNames = {TOP:'Top',JUNGLE:'Jungle',MIDDLE:'Mid',BOTTOM:'ADC',UTILITY:'Suporte'};
+            const roleColors = {TOP:'#e74c3c',JUNGLE:'#2ecc71',MIDDLE:'#3498db',BOTTOM:'#e67e22',UTILITY:'#9b59b6'};
+            const roleIcons = {TOP:'⚔️',JUNGLE:'🌿',MIDDLE:'🎯',BOTTOM:'🏹',UTILITY:'🛡️'};
+            const totalRoleGames = Object.values(roleCounts).reduce((s,v)=>s+v,0);
+            if (totalRoleGames >= 3) {
+                const roleArr = Object.entries(roleCounts).sort((a2,b2) => b2[1]-a2[1]);
+                let roleItems = '';
+                for (const [role, count] of roleArr) {
+                    const pct = ((count/totalRoleGames)*100).toFixed(0);
+                    roleItems += `<div class="role-item">
+                        <div class="role-icon">${roleIcons[role]||'?'}</div>
+                        <div class="role-info">
+                            <div class="role-name">${roleNames[role]||role}</div>
+                            <div class="role-bar-wrap"><div class="role-bar" style="width:${pct}%;background:${roleColors[role]||'var(--pri)'}"></div></div>
+                        </div>
+                        <div class="role-pct">${pct}%</div>
+                        <div class="role-count">${count}</div>
+                    </div>`;
+                }
+                roleSection = `<div class="sx"><h3>Distribuição de Roles</h3><div class="role-dist">${roleItems}</div></div>`;
+            }
+
+            // ==================== MASTERY ====================
             let mas = '';
             if (ma.length) {
-                mas = '<div class="sx"><h3>⭐ Maestria</h3><div class="mg">';
+                mas = '<div class="sx"><h3>Maestria</h3><div class="mg">';
                 for (const m of ma) {
                     mas += `<div class="mi"><span class="ml">M${m.championLevel}</span><img src="${champImg(m.championId)}" alt="" onerror="this.style.opacity='0.3'"><div class="mn">${CMAP[m.championId]||'?'}</div><div class="mp">${(m.championPoints||0).toLocaleString()} pts</div></div>`;
                 }
                 mas += '</div></div>';
             }
 
-            // Sort matches most recent first
-            const sm = [...mt].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0));
+            // ==================== MATCH HISTORY ====================
             let matchs = '';
             if (sm.length) {
-                // Collect unique champs and modes for filter
                 const champSet = new Set(), modeSet = new Set();
-                sm.forEach(m => { const mp=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; if(mp.championId) champSet.add(mp.championId); if(m.info?.gameMode) modeSet.add(m.info.gameMode); });
+                sm.forEach(m => { const mp=m.info?.participants?.find(x=>x.puuid===puuid)||{}; if(mp.championId) champSet.add(mp.championId); if(m.info?.gameMode) modeSet.add(m.info.gameMode); });
                 const filterBar = `<div class="match-filters">
                     <select id="filter-champ" onchange="filterMatches()"><option value="">Campeão</option>${[...champSet].map(c=>`<option value="${c}">${CMAP[c]||c}</option>`).join('')}</select>
-                    <select id="filter-mode" onchange="filterMatches()"><option value="">Modo</option>${[...modeSet].map(m=>`<option value="${m}">${modeName(m)}</option>`).join('')}</select>
+                    <select id="filter-mode" onchange="filterMatches()"><option value="">Modo</option>${[...modeSet].map(m2=>`<option value="${m2}">${modeName(m2)}</option>`).join('')}</select>
                     <select id="filter-result" onchange="filterMatches()"><option value="">Resultado</option><option value="w">Vitória</option><option value="l">Derrota</option></select>
                 </div>`;
-                matchs = '<div class="sx"><h3>📜 Partidas Recentes</h3>' + filterBar;
+                matchs = '<div class="sx"><h3>Partidas Recentes <span class="match-count">' + sm.length + '</span></h3>' + filterBar;
                 for (const m of sm) {
-                    const mp  = m.info?.participants?.find(x => x.puuid === a.puuid) || {};
+                    const mp  = m.info?.participants?.find(x => x.puuid === puuid) || {};
                     const tw  = m.info.teams?.find(t => t.teamId === mp.teamId)?.win;
                     const dur = m.info.gameDuration, cre = m.info.gameCreation;
                     const k=mp.kills||0, dd=mp.deaths||0, as2=mp.assists||0;
                     const cs2=(mp.totalMinionsKilled||0)+(mp.neutralMinionsKilled||0);
                     const cn=CMAP[mp.championId]||`#${mp.championId}`, cl2=mp.champLevel||'';
+                    const mkda = ((k+as2)/Math.max(dd,1)).toFixed(1);
+                    const dmg2 = mp.totalDamageDealtToChampions||0;
+                    const csPerMin = dur>0 ? (cs2/(dur/60)).toFixed(1) : '0';
                     let items='';
                     for(let j=0;j<=6;j++){if(mp['item'+j]) items+=`<img src="${itemImg(mp['item'+j])}" alt="" loading="lazy">`;}
                     let sums='';
-                    if(mp.summoner1Id) sums+=`<img src="${spellImg(mp.summoner1Id)}" style="width:20px;height:20px;border-radius:4px;" loading="lazy">`;
-                    if(mp.summoner2Id) sums+=`<img src="${spellImg(mp.summoner2Id)}" style="width:20px;height:20px;border-radius:4px;" loading="lazy">`;
+                    if(mp.summoner1Id) sums+=`<img src="${spellImg(mp.summoner1Id)}" loading="lazy">`;
+                    if(mp.summoner2Id) sums+=`<img src="${spellImg(mp.summoner2Id)}" loading="lazy">`;
                     const cls=tw?'w':'l', res=tw?'VITÓRIA':'DERROTA';
+                    // Multi-kills badge
+                    let badge = '';
+                    if(mp.pentaKills) badge='<span class="mk-badge penta">PENTA</span>';
+                    else if(mp.quadraKills) badge='<span class="mk-badge quadra">QUADRA</span>';
+                    else if(mp.tripleKills) badge='<span class="mk-badge triple">TRIPLE</span>';
                     const t100=(m.info?.participants||[]).filter(x=>x.teamId===100);
                     const t200=(m.info?.participants||[]).filter(x=>x.teamId===200);
-                    const row = o => `<div class="or ${o.teamId===100?'b':'r'}">${o.puuid===a.puuid?'<b style="color:var(--pri);min-width:10px;">▶</b>':'<span style="min-width:10px;"></span>'}<img src="${champImg(o.championId)}" loading="lazy" onerror="this.style.visibility='hidden'"><span class="on">${o.riotIdGameName||'???'}</span><span class="ok"><b>${o.kills||0}</b>/<span style="color:#ef5350;">${o.deaths||0}</span>/<span style="color:var(--pri);">${o.assists||0}</span></span></div>`;
+                    const row = o => `<div class="or ${o.teamId===100?'b':'r'}">${o.puuid===puuid?'<b style="color:var(--pri);min-width:10px;">▶</b>':'<span style="min-width:10px;"></span>'}<img src="${champImg(o.championId)}" loading="lazy" onerror="this.style.visibility='hidden'"><span class="on">${o.riotIdGameName||'???'}</span><span class="ok"><b>${o.kills||0}</b>/<span style="color:#ef5350;">${o.deaths||0}</span>/<span style="color:var(--pri);">${o.assists||0}</span></span></div>`;
+                    const matchId = m.metadata?.matchId || '';
                     matchs += `<div class="mc ${cls}" data-champ="${mp.championId}" data-mode="${m.info.gameMode}" data-result="${cls}">
-                        <div class="mh"><span>${res}</span><span class="mhi">${fmtDur(dur)} &bull; ${modeName(m.info.gameMode)} &bull; ${fmtAgo(cre)}</span></div>
+                        <div class="mh">
+                            <span>${res}</span>${badge}
+                            <span class="mhi">${fmtDur(dur)} &bull; ${modeName(m.info.gameMode)} &bull; ${fmtAgo(cre)}</span>
+                        </div>
                         <div class="mb">
-                            <div class="mch"><img src="${champImg(mp.championId)}" alt="${cn}" loading="lazy"><div>
-                                <div class="mcn">${cn} Nv.${cl2}</div>
-                                <div class="kda"><b>${k}</b>/<span style="color:#ef5350;">${dd}</span>/<span style="color:var(--pri);">${as2}</span> KDA</div>
-                                <div class="csm">${cs2} CS &bull; Visão ${mp.visionScore||0} &bull; ${mp.goldEarned>0?(mp.goldEarned/1000).toFixed(1)+'K':0} ouro</div>
-                                <div style="margin-top:4px;">${sums}</div>
-                            </div></div>
+                            <div class="mch">
+                                <div class="mch-img-wrap"><img src="${champImg(mp.championId)}" alt="${cn}" loading="lazy"><span class="mch-lvl">${cl2}</span></div>
+                                <div>
+                                    <div class="mcn">${cn}</div>
+                                    <div class="kda"><b>${k}</b>/<span style="color:#ef5350;">${dd}</span>/<span style="color:var(--pri);">${as2}</span> <span class="kda-ratio ${parseFloat(mkda)>=3?'kda-good':parseFloat(mkda)<2?'kda-bad':''}">${mkda}</span></div>
+                                    <div class="csm">${cs2} CS (${csPerMin}/min) &bull; ${fmtGold(dmg2)} dano &bull; Visão ${mp.visionScore||0}</div>
+                                    <div class="match-sums">${sums}</div>
+                                </div>
+                            </div>
                             <div class="mii">${items}</div>
                         </div>
-                        <div class="os"><div class="tsr">
-                            <div><div class="th"><span class="td b"></span> AZUL ${mp.teamId===100?'← Seu time':''}</div>${t100.map(row).join('')}</div>
-                            <div><div class="th"><span class="td r"></span> VERMELHA ${mp.teamId===200?'← Seu time':''}</div>${t200.map(row).join('')}</div>
-                        </div></div>
+                        <details class="match-teams"><summary>Times</summary><div class="tsr">
+                            <div><div class="th"><span class="td b"></span> AZUL ${mp.teamId===100?'(Seu time)':''}</div>${t100.map(row).join('')}</div>
+                            <div><div class="th"><span class="td r"></span> VERMELHA ${mp.teamId===200?'(Seu time)':''}</div>${t200.map(row).join('')}</div>
+                        </div></details>
                     </div>`;
                 }
                 matchs += '</div>';
             }
 
-            // ---- Settings tab (icon change, PIN, predictions) ----
+            // ==================== SETTINGS TAB ====================
             const user = getLoggedUser();
             const isOwner = user && user.idx === idx;
             let settingsTab = '';
             if (isOwner) {
-                // Icon picker - popular LoL profile icons
                 const iconIds = [5885,588,589,590,591,592,593,594,595,596,597,598,599,600,601,602,603,604,605,606,607,608,4951,4952,4953,4954,4955,4956,4957,4958,4959,4960,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
                 let iconGrid = '<div class="cfg-icon-grid">';
                 for (const iid of iconIds) {
@@ -1182,8 +1370,6 @@
                     iconGrid += `<img src="${profImg(iid)}" class="cfg-icon-opt${sel}" data-iid="${iid}" onclick="pickIcon(${idx},${iid})" ${F}>`;
                 }
                 iconGrid += '</div>';
-
-                // PIN change form
                 const pinSection = `<div class="cfg-section">
                     <h4>Alterar PIN</h4>
                     <div class="cfg-pin-form">
@@ -1194,12 +1380,10 @@
                         <div id="cfg-pin-msg" class="cfg-msg"></div>
                     </div>
                 </div>`;
-
-                // Predictions history
                 let predsHtml = '<div class="cfg-section"><h4>Meus Palpites</h4>';
                 const predKeys = [];
-                for (let k = 0; k < localStorage.length; k++) {
-                    const key = localStorage.key(k);
+                for (let k2 = 0; k2 < localStorage.length; k2++) {
+                    const key = localStorage.key(k2);
                     if (key && key.startsWith('pred_' + idx + '_')) predKeys.push(key);
                 }
                 if (predKeys.length) {
@@ -1207,7 +1391,6 @@
                     for (const key of predKeys) {
                         try {
                             const pred = JSON.parse(localStorage.getItem(key));
-                            const mid = key.replace('pred_' + idx + '_', '');
                             const date = pred.time ? new Date(pred.time).toLocaleDateString('pt-BR') : '?';
                             const score = pred.scoreA != null && pred.scoreB != null ? pred.scoreA + ' x ' + pred.scoreB : '';
                             predsHtml += '<div class="cfg-pred-item"><span class="cfg-pred-winner">' + (pred.winner||'?') + '</span>' + (score ? '<span class="cfg-pred-score">' + score + '</span>' : '') + '<span class="cfg-pred-date">' + date + '</span></div>';
@@ -1218,33 +1401,45 @@
                     predsHtml += '<p style="color:var(--dim);font-size:.85em;">Nenhum palpite registrado ainda.</p>';
                 }
                 predsHtml += '</div>';
-
                 settingsTab = `<div class="cfg-section"><h4>Trocar Ícone</h4><div class="cfg-icon-current"><img src="${profImg(ic)}" class="cfg-icon-preview" id="cfg-icon-preview" ${F}><span>Ícone atual</span></div>${iconGrid}</div>${pinSection}${predsHtml}`;
             }
 
+            // ==================== ASSEMBLE PROFILE ====================
             const hasCfg = isOwner;
-            const tabs = hasCfg ? `<div class="prof-tabs">
-                <button class="prof-tab on" data-tab="stats" onclick="switchProfTab('stats')">Estatísticas</button>
-                <button class="prof-tab" data-tab="config" onclick="switchProfTab('config')">Configurações</button>
-            </div>` : '';
+            const tabList = [{k:'overview',l:'Visão Geral'},{k:'champions',l:'Campeões'},{k:'matches',l:'Partidas'}];
+            if(hasCfg) tabList.push({k:'config',l:'Config'});
 
-            const rb = solo ? `<span class="prg">${solo.tier} ${solo.rank} &mdash; ${solo.leaguePoints} LP</span>` : `<span class="prg">Não posicionado</span>`;
+            const tabs = `<div class="prof-tabs">
+                ${tabList.map((t,ti) => `<button class="prof-tab ${ti===0?'on':''}" data-tab="${t.k}" onclick="switchProfTab('${t.k}')">${t.l}</button>`).join('')}
+            </div>`;
+
+            const rb = solo
+                ? `<span class="prg ${rankCls(solo.tier)}">${solo.tier} ${solo.rank} &mdash; ${solo.leaguePoints} LP</span>`
+                : `<span class="prg">Não posicionado</span>`;
+            const flexBadge = flex
+                ? `<span class="prg prg-flex">${flex.tier} ${flex.rank} Flex</span>`
+                : '';
+
             app.innerHTML = `<div class="section-wrap-sm">
                 <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
                 <div class="pv">
                     <div class="pb"><div class="pbg"></div><div class="pbi">
                         <div class="pi"><img src="${profImg(ic)}" alt="" id="prof-main-icon" ${F}></div>
                         <div><div class="pn2">${a.gameName||p.name} <span class="t">#${a.tagLine||p.tag}</span></div>
-                        <span class="prg">${p.region}</span>${rb}</div>
+                        <div class="prof-badges">${rb}${flexBadge}<span class="prg prg-region">${p.region}</span></div>
+                        </div>
                     </div></div>
+                    ${formHtml}
                     ${tabs}
-                    <div id="prof-tab-stats">${stats}${ranked}${mas}${matchs}</div>
+                    <div id="prof-tab-overview">${stats}${highlights}${ranked}</div>
+                    <div id="prof-tab-champions" style="display:none;">${champPool}${roleSection}${mas}</div>
+                    <div id="prof-tab-matches" style="display:none;">${matchs}</div>
                     ${hasCfg ? '<div id="prof-tab-config" style="display:none;">' + settingsTab + '</div>' : ''}
                 </div>
             </div>`;
         }).catch(err => {
             app.innerHTML = `<div class="section-wrap-sm"><button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
-                <div class="err"><p style="font-size:2em;margin-bottom:12px;">❌</p><p style="font-size:1.2em;margin-bottom:8px;">Erro ao carregar perfil</p><p>${err.message}</p>
+                <div class="err"><p style="font-size:2em;margin-bottom:12px;">&#10060;</p><p style="font-size:1.2em;margin-bottom:8px;">Erro ao carregar perfil</p><p>${err.message}</p>
                 <button onclick="renderProfile(${idx})" style="margin-top:16px;padding:10px 22px;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;border:none;cursor:pointer;">Tentar Novamente</button></div></div>`;
         });
     }
