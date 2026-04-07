@@ -1301,7 +1301,7 @@
             return null;
         }
 
-        // Callback for background refresh — updates card + ranking silently
+        // Callback for background refresh — updates card, ranking, and current page
         window.onPlayerRefreshed = function(i, d) {
             const rd = renderCard(i, d);
             // Update rankData for this player
@@ -1309,6 +1309,13 @@
             if (rd) { if (existing >= 0) rankData[existing] = rd; else rankData.push(rd); }
             else if (existing >= 0) rankData.splice(existing, 1);
             renderSoloQRanking(rankData, false);
+            renderTimeline();
+
+            // Re-render current page if it depends on player data
+            const h = location.hash.replace(/^#/, '');
+            if (h === 'dashboard')          renderDashboard();
+            else if (h === 'arena')         renderArenaRPG();
+            else if (h.startsWith('profile/' + i)) renderProfile(i);
         };
 
         // Load ALL players in parallel.
@@ -1350,6 +1357,8 @@
                     startRetryLoop();
                     // Check in-game immediately after all players loaded
                     setTimeout(checkSquadInGame, 3000);
+                    // Auto-refresh: cycle through all players every 3 min to keep data fresh
+                    startAutoRefreshLoop();
                 }
             });
         }
@@ -1375,6 +1384,21 @@
                     }, n * 4000); // 4s apart
                 });
             }, 20000);
+        }
+
+        // Auto-refresh: every 3 min, refresh all stale players to detect new matches
+        let _autoRefreshTimer = null;
+        function startAutoRefreshLoop() {
+            if (_autoRefreshTimer) clearInterval(_autoRefreshTimer);
+            _autoRefreshTimer = setInterval(() => {
+                if (apiExpired) return;
+                console.log('[AutoRefresh] Verificando dados desatualizados...');
+                PLAYERS.forEach((_, i) => {
+                    if (cache[i] && isStale(cache[i])) {
+                        refreshPlayer(i);
+                    }
+                });
+            }, 3 * 60 * 1000); // 3 min
         }
 
         PLAYERS.forEach((_, i) => tryLoadPlayer(i));
@@ -5216,9 +5240,11 @@
                     updateCardLive(i);
                 } else {
                     if (_liveAlerts[i]) {
-                        console.log(`[Live] ${p.name} saiu da partida`);
+                        console.log(`[Live] ${p.name} saiu da partida — buscando resultado...`);
                         delete _liveAlerts[i];
                         updateCardLive(i);
+                        // Game ended: refresh player data to pick up new match result
+                        setTimeout(() => refreshPlayer(i), 15000); // wait 15s for Riot API to process match
                     }
                 }
             } catch(e) { console.warn(`[Live] Erro ao checar ${p.name}:`, e.message); }
