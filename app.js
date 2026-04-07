@@ -1362,6 +1362,8 @@
                     _allPlayersLoaded = true;
                     PLAYERS.forEach((_, j) => setTimeout(() => loadPlayerBackground(j), j * 5000));
                     startRetryLoop();
+                    // Sort squad cards by most recent match
+                    sortSquadByLastMatch();
                     // Check in-game immediately after all players loaded
                     setTimeout(checkSquadInGame, 3000);
                     // Auto-refresh: cycle through all players every 3 min to keep data fresh
@@ -1391,6 +1393,21 @@
                     }, n * 4000); // 4s apart
                 });
             }, 20000);
+        }
+
+        // Sort squad grid by last match played (most recent first)
+        function sortSquadByLastMatch() {
+            const grid = document.getElementById('squad-grid');
+            if (!grid) return;
+            const cards = [...grid.children];
+            cards.sort((a, b) => {
+                const ai = parseInt(a.dataset.i), bi = parseInt(b.dataset.i);
+                const ma = cache[ai]?.matches, mb = cache[bi]?.matches;
+                const lastA = Array.isArray(ma) && ma.length ? (ma[0]?.info?.gameCreation || 0) : 0;
+                const lastB = Array.isArray(mb) && mb.length ? (mb[0]?.info?.gameCreation || 0) : 0;
+                return lastB - lastA;
+            });
+            cards.forEach(c => grid.appendChild(c));
         }
 
         // Auto-refresh: every 3 min, refresh all stale players to detect new matches
