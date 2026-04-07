@@ -1173,34 +1173,92 @@ body::after {
 }
 
 /* ==================== DYNAMIC CARD BACKGROUNDS ==================== */
-/* In-Game: card pulsa azul/vermelho */
+/* In-Game: card azul com splash art do campeão */
 .pc-ingame {
-    border-color: rgba(0,212,255,0.35) !important;
-    animation: inGamePulse 2s ease-in-out infinite;
+    border-color: rgba(0,150,255,0.5) !important;
+    background: linear-gradient(135deg, #0a1628 0%, #0d1f3c 40%, #0a1830 100%) !important;
+    animation: inGamePulse 2.5s ease-in-out infinite;
     position: relative;
+    overflow: hidden;
+}
+.pc-ingame .pc-live-splash {
+    position: absolute;
+    inset: 0;
+    background: var(--live-splash, none) center 20%/cover no-repeat;
+    opacity: 0.18;
+    filter: saturate(0.6) brightness(0.8);
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.5s;
+    border-radius: inherit;
+}
+.pc-ingame:hover .pc-live-splash {
+    opacity: 0.28;
+    filter: saturate(0.8) brightness(0.9);
+}
+.pc-ingame .pch,
+.pc-ingame .pr,
+.pc-ingame .pn,
+.pc-ingame .lr,
+.pc-ingame .pc-live-champ,
+.pc-ingame .noob-badge,
+.pc-ingame .noob-footer {
+    position: relative;
+    z-index: 1;
 }
 .pc-ingame::before {
     content: '🎮 EM JOGO';
     position: absolute;
     top: -1px;
     right: 16px;
-    background: linear-gradient(135deg, #1e90ff, #00d4ff);
+    background: linear-gradient(135deg, #1565c0, #0091ea);
     color: #fff;
     font-size: 0.55em;
     font-weight: 900;
-    padding: 3px 12px;
+    padding: 4px 14px;
     border-radius: 0 0 8px 8px;
     letter-spacing: 1.5px;
-    z-index: 3;
+    z-index: 4;
+    box-shadow: 0 2px 12px rgba(0,145,234,0.4);
     animation: inGameBadgePulse 1.5s ease-in-out infinite;
 }
+.pc-ingame::after {
+    content: '' !important;
+    position: absolute !important;
+    inset: 0 !important;
+    background: linear-gradient(180deg, rgba(0,100,200,0.06) 0%, rgba(0,50,120,0.12) 100%) !important;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+    opacity: 1 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    font-size: inherit !important;
+    transform: none !important;
+}
+.pc-live-splash { display: none; }
+.pc-ingame .pc-live-splash { display: block; }
+.pc-live-champ {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0,145,234,0.15);
+    color: #4fc3f7;
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-top: 8px;
+    border: 1px solid rgba(0,145,234,0.2);
+}
 @keyframes inGamePulse {
-    0%, 100% { box-shadow: 0 0 12px rgba(0,212,255,0.15), inset 0 0 20px rgba(0,212,255,0.03); border-color: rgba(0,212,255,0.35); }
-    50% { box-shadow: 0 0 25px rgba(0,212,255,0.3), 0 0 50px rgba(30,144,255,0.1), inset 0 0 30px rgba(0,212,255,0.06); border-color: rgba(30,144,255,0.5); }
+    0%, 100% { box-shadow: 0 0 15px rgba(0,100,200,0.2), inset 0 0 20px rgba(0,100,200,0.03); border-color: rgba(0,150,255,0.4); }
+    50% { box-shadow: 0 0 30px rgba(0,120,255,0.35), 0 0 60px rgba(0,80,200,0.12), inset 0 0 40px rgba(0,100,200,0.06); border-color: rgba(0,140,255,0.6); }
 }
 @keyframes inGameBadgePulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+    0%, 100% { opacity: 1; box-shadow: 0 2px 12px rgba(0,145,234,0.4); }
+    50% { opacity: 0.85; box-shadow: 0 2px 20px rgba(0,145,234,0.6); }
 }
 
 /* Win Streak: aura dourada */

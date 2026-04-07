@@ -990,7 +990,10 @@
             </div>` : '';
 
             // Dynamic card backgrounds
-            const isInGame = !!_liveAlerts[i];
+            const liveData = _liveAlerts[i];
+            const isInGame = !!liveData;
+            const liveChampId = liveData?.champId;
+            const liveChampName = liveChampId ? (CMAP[liveChampId] || null) : null;
             // Win/loss streak detection
             let streakCount = 0, streakType = null;
             const sortedMt = [...mt].filter(m => m?.info?.participants).sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0));
@@ -1003,15 +1006,23 @@
             }
             // Apply dynamic classes
             card.classList.remove('pc-ingame', 'pc-winstreak', 'pc-lossstreak');
-            if (isInGame) card.classList.add('pc-ingame');
+            card.style.removeProperty('--live-splash');
+            if (isInGame) {
+                card.classList.add('pc-ingame');
+                if (liveChampName) {
+                    card.style.setProperty('--live-splash', `url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${liveChampName}_0.jpg')`);
+                }
+            }
             else if (streakType === 'win' && streakCount >= 3) card.classList.add('pc-winstreak');
             else if (streakType === 'loss' && streakCount >= 3) card.classList.add('pc-lossstreak');
 
             const streakBadgeHtml = (streakType === 'win' && streakCount >= 3) ? `<div class="pc-streak-badge">🔥 ${streakCount} vitórias seguidas</div>`
                 : (streakType === 'loss' && streakCount >= 3) ? `<div class="pc-streak-badge">💀 ${streakCount} derrotas seguidas</div>`
+                : isInGame && liveChampName ? `<div class="pc-live-champ">🎮 Jogando de <b>${liveChampName}</b></div>`
                 : '';
 
             card.innerHTML = `
+            <div class="pc-live-splash"></div>
             ${noobBadge}
             <div class="pch">
                 <div class="pci ${isNoob?'pci-noob':''}">${isNoob?'<div class="noob-ring"></div>':''}
@@ -3391,15 +3402,26 @@
                 });
                 if (resp.status === 429) break; // Stop checking if rate limited
                 if (resp.ok) {
-                    if (!_liveAlerts[i]) {
-                        _liveAlerts[i] = true;
-                        const pName = d.account.gameName || p.name;
-                        showInGameAlert(i, pName);
-                        postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${pName} está em partida agora!` });
-                        sendNotification('Em Jogo!', `${pName} está em partida agora!`);
+                    const gameData = await resp.json().catch(() => null);
+                    // Find the champion the player is using
+                    let liveChampId = null;
+                    if (gameData?.participants) {
+                        const me = gameData.participants.find(x => x.puuid === d.account.puuid);
+                        if (me) liveChampId = me.championId;
                     }
+                    const wasAlerted = !!_liveAlerts[i];
+                    _liveAlerts[i] = { champId: liveChampId, gameData };
+                    if (!wasAlerted) {
+                        const pName = d.account.gameName || p.name;
+                        const champName = CMAP[liveChampId] || '';
+                        showInGameAlert(i, pName, champName);
+                        postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${pName} está em partida agora!${champName ? ` (${champName})` : ''}` });
+                        sendNotification('Em Jogo!', `${pName} está jogando de ${champName || 'campeão'}!`);
+                    }
+                    // Update card live if on squad page
+                    updateCardLive(i);
                 } else {
-                    delete _liveAlerts[i];
+                    if (_liveAlerts[i]) { delete _liveAlerts[i]; updateCardLive(i); }
                 }
             } catch(_) {}
             // Small delay between spectator checks to avoid rate limit
@@ -3407,16 +3429,26 @@
         }
     }
 
-    function showInGameAlert(idx, name) {
-        // Don't show if there's already an alert
+    function showInGameAlert(idx, name, champName) {
         if (document.getElementById(`ingame-alert-${idx}`)) return;
         const alert = document.createElement('div');
         alert.id = `ingame-alert-${idx}`;
         alert.className = 'ingame-alert';
-        alert.innerHTML = `<span class="ldot"></span><b>${name}</b> está em partida agora! <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.2em;margin-left:8px;">&times;</button>`;
+        alert.innerHTML = `<span class="ldot"></span><b>${name}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora! <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.2em;margin-left:8px;">&times;</button>`;
         alert.onclick = (e) => { if (e.target.tagName !== 'BUTTON') location.hash = `profile/${idx}`; };
         document.body.appendChild(alert);
         setTimeout(() => alert.remove(), 30000);
+    }
+
+    // Update a single card's live state without re-rendering everything
+    function updateCardLive(i) {
+        const card = document.querySelector(`[data-i="${i}"]`);
+        if (!card) return;
+        const d = cache[i];
+        if (!d) return;
+        // Re-render this card with updated live data
+        const onRefresh = window.onPlayerRefreshed;
+        if (typeof onRefresh === 'function') onRefresh(i, d);
     }
 
     // ======================== PALPITES COM PRAZO ========================

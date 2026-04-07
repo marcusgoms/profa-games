@@ -474,9 +474,12 @@ test('tem skeleton pulse animation', () => {
 test('tem skeleton profile', () => assertIncludes(cssContent, 'skel-profile-header'));
 test('tem skeleton dashboard', () => assertIncludes(cssContent, 'skel-dash-grid'));
 test('tem skeleton CBLOL', () => assertIncludes(cssContent, 'skel-cblol-match'));
-test('tem dynamic card in-game', () => {
+test('tem dynamic card in-game com splash', () => {
     assertIncludes(cssContent, 'pc-ingame');
     assertIncludes(cssContent, '@keyframes inGamePulse');
+    assertIncludes(cssContent, 'pc-live-splash');
+    assertIncludes(cssContent, '--live-splash');
+    assertIncludes(cssContent, 'pc-live-champ');
 });
 test('tem dynamic card win streak', () => {
     assertIncludes(cssContent, 'pc-winstreak');
@@ -538,6 +541,16 @@ test('tem dynamic card classes', () => {
     assertIncludes(appContent, 'pc-ingame');
     assertIncludes(appContent, 'pc-winstreak');
     assertIncludes(appContent, 'pc-lossstreak');
+});
+test('in-game card usa splash do campeão ao vivo', () => {
+    assertIncludes(appContent, '--live-splash');
+    assertIncludes(appContent, 'liveChampName');
+    assertIncludes(appContent, 'pc-live-splash');
+    assertIncludes(appContent, 'champion/splash');
+});
+test('checkSquadInGame salva champId', () => {
+    assertIncludes(appContent, 'champId: liveChampId');
+    assertIncludes(appContent, 'me.championId');
 });
 test('tem streak badge HTML', () => assertIncludes(appContent, 'pc-streak-badge'));
 test('tem skeleton no profile', () => assertIncludes(appContent, 'skel-profile-header'));
