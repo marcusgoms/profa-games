@@ -1543,6 +1543,7 @@
         });
 
         // Area fills + lines per player
+        const endLabels = [];
         data.forEach((d, idx) => {
             const color = tierColors[d.tier] || '#00d4ff';
             let points = [];
@@ -1571,14 +1572,34 @@
                 svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg)" stroke-width="2.5" opacity="0.95"/>`;
             });
 
-            // Label at the end
+            // Collect label for anti-overlap pass
             if (points.length) {
                 const last = points[points.length - 1];
                 const isNoob = PLAYERS[d.idx]?.special === 'noob';
                 const suffix = isNoob ? ' 🤡' : '';
-                svg += `<text x="${last.x + 8}" y="${last.y - 6}" fill="${color}" font-size="11" font-weight="800" font-family="system-ui">${d.name}${suffix}</text>`;
-                svg += `<text x="${last.x + 8}" y="${last.y + 8}" fill="#8892b0" font-size="9" font-family="system-ui">${totalLPtoElo(last.val)}</text>`;
+                endLabels.push({ x: last.x, y: last.y, name: d.name + suffix, elo: totalLPtoElo(last.val), color });
             }
+        });
+
+        // Anti-overlap: sort labels by Y, push apart if too close
+        endLabels.sort((a, b) => a.y - b.y);
+        const MIN_GAP = 22; // min pixels between label groups
+        for (let i = 1; i < endLabels.length; i++) {
+            const prev = endLabels[i - 1], cur = endLabels[i];
+            if (cur.y - prev.y < MIN_GAP) {
+                const overlap = MIN_GAP - (cur.y - prev.y);
+                prev.y -= overlap / 2;
+                cur.y += overlap / 2;
+            }
+        }
+        // Clamp to chart bounds
+        endLabels.forEach(l => { l.y = Math.max(PADT + 10, Math.min(H - PADB - 5, l.y)); });
+
+        // Render labels with connector lines
+        endLabels.forEach(l => {
+            svg += `<line x1="${l.x + 5}" y1="${l.y}" x2="${l.x + 8}" y2="${l.y - 6}" stroke="${l.color}" stroke-width="0.8" opacity="0.4"/>`;
+            svg += `<text x="${l.x + 10}" y="${l.y - 6}" fill="${l.color}" font-size="10" font-weight="800" font-family="system-ui">${l.name}</text>`;
+            svg += `<text x="${l.x + 10}" y="${l.y + 7}" fill="#8892b0" font-size="8" font-family="system-ui">${l.elo}</text>`;
         });
 
         // Axis lines
