@@ -500,11 +500,22 @@
     function isStale(d) { return !d?._ts || Date.now()-d._ts >= CACHE_TTL; }
 
     // Firebase player data helpers
+    // Firebase drops empty arrays/null values, so we normalize on read
+    function normPlayerData(d) {
+        if (!d) return null;
+        if (!d.account) return null;
+        d.league = Array.isArray(d.league) ? d.league : [];
+        d.mastery = Array.isArray(d.mastery) ? d.mastery : [];
+        d.matches = Array.isArray(d.matches) ? d.matches : [];
+        d.summoner = d.summoner || {};
+        return d;
+    }
+
     async function fbGetPlayer(i) {
         if (!db) return null;
         try {
             const snap = await db.ref(`players/${i}`).once('value');
-            return snap.val() || null;
+            return normPlayerData(snap.val());
         } catch(_) { return null; }
     }
 
@@ -561,7 +572,7 @@
         }
 
         // Fallback to localStorage
-        const stored = lsGet(`profa_player_${i}`);
+        const stored = normPlayerData(lsGet(`profa_player_${i}`));
         if (stored) {
             cache[i] = stored;
             if (isStale(stored)) refreshPlayer(i);
@@ -678,7 +689,7 @@
             if (fbData) { fbData._ts = fbData._updatedAt || Date.now(); cache[i] = fbData; lsSet(`profa_player_${i}`, fbData); }
         }
         if (!cache[i]) {
-            const c = lsGet(`profa_player_${i}`);
+            const c = normPlayerData(lsGet(`profa_player_${i}`));
             if (c) cache[i] = c;
         }
         if (cache[i]?._full) {
@@ -777,14 +788,15 @@
             const card = document.querySelector(`[data-i="${i}"]`);
             if (!card) return null;
             const p = PLAYERS[i];
-            const s = d.summoner, ic = playerIcon(i, s.profileIconId), lv = s.summonerLevel || '?';
-            const solo = d.league.find(e => e.queueType === 'RANKED_SOLO_5x5');
+            const s = d.summoner || {}, le = Array.isArray(d.league) ? d.league : [], mt = Array.isArray(d.matches) ? d.matches : [];
+            const ic = playerIcon(i, s.profileIconId), lv = s.summonerLevel || '?';
+            const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
             const wr = solo ? ((solo.wins/(solo.wins+solo.losses))*100)|0 : null;
-            const recent = d.matches.length
-                ? [...d.matches].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))[0]
+            const recent = mt.length
+                ? [...mt].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0))[0]
                 : null;
-            const ago = recent ? fmtAgo(recent.info.gameCreation) : '';
-            const rmp = recent?.info?.participants?.find(x => x.puuid === d.account.puuid);
+            const ago = recent ? fmtAgo(recent.info?.gameCreation) : '';
+            const rmp = recent?.info?.participants?.find(x => x.puuid === d.account?.puuid);
             const rChId = rmp?.championId;
             const rWin = rmp?.win;
 
@@ -806,7 +818,7 @@
                     <img src="${profImg(ic)}" alt="" ${F}>
                 </div>
                 <div>
-                    <div class="pcn">${noobTitle}${d.account.gameName||p.name} <span class="t">#${d.account.tagLine||p.tag}</span></div>
+                    <div class="pcn">${noobTitle}${d.account?.gameName||p.name} <span class="t">#${d.account?.tagLine||p.tag}</span></div>
                     <div class="cl">Nível ${lv}${isNoob?' — AMON (Hardstuck)':''}</div>
                 </div>
             </div>
@@ -1095,11 +1107,14 @@
         </div>`;
 
         loadPlayer(idx).then(d => {
-            const { account:a, summoner:s, league:le, mastery:ma, matches:mt } = d;
+            const a = d.account || {}, s = d.summoner || {};
+            const le = Array.isArray(d.league) ? d.league : [];
+            const ma = Array.isArray(d.mastery) ? d.mastery : [];
+            const mt = Array.isArray(d.matches) ? d.matches : [];
             const ic = playerIcon(idx, s.profileIconId), lv = s.summonerLevel || '?';
             const solo = le.find(e => e.queueType === 'RANKED_SOLO_5x5');
             const flex = le.find(e => e.queueType === 'RANKED_FLEX_SR');
-            const puuid = a.puuid;
+            const puuid = a.puuid || '';
 
             // ==================== AGGREGATE STATS ====================
             let tv=0, td=0; le.forEach(e => { tv+=e.wins||0; td+=e.losses||0; });
@@ -2440,7 +2455,7 @@
             const sb = db.league.find(e=>e.queueType==='RANKED_SOLO_5x5');
 
             function pStats(d) {
-                const mt = d.matches, a = d.account;
+                const mt = Array.isArray(d.matches)?d.matches:[], a = d.account||{};
                 let k=0,dd=0,as=0,cs=0,g=0;
                 mt.forEach(m => { const p=m.info?.participants?.find(x=>x.puuid===a.puuid)||{}; k+=p.kills||0; dd+=p.deaths||0; as+=p.assists||0; cs+=(p.totalMinionsKilled||0)+(p.neutralMinionsKilled||0); g+=p.goldEarned||0; });
                 const n=mt.length||1;
@@ -2516,9 +2531,9 @@
         const allMatches = [];
         PLAYERS.forEach((p, i) => {
             const d = cache[i];
-            if (!d?.matches) return;
+            if (!d?.matches || !Array.isArray(d.matches)) return;
             d.matches.forEach(m => {
-                const mp = m.info?.participants?.find(x => x.puuid === d.account.puuid);
+                const mp = m.info?.participants?.find(x => x.puuid === d.account?.puuid);
                 if (!mp) return;
                 allMatches.push({ player: d.account.gameName||p.name, playerIdx: i, icon: playerIcon(i, d.summoner?.profileIconId), champ: mp.championId, win: mp.win, kills: mp.kills||0, deaths: mp.deaths||0, assists: mp.assists||0, time: m.info.gameCreation, mode: m.info.gameMode, duration: m.info.gameDuration });
             });
