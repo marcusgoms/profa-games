@@ -1962,7 +1962,10 @@
             const liveBanner = liveAlert ? `<div class="prof-live-banner" onclick="showLiveMatch(${idx})"><span class="ldot"></span> EM PARTIDA AO VIVO — Clique para assistir</div>` : '';
 
             app.innerHTML = `<div class="section-wrap-sm">
-                <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+                <div class="prof-topbar">
+                    <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
+                    <button class="prof-refresh-btn" id="prof-refresh-btn" onclick="checkNewMatches(${idx})">&#128260; Verificar partidas novas</button>
+                </div>
                 ${liveBanner}
                 <div class="pv">
                     <div class="pb" style="--pb-splash:url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${CMAP[champArr[0]?.id]||'Zed'}_0.jpg')"><div class="pbg"></div><div class="pbi">
@@ -5514,6 +5517,57 @@
             }, 1000);
         }
     }
+
+    // Quick-check for new matches (fetches last 2 match IDs and compares)
+    window.checkNewMatches = async function(playerIdx) {
+        const btn = document.getElementById('prof-refresh-btn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '&#8987; Verificando...'; }
+        try {
+            const d = cache[playerIdx];
+            if (!d?.account?.puuid) throw new Error('Dados não disponíveis');
+            const p = PLAYERS[playerIdx], cl = clust(p.region), pl = plat(p.region);
+            const puuid = d.account.puuid;
+            // Fetch only last 2 match IDs
+            const ids = await riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=2`);
+            if (!ids?.length) { showToast('📋', 'Nenhuma partida encontrada.'); return; }
+            const oldIds = new Set((d.matches||[]).map(m => m.metadata?.matchId).filter(Boolean));
+            const newIds = ids.filter(id => !oldIds.has(id));
+            if (!newIds.length) {
+                showToast('✅', `<b>${d.account.gameName||p.name}</b> — Nenhuma partida nova.`);
+                if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; Verificar partidas novas'; }
+                return;
+            }
+            // Fetch new matches
+            if (btn) btn.innerHTML = `&#8987; Baixando ${newIds.length} partida${newIds.length>1?'s':''}...`;
+            const newMatches = [];
+            for (const id of newIds) {
+                await new Promise(r => setTimeout(r, 1200));
+                const raw = await rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${id}`, null);
+                if (raw) { const c = compressMatch(raw, puuid); if (c) newMatches.push(c); }
+            }
+            if (newMatches.length) {
+                const prev = cache[playerIdx];
+                const existingIds2 = new Set((prev.matches||[]).map(m => m.metadata?.matchId).filter(Boolean));
+                const brandNew = newMatches.filter(m => !existingIds2.has(m.metadata?.matchId));
+                if (brandNew.length) {
+                    prev.matches = [...brandNew, ...(prev.matches||[])].sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0));
+                    prev._ts = Date.now();
+                    cache[playerIdx] = prev;
+                    lsSet(`profa_player_${playerIdx}`, prev);
+                    fbSavePlayer(playerIdx, prev);
+                    showToast('🆕', `<b>${brandNew.length}</b> partida${brandNew.length>1?'s':''}  nova${brandNew.length>1?'s':''} de <b>${d.account.gameName||p.name}</b>!`);
+                    // Re-render profile
+                    renderProfile(playerIdx);
+                    return;
+                }
+            }
+            showToast('✅', `<b>${d.account.gameName||p.name}</b> — Nenhuma partida nova.`);
+        } catch(e) {
+            console.warn('[CheckNew]', e);
+            showToast('⚠️', 'Erro ao verificar: ' + (e.message||'tente novamente'));
+        }
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; Verificar partidas novas'; }
+    };
 
     // Show live match for a player (called from profile or card)
     window.showLiveMatch = async function(playerIdx) {
