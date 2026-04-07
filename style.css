@@ -1365,6 +1365,8 @@ body::after {
 .notif-bar-close:hover { color: #fff; }
 
 /* NOTIFICATION BELL */
+.discord-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(88,101,242,0.25); color: #5865f2; background: rgba(88,101,242,0.08); transition: all 0.2s; flex-shrink: 0; text-decoration: none; }
+.discord-btn:hover { background: rgba(88,101,242,0.2); border-color: rgba(88,101,242,0.5); transform: translateY(-1px); }
 .notif-bell { background: none; border: none; color: var(--dim); font-size: 1.1em; cursor: pointer; padding: 6px; transition: color 0.2s; position: relative; }
 .notif-bell:hover { color: var(--pri); }
 
@@ -1682,6 +1684,8 @@ body::after {
 }
 .ft-icons { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; opacity: 0.4; }
 .ft-icon { width: 20px; height: 20px; border-radius: 50%; }
+.ft-discord { display: inline-block; color: #5865f2; text-decoration: none; font-weight: 700; margin-bottom: 8px; padding: 4px 14px; border-radius: 8px; background: rgba(88,101,242,0.08); border: 1px solid rgba(88,101,242,0.15); transition: all 0.2s; font-size: 1.05em; }
+.ft-discord:hover { background: rgba(88,101,242,0.18); border-color: rgba(88,101,242,0.4); }
 
 /* ==================== RESPONSIVE ==================== */
 
