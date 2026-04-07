@@ -5506,7 +5506,7 @@
 
     // ======================== NOTIFICATION SYSTEM ========================
     // Notification preferences (stored in localStorage)
-    const NOTIF_DEFAULTS = { live: true, rank: true, chat: true, cblol: true, pentakill: true };
+    const NOTIF_DEFAULTS = { chat: true };
     function getNotifPrefs() {
         try { return { ...NOTIF_DEFAULTS, ...JSON.parse(localStorage.getItem('profa_notif_prefs') || '{}') }; } catch(_) { return { ...NOTIF_DEFAULTS }; }
     }
@@ -5584,11 +5584,7 @@
         panel.id = 'notif-settings-panel';
         panel.className = 'notif-settings-panel';
         const items = [
-            { key: 'live', icon: '🎮', label: 'Partidas ao vivo do squad' },
-            { key: 'rank', icon: '📊', label: 'Mudanças de rank / PDL' },
             { key: 'chat', icon: '💬', label: 'Mensagens no chat' },
-            { key: 'cblol', icon: '🏆', label: 'CBLOL e campeonatos' },
-            { key: 'pentakill', icon: '💀', label: 'Pentakills' },
         ];
         panel.innerHTML = `
             <div class="notif-settings-header">
@@ -5620,20 +5616,17 @@
         if (newVal > oldVal) {
             const msg = `${name} subiu para ${newSolo.tier} ${newSolo.rank}!`;
             postFeedEvent({ type: 'rank_up', player: name, idx: playerIdx, msg });
-            sendNotification('Rank Up!', msg, null, 'rank');
-            if (getNotifPrefs().rank) showToast('📈', msg, () => location.hash = `profile/${playerIdx}`);
             playSFX('victory');
         } else if (newVal < oldVal) {
             const msg = `${name} caiu para ${newSolo.tier} ${newSolo.rank}`;
             postFeedEvent({ type: 'rank_down', player: name, idx: playerIdx, msg });
-            sendNotification('Rank Down', msg, null, 'rank');
-            if (getNotifPrefs().rank) showToast('📉', msg, () => location.hash = `profile/${playerIdx}`);
+            // rank down tracked via feed only
         }
         // LP milestone notifications
         const newLP = newSolo.leaguePoints || 0;
         const oldLP = oldSolo.leaguePoints || 0;
         if (newLP >= 100 && oldLP < 100) {
-            sendNotification('PDL Milestone!', `${name} chegou a ${newLP} PDL em ${newSolo.tier} ${newSolo.rank}!`, null, 'rank');
+            // LP milestone tracked via feed only
             postFeedEvent({ type: 'lp_milestone', player: name, idx: playerIdx, msg: `${name} atingiu ${newLP} PDL!` });
         }
         // Detect pentakill from new matches
@@ -5643,8 +5636,7 @@
             const mp = m.info?.participants?.find(x => x.puuid === newData.account?.puuid);
             if (mp?.pentaKills > 0) {
                 const champName = CMAP[mp.championId] || '?';
-                sendNotification('PENTAKILL!', `${name} fez PENTAKILL de ${champName}!`, null, 'pentakill');
-                if (getNotifPrefs().pentakill) showToast('💀', `<b>${name}</b> fez PENTAKILL de <b>${champName}</b>!`, () => location.hash = `profile/${playerIdx}`);
+                // pentakill tracked via feed only
                 postFeedEvent({ type:'pentakill', player:name, idx:playerIdx, msg:`${name} fez PENTAKILL de ${champName}!` });
                 playSFX('unlock');
             }
@@ -5695,7 +5687,6 @@
                             const pName = d.account.gameName || p.name;
                             const champName = CMAP[liveChampId] || '';
                             if (!_liveAlerts[i]?._notified) {
-                                if (getNotifPrefs().live) showToast('🎮', `<b>${pName}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora!`);
                                 _liveAlerts[i]._notified = true;
                             }
                         }
@@ -5717,9 +5708,7 @@
                             const pName = d.account.gameName || p.name;
                             const champName = CMAP[liveChampId] || '';
                             const idx = i;
-                            if (getNotifPrefs().live) showToast('🎮', `<b>${pName}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora!`, );
                             postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${pName} está em partida agora!${champName ? ` (${champName})` : ''}` });
-                            sendNotification('Em Jogo!', `${pName} está jogando de ${champName || 'campeão'}!`, null, 'live');
                         }
                         updateCardLive(i);
                     } else {
@@ -5796,9 +5785,7 @@
         if (btn) { btn.disabled = true; btn.innerHTML = '&#8987; Verificando...'; }
         await checkSquadInGame();
         const liveCount = Object.keys(_liveAlerts).length;
-        if (liveCount === 0) {
-            showToast('😴', 'Ninguém do squad está em partida agora.');
-        }
+        // live count shown on button only
         if (btn) { btn.disabled = false; btn.innerHTML = '🎮 Quem está em partida?'; }
     };
 
@@ -5854,11 +5841,10 @@
 
             // Fetch only last 2 match IDs
             const ids = await riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=2`);
-            if (!ids?.length) { showToast('📋', 'Nenhuma partida encontrada.'); return; }
+            if (!ids?.length) return;
             const oldIds = new Set((d.matches||[]).map(m => m.metadata?.matchId).filter(Boolean));
             const newIds = ids.filter(id => !oldIds.has(id));
             if (!newIds.length) {
-                showToast('✅', `<b>${d.account.gameName||p.name}</b> — Nenhuma partida nova.`);
                 if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; Verificar partidas novas'; }
                 return;
             }
@@ -5887,7 +5873,7 @@
                     lsSet(`profa_player_${playerIdx}`, prev);
                     fbSavePlayer(playerIdx, prev);
                     if (oldLeague) detectRankChanges(playerIdx, { league: oldLeague }, { league: prev.league, account: prev.account, matches: prev.matches });
-                    showToast('🆕', `<b>${brandNew.length}</b> partida${brandNew.length>1?'s':''}  nova${brandNew.length>1?'s':''} de <b>${d.account.gameName||p.name}</b>!`);
+                    // new matches loaded silently
                     renderProfile(playerIdx);
                     return;
                 }
@@ -5898,7 +5884,7 @@
             lsSet(`profa_player_${playerIdx}`, prev);
             fbSavePlayer(playerIdx, prev);
             if (oldLeague) detectRankChanges(playerIdx, { league: oldLeague }, { league: prev.league, account: prev.account, matches: prev.matches });
-            showToast('✅', `<b>${d.account.gameName||p.name}</b> — Nenhuma partida nova. Rank atualizado.`);
+            // rank updated silently
         } catch(e) {
             console.warn('[CheckNew]', e);
             showToast('⚠️', 'Erro ao verificar: ' + (e.message||'tente novamente'));
