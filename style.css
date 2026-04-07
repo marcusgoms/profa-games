@@ -782,8 +782,8 @@ body::after {
 .soloq-svg { width: 100%; height: auto; min-width: 500px; }
 
 /* ==================== PAGE TRANSITION ==================== */
-.page-enter { animation: pageIn 0.25s ease; }
-@keyframes pageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.page-enter { animation: pageIn3D 0.4s ease; }
+@keyframes pageIn3D { from { opacity: 0; transform: perspective(800px) rotateX(-3deg) translateY(20px) scale(0.98); } to { opacity: 1; transform: perspective(800px) rotateX(0) translateY(0) scale(1); } }
 
 /* ==================== THEME TOGGLE ==================== */
 .theme-toggle { background: none; border: 1px solid rgba(255,255,255,0.08); color: var(--dim); font-size: 1.1em; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -1172,11 +1172,70 @@ body::after {
     .live-detail-matchup { gap: 1.2rem; }
 }
 
+/* ==================== 3D EFFECTS ==================== */
+/* Card glare overlay */
+.card-glare { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 2; }
+.pc { transform-style: preserve-3d; transition: transform 0.15s ease, box-shadow 0.15s ease; will-change: transform; }
+
+/* Particle canvas */
+.particle-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit; }
+
+/* 3D Rank Badge */
+.rank-badge-3d { perspective: 400px; margin-left: auto; flex-shrink: 0; }
+.rank-badge-inner { width: 80px; height: 90px; position: relative; transform-style: preserve-3d; animation: badgeFloat 3s ease-in-out infinite, badgeSpin 8s linear infinite; }
+.rank-badge-face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; backface-visibility: hidden; border: 2px solid var(--rank-color); }
+.rank-badge-front { background: linear-gradient(145deg, rgba(0,0,0,0.6), rgba(0,0,0,0.3)); box-shadow: 0 4px 20px color-mix(in srgb, var(--rank-color) 30%, transparent), inset 0 1px 0 rgba(255,255,255,0.1); }
+.rank-badge-back { transform: rotateY(180deg); background: linear-gradient(145deg, rgba(0,0,0,0.4), rgba(0,0,0,0.2)); box-shadow: 0 4px 20px color-mix(in srgb, var(--rank-color) 20%, transparent); }
+.rank-badge-tier { font-size: 0.55em; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--rank-color); text-shadow: 0 0 10px var(--rank-color); }
+.rank-badge-rank { font-size: 1.4em; font-weight: 900; color: var(--rank-color); text-shadow: 0 0 15px var(--rank-color); }
+.rank-badge-lp { font-size: 0.6em; color: var(--dim); font-weight: 600; }
+.rank-badge-emblem { font-size: 2.2em; font-weight: 900; color: var(--rank-color); text-shadow: 0 0 20px var(--rank-color); opacity: 0.6; }
+@keyframes badgeFloat { 0%,100%{transform:translateY(0) rotateY(0)} 50%{transform:translateY(-6px) rotateY(0)} }
+@keyframes badgeSpin { 0%{transform:translateY(0) rotateY(0)} 25%{transform:translateY(-4px) rotateY(5deg)} 50%{transform:translateY(0) rotateY(0)} 75%{transform:translateY(-4px) rotateY(-5deg)} 100%{transform:translateY(0) rotateY(0)} }
+
+/* Hero floating orbs */
+.squad-hero { overflow: hidden; }
+.squad-hero::before { content: ''; position: absolute; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(0,212,255,0.08), transparent 70%); top: -40px; left: 10%; animation: orbFloat1 6s ease-in-out infinite; filter: blur(30px); pointer-events: none; }
+.squad-hero::after { content: ''; position: absolute; width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(233,69,96,0.08), transparent 70%); bottom: -30px; right: 15%; animation: orbFloat2 5s ease-in-out infinite; filter: blur(25px); pointer-events: none; }
+@keyframes orbFloat1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(30px,20px) scale(1.1)} 66%{transform:translate(-20px,10px) scale(0.95)} }
+@keyframes orbFloat2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-25px,-15px) scale(1.15)} }
+
+/* Hero emblem 3D spin */
+.hero-emblem { animation: emblemPulse 3s ease-in-out infinite; }
+@keyframes emblemPulse { 0%,100%{transform:perspective(200px) rotateY(0) scale(1); box-shadow:0 2px 12px rgba(0,212,255,0.15)} 50%{transform:perspective(200px) rotateY(15deg) scale(1.05); box-shadow:0 4px 20px rgba(0,212,255,0.3)} }
+
+/* Profile header depth */
+.pb { transform-style: preserve-3d; }
+.pbg { animation: bgPulse 4s ease-in-out infinite; }
+@keyframes bgPulse { 0%,100%{opacity:0.15} 50%{opacity:0.25} }
+.pi { transition: transform 0.3s; }
+.pi:hover { transform: perspective(200px) rotateY(-10deg) scale(1.05); }
+
+/* Nav 3D hover */
+.nl a { transition: all 0.2s; transform-style: preserve-3d; }
+.nl a:hover { transform: perspective(400px) translateZ(4px); }
+.nl a.on { transform: perspective(400px) translateZ(2px); }
+
+/* Section cards depth */
+.ranked-card, .hl-item, .pst { transition: transform 0.2s, box-shadow 0.2s; }
+.ranked-card:hover, .hl-item:hover, .pst:hover { transform: perspective(500px) translateZ(8px) scale(1.02); box-shadow: 0 8px 24px rgba(0,212,255,0.08); }
+
+/* Champ row 3D tilt */
+.champ-row { transition: transform 0.2s; }
+.champ-row:hover { transform: perspective(500px) rotateX(-2deg) translateZ(4px) scale(1.01); }
+
 /* Mobile */
 @media(max-width:760px){
     :root { font-size: 15px; }
 
     /* Nav */
+    /* Disable heavy 3D on mobile */
+    .particle-canvas { display: none; }
+    .squad-hero::before, .squad-hero::after { display: none; }
+    .rank-badge-3d { display: none; }
+    .pc:hover { transform: none; }
+    .card-glare { display: none; }
+
     .nl{display:none;flex-direction:column;position:absolute;top:62px;left:0;right:0;background:rgba(13,13,26,0.97);padding:16px 24px;gap:4px;border-bottom:1px solid rgba(255,255,255,0.06);z-index:100}
     .nl.open{display:flex}
     .nl a { padding: 12px 16px; font-size: 1em; border-radius: 10px; }

@@ -746,6 +746,114 @@
     $('mmb').addEventListener('click', () => $('nav').classList.toggle('open'));
     $('nav').addEventListener('click', () => $('nav').classList.remove('open'));
 
+    // ======================== 3D EFFECTS ========================
+    // 3D Tilt on squad cards
+    function init3DTilt() {
+        document.querySelectorAll('.pc').forEach(card => {
+            if (card._tilt3d) return;
+            card._tilt3d = true;
+            card.addEventListener('mousemove', e => {
+                const r = card.getBoundingClientRect();
+                const x = (e.clientX - r.left) / r.width - 0.5;
+                const y = (e.clientY - r.top) / r.height - 0.5;
+                card.style.transform = `perspective(600px) rotateY(${x*12}deg) rotateX(${-y*12}deg) scale(1.02)`;
+                card.style.boxShadow = `${-x*20}px ${y*20}px 40px rgba(0,212,255,0.12)`;
+                // Glare
+                const glare = card.querySelector('.card-glare');
+                if (glare) { glare.style.opacity = '1'; glare.style.background = `radial-gradient(circle at ${(x+0.5)*100}% ${(y+0.5)*100}%, rgba(255,255,255,0.12), transparent 60%)`; }
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = ''; card.style.boxShadow = '';
+                const glare = card.querySelector('.card-glare');
+                if (glare) glare.style.opacity = '0';
+            });
+            // Add glare overlay
+            if (!card.querySelector('.card-glare')) {
+                const g = document.createElement('div');
+                g.className = 'card-glare';
+                card.appendChild(g);
+            }
+        });
+    }
+
+    // Particle canvas background
+    function initParticles(container) {
+        if (!container || container.querySelector('.particle-canvas')) return;
+        const canvas = document.createElement('canvas');
+        canvas.className = 'particle-canvas';
+        container.style.position = 'relative';
+        container.insertBefore(canvas, container.firstChild);
+        const ctx = canvas.getContext('2d');
+        let w, h, particles = [], animId;
+
+        function resize() {
+            w = canvas.width = container.offsetWidth;
+            h = canvas.height = container.offsetHeight;
+        }
+        resize();
+
+        const count = Math.min(50, Math.floor(w * h / 8000));
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: Math.random() * w, y: Math.random() * h,
+                vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4,
+                r: Math.random() * 2 + 0.5,
+                a: Math.random() * 0.4 + 0.1,
+                color: Math.random() > 0.5 ? '0,212,255' : '233,69,96'
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, w, h);
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+                if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${p.color},${p.a})`;
+                ctx.fill();
+            });
+            // Draw connections
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 120) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `rgba(0,212,255,${0.06 * (1 - dist/120)})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                }
+            }
+            animId = requestAnimationFrame(draw);
+        }
+        draw();
+
+        // Cleanup when container is removed
+        const observer = new MutationObserver(() => {
+            if (!document.contains(container)) { cancelAnimationFrame(animId); observer.disconnect(); }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('resize', resize, { passive: true });
+    }
+
+    // 3D floating rank badge
+    function create3DRankBadge(tier, rank, lp) {
+        if (!tier) return '';
+        const tierColors3d = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
+        const color = tierColors3d[tier] || '#00d4ff';
+        return `<div class="rank-badge-3d" style="--rank-color:${color}">
+            <div class="rank-badge-inner">
+                <div class="rank-badge-face rank-badge-front"><span class="rank-badge-tier">${tier}</span><span class="rank-badge-rank">${rank}</span><span class="rank-badge-lp">${lp} LP</span></div>
+                <div class="rank-badge-face rank-badge-back"><span class="rank-badge-emblem">${tier.charAt(0)}</span></div>
+            </div>
+        </div>`;
+    }
+
     // ======================== TEAM ========================
     async function renderTeam() {
         app.innerHTML = `
@@ -784,6 +892,9 @@
                 <div id="squad-timeline"><p style="color:var(--dim);text-align:center;padding:1rem;">Carregando...</p></div>
             </div>
         </div>`;
+
+        // Init 3D effects
+        initParticles(document.querySelector('.squad-hero'));
 
         const rankData = [];
         let loaded = 0;
@@ -887,11 +998,11 @@
                 if (!isAuth && !failedPlayers.includes(i)) failedPlayers.push(i);
             }).finally(() => {
                 loaded++;
+                init3DTilt();
                 renderSoloQRanking(rankData, loaded < PLAYERS.length);
                 renderTimeline();
                 if (loaded === PLAYERS.length) {
                     _allPlayersLoaded = true;
-                    // Stagger background loading: 5s apart per player to avoid rate limit
                     PLAYERS.forEach((_, j) => setTimeout(() => loadPlayerBackground(j), j * 5000));
                     startRetryLoop();
                 }
@@ -1465,6 +1576,7 @@
                         <div><div class="pn2">${a.gameName||p.name} <span class="t">#${a.tagLine||p.tag}</span></div>
                         <div class="prof-badges">${rb}${flexBadge}<span class="prg prg-region">${p.region}</span></div>
                         </div>
+                        ${solo ? create3DRankBadge(solo.tier, solo.rank, solo.leaguePoints) : ''}
                     </div></div>
                     ${formHtml}
                     ${tabs}
@@ -1474,6 +1586,7 @@
                     ${hasCfg ? '<div id="prof-tab-config" style="display:none;">' + settingsTab + '</div>' : ''}
                 </div>
             </div>`;
+            initParticles(document.querySelector('.pb'));
         }).catch(err => {
             app.innerHTML = `<div class="section-wrap-sm"><button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
                 <div class="err"><p style="font-size:2em;margin-bottom:12px;">&#10060;</p><p style="font-size:1.2em;margin-bottom:8px;">Erro ao carregar perfil</p><p>${err.message}</p>
