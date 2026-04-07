@@ -208,7 +208,7 @@
         test('fmtTime(3661) → "61:01"', () => assertEqual(fmtTime(3661), '61:01'));
         test('fmtTime(5) → "0:05"', () => assertEqual(fmtTime(5), '0:05'));
         test('fmtAgo(null) → ""', () => assertEqual(fmtAgo(null), ''));
-        test('fmtAgo(0) → contém "d atrás"', () => assertIncludes(fmtAgo(0), 'd atrás'));
+        test('fmtAgo(0) → "" (0 é falsy)', () => assertEqual(fmtAgo(0), ''));
         test('fmtAgo(recente) → contém "min atrás"', () => assertIncludes(fmtAgo(Date.now() - 120000), 'min atrás'));
         test('fmtAgo(1h) → contém "h atrás"', () => assertIncludes(fmtAgo(Date.now() - 7200000), 'h atrás'));
         test('fmtKeyTime(null) → "desconhecido"', () => assertEqual(fmtKeyTime(null), 'desconhecido'));
