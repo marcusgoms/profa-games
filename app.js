@@ -1021,7 +1021,7 @@
         // Sidebars só no Squad FF
         const _sL = document.getElementById('sidebar-left'), _sR = document.getElementById('sidebar-right');
         if (_sL) _sL.classList.toggle('tier-sidebar--visible', !h || h === 'team');
-        if (_sR) _sR.classList.toggle('tier-sidebar--visible', !h || h === 'team');
+        if (_sR) _sR.classList.toggle('squad-sidebar--visible', !h || h === 'team');
         if (!h || h === 'team')               { clearLive(); renderTeam(); }
         else if (h.startsWith('live'))        { clearLive(); renderLivePage(h); }
         else if (h.startsWith('profile/'))    renderProfile(parseInt(h.split('/')[1]));
@@ -1029,6 +1029,7 @@
         else if (h === 'cblol')               { clearLive(); renderCBLOL('upcoming'); }
         else if (h === 'dashboard')           { clearLive(); renderDashboard(); }
         else if (h === 'arena')               { clearLive(); renderArenaRPG(); }
+        else if (h.startsWith('dm/'))           { clearLive(); renderDM(parseInt(h.split('/')[1])); }
         else if (h === 'chat')                { clearLive(); clearChatBadge(); renderChat(); }
         else if (h === 'teambuilder')         { clearLive(); renderTeamBuilder(); }
         else                                  { clearLive(); renderTeam(); }
@@ -1036,7 +1037,7 @@
     function pn(h) {
         if (!h || h === 'team' || h.startsWith('profile/') || h.startsWith('compare')) return 'team';
         if (h === 'arena') return 'arena';
-        if (h === 'chat') return 'chat';
+        if (h === 'chat' || h.startsWith('dm/')) return 'chat';
         if (h === 'cblol') return 'cblol';
         if (h.startsWith('live')) return 'live';
         if (h === 'dashboard') return 'dashboard';
@@ -1322,6 +1323,7 @@
             else if (existing >= 0) rankData.splice(existing, 1);
             renderSoloQRanking(rankData, false);
             renderSquadPodium(rankData);
+                updateSquadSidebar(rankData);
             renderTimeline();
 
             // Re-render current page if it depends on player data
@@ -1364,6 +1366,7 @@
                 init3DTilt();
                 renderSoloQRanking(rankData, loaded < PLAYERS.length);
                 renderSquadPodium(rankData);
+                updateSquadSidebar(rankData);
                 renderTimeline();
                 if (loaded === PLAYERS.length) {
                     _allPlayersLoaded = true;
@@ -6069,23 +6072,6 @@
             { name:'DrMundo', display:'Dr. Mundo', wr:52.0, tier:'B', role:'Jungle' },
             { name:'Soraka', display:'Soraka', wr:52.0, tier:'A', role:'Sup' },
         ];
-        const LOW_WR = [
-            { name:'Zeri', display:'Zeri', wr:45.1, tier:'E', role:'ADC' },
-            { name:'Ryze', display:'Ryze', wr:45.4, tier:'E', role:'Mid' },
-            { name:'Azir', display:'Azir', wr:45.8, tier:'E', role:'Mid' },
-            { name:'Nidalee', display:'Nidalee', wr:46.0, tier:'D', role:'Jungle' },
-            { name:'Kalista', display:'Kalista', wr:46.2, tier:'D', role:'ADC' },
-            { name:'Akali', display:'Akali', wr:46.5, tier:'D', role:'Mid' },
-            { name:'Corki', display:'Corki', wr:46.7, tier:'D', role:'Mid' },
-            { name:'Rengar', display:'Rengar', wr:46.8, tier:'D', role:'Jungle' },
-            { name:'Jayce', display:'Jayce', wr:46.9, tier:'D', role:'Top' },
-            { name:'Gangplank', display:'Gangplank', wr:47.0, tier:'D', role:'Top' },
-            { name:'Thresh', display:'Thresh', wr:47.1, tier:'D', role:'Sup' },
-            { name:'LeBlanc', display:'LeBlanc', wr:47.2, tier:'D', role:'Mid' },
-            { name:'Gwen', display:'Gwen', wr:47.3, tier:'D', role:'Top' },
-            { name:'Riven', display:'Riven', wr:47.4, tier:'D', role:'Top' },
-            { name:'Qiyana', display:'Qiyana', wr:47.5, tier:'D', role:'Mid' },
-        ];
         function wrClass(wr) {
             if (wr >= 52) return 'tier-row__wr--high';
             if (wr >= 50) return 'tier-row__wr--mid';
@@ -6108,8 +6094,162 @@
         }
         setTimeout(() => {
             renderList('tier-left-list', TOP_WR);
-            renderList('tier-right-list', LOW_WR);
         }, 2500);
     })();
+
+    // ======================== SQUAD SIDEBAR (right) ========================
+    let _squadSidebarData = [];
+    function updateSquadSidebar(rankData) {
+        _squadSidebarData = rankData;
+        renderSquadSidebar();
+    }
+    function renderSquadSidebar() {
+        const el = document.getElementById('squad-sidebar-list');
+        if (!el) return;
+        // Build list: all players, sorted by totalLP desc. Unranked go last.
+        const ranked = _squadSidebarData.filter(r => r).sort((a, b) => b.totalLP - a.totalLP);
+        const rankedIdxs = new Set(ranked.map(r => r.idx));
+        const unranked = PLAYERS.map((p, i) => i).filter(i => !rankedIdxs.has(i));
+        const rows = [];
+        ranked.forEach((r, pos) => {
+            const p = PLAYERS[r.idx];
+            const isNoob = p.special === 'noob';
+            const presence = _onlineUsers[r.idx];
+            const isOnline = presence?.online;
+            const lastSeen = presence?.ts ? fmtAgo(presence.ts) : '';
+            rows.push({ idx: r.idx, name: r.name, tier: r.tier, rank: r.rank, lp: r.lp, icon: r.icon, isNoob, isOnline, lastSeen, hasRank: true });
+        });
+        unranked.forEach(i => {
+            const p = PLAYERS[i];
+            const isNoob = p.special === 'noob';
+            const presence = _onlineUsers[i];
+            const isOnline = presence?.online;
+            const lastSeen = presence?.ts ? fmtAgo(presence.ts) : '';
+            rows.push({ idx: i, name: p.name, tier: null, rank: null, lp: null, icon: playerIcon(i, null), isNoob, isOnline, lastSeen, hasRank: false });
+        });
+        el.innerHTML = rows.map(r => `
+            <div class="sq-row ${r.isNoob ? 'sq-row--noob' : ''}" onclick="location.hash='dm/${r.idx}'" title="Chat privado com ${r.name}">
+                <img class="sq-row__avatar ${r.isOnline ? 'sq-row__avatar--online' : ''}" src="${profImg(r.icon)}" alt="" ${F}>
+                <div class="sq-row__info">
+                    <div class="sq-row__name">${r.name} ${r.isNoob ? '<span class="sq-row__noob-tag">NOOB</span>' : ''}</div>
+                    ${r.hasRank ? `<div class="sq-row__rank ${rankCls(r.tier)}">${r.tier} ${r.rank} — ${r.lp} PDL</div>` : '<div class="sq-row__rank" style="color:var(--dim)">Sem ranked</div>'}
+                    <div class="sq-row__seen">${r.isOnline ? '🟢 Online agora' : (r.lastSeen ? r.lastSeen : 'Offline')}</div>
+                </div>
+                <span class="sq-row__dm">💬</span>
+                <span class="sq-row__status ${r.isOnline ? 'sq-row__status--on' : 'sq-row__status--off'}"></span>
+            </div>
+        `).join('');
+    }
+    // Re-render sidebar when presence changes
+    const _origListenPresence = listenPresence;
+    listenPresence = function() {
+        if (!db) return;
+        db.ref('presence').on('value', snap => {
+            _onlineUsers = snap.val() || {};
+            renderOnlineBadge();
+            renderSquadSidebar();
+        });
+    };
+
+    // ======================== DM (Chat Privado) ========================
+    let _dmRef = null;
+    function getDMKey(a, b) { return a < b ? `dm_${a}_${b}` : `dm_${b}_${a}`; }
+    function stopDM() { if (_dmRef) { _dmRef.off(); _dmRef = null; } }
+
+    function renderDM(targetIdx) {
+        stopDM();
+        stopChat();
+        const user = getLoggedUser();
+        const target = PLAYERS[targetIdx];
+        if (!target) { location.hash = 'chat'; return; }
+        const isNoob = target.special === 'noob';
+        const targetPresence = _onlineUsers[targetIdx];
+        const isOnline = targetPresence?.online;
+
+        app.innerHTML = `<div class="chat-fullpage">
+            <div class="chat-topbar">
+                <div class="chat-topbar-info" style="display:flex;align-items:center;gap:12px;">
+                    <button class="bb" onclick="location.hash='chat'" style="margin:0;padding:6px 10px;font-size:0.8em;">&larr;</button>
+                    <img src="${profImg(playerIcon(targetIdx, null))}" style="width:32px;height:32px;border-radius:50%;border:2px solid ${isNoob?'#ef5350':'rgba(255,255,255,0.1)'};" ${F}>
+                    <div>
+                        <h2 style="font-size:1em;margin:0;">${target.name} ${isNoob?'<span style="color:#ef5350;font-size:0.6em;">NOOB 🤡</span>':''}</h2>
+                        <div class="chat-topbar-status">
+                            <span class="online-dot" style="background:${isOnline?'#4caf50':'#666'};"></span>
+                            ${isOnline ? 'Online' : (targetPresence?.ts ? fmtAgo(targetPresence.ts) : 'Offline')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-box" id="dm-box"><div class="ld"><div class="sp"></div></div></div>
+            ${user ? `
+            <div class="chat-input-area">
+                <div class="chat-input-row">
+                    <input type="text" id="dm-input" placeholder="Mensagem para ${target.name}..." maxlength="500" autocomplete="off">
+                    <button class="chat-send" onclick="sendDM(${targetIdx})">➤</button>
+                </div>
+            </div>` : '<div class="chat-login-prompt"><p>Faça login para enviar mensagens</p><button class="cfg-btn" onclick="showLoginModal()">Entrar</button></div>'}
+        </div>`;
+
+        const dmInput = document.getElementById('dm-input');
+        if (dmInput) {
+            dmInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDM(targetIdx); } });
+            dmInput.focus();
+        }
+
+        if (!db) { const box = document.getElementById('dm-box'); if(box) box.innerHTML='<p class="chat-empty">Firebase não configurado.</p>'; return; }
+        const dmKey = getDMKey(user ? user.idx : -1, targetIdx);
+        _dmRef = db.ref('dms/' + dmKey).orderByChild('ts').limitToLast(100);
+        _dmRef.on('value', snap => {
+            const box = document.getElementById('dm-box');
+            if (!box) { stopDM(); return; }
+            const msgs = [];
+            snap.forEach(child => {
+                const val = child.val();
+                if (val) msgs.push({ _key: child.key, ...val, ts: val.ts || Date.now() });
+            });
+            msgs.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+            if (!msgs.length) {
+                box.innerHTML = `<p class="chat-empty">Nenhuma mensagem ainda. Diga oi para ${target.name}${isNoob?' (se tiver coragem)':''}! 👋</p>`;
+                return;
+            }
+            const wasAtBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+            let html = '';
+            msgs.forEach(m => {
+                const isMe = user?.idx === m.idx;
+                const icon = playerIcon(m.idx, null);
+                const d = new Date(m.ts);
+                const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                html += `<div class="chat-msg ${isMe ? 'chat-msg-me' : 'chat-msg-other'}">
+                    ${!isMe ? `<img src="${profImg(icon)}" class="chat-avatar" ${F}>` : ''}
+                    <div class="chat-bubble ${isMe ? 'chat-bubble-me' : 'chat-bubble-other'}">
+                        ${!isMe ? `<div class="chat-name" style="${m.idx === targetIdx && isNoob ? 'color:#ef5350;' : ''}">${escapeHtml(m.name||'')}</div>` : ''}
+                        <div class="chat-text">${escapeHtml(m.text||'')}</div>
+                        <div class="chat-time">${timeStr}</div>
+                    </div>
+                </div>`;
+            });
+            box.innerHTML = html;
+            if (wasAtBottom) box.scrollTop = box.scrollHeight;
+        });
+    }
+
+    window.sendDM = function(targetIdx) {
+        const user = getLoggedUser();
+        if (!user || !db) return;
+        const input = document.getElementById('dm-input');
+        if (!input || !input.value.trim()) return;
+        const text = input.value.trim();
+        input.value = '';
+        const dmKey = getDMKey(user.idx, targetIdx);
+        db.ref('dms/' + dmKey).push({
+            idx: user.idx,
+            name: PLAYERS[user.idx]?.name || '???',
+            text: text,
+            ts: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => { input.focus(); }).catch(e => {
+            input.value = text;
+            showToast('❌', 'Erro ao enviar: ' + e.message);
+        });
+    };
 
     })();
