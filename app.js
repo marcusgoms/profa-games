@@ -449,7 +449,7 @@
     async function riot(url, retries=3) {
         const r = await fetch(url, { headers:{ 'X-Riot-Token': RIOT_KEY } });
         if (r.status === 429 && retries > 0) {
-            const wait = (parseInt(r.headers.get('Retry-After') || '2') + 1) * 1000;
+            const wait = Math.max((parseInt(r.headers.get('Retry-After') || '5') + 2) * 1000, 5000);
             await new Promise(res => setTimeout(res, wait));
             return riot(url, retries - 1);
         }
@@ -567,7 +567,9 @@
             return cache[i];
         }
 
-        // Nothing cached anywhere — must fetch from API
+        // Nothing cached anywhere — must fetch from API (queued to avoid rate limit)
+        _refreshQueue = _refreshQueue.then(() => new Promise(r => setTimeout(r, 3000)));
+        await _refreshQueue;
         const data = await fetchPlayerFast(i);
         data._ts = Date.now();
         cache[i] = data;
@@ -870,16 +872,18 @@
                 // Stop if we navigated away from team page
                 if (!document.getElementById('squad-grid')) { clearInterval(retryTimer); retryTimer = null; return; }
                 if (!failedPlayers.length) { clearInterval(retryTimer); retryTimer = null; return; }
-                // Retry each failed player
+                // Retry each failed player (staggered)
                 const toRetry = [...failedPlayers];
-                toRetry.forEach(i => {
-                    // Clear stale cache so it tries again
-                    delete cache[i];
-                    delete bgRefresh[i];
-                    delete bgLoading[i];
-                    tryLoadPlayer(i);
+                toRetry.forEach((idx, n) => {
+                    setTimeout(() => {
+                        // Clear stale cache so it tries again
+                        delete cache[idx];
+                        delete bgRefresh[idx];
+                        delete bgLoading[idx];
+                        tryLoadPlayer(idx);
+                    }, n * 4000); // 4s apart
                 });
-            }, 15000);
+            }, 20000);
         }
 
         PLAYERS.forEach((_, i) => tryLoadPlayer(i));
