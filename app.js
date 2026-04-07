@@ -2447,95 +2447,99 @@
         const bDrg = (bt.dragons||[]).map(d => `<span class="drg-icon" title="${d}">${drgEmoji(d)}</span>`).join('');
         const rDrg = (rt.dragons||[]).map(d => `<span class="drg-icon" title="${d}">${drgEmoji(d)}</span>`).join('');
 
-        // ---- player row builder ----
-        function playerRow(p, side, opp) {
+        // ---- helper: extract player data ----
+        function getPlayerData(p, side) {
             const mi     = side==='b' ? (p.participantId-1) : (p.participantId-6);
             const meta   = side==='b' ? bMeta : rMeta;
             const pmeta  = meta?.participantMetadata?.[mi] || {};
             const champId= pmeta.championId || '?';
             const sName  = pmeta.summonerName || '';
             const role   = pmeta.role || '';
-
             const di   = p.participantId - 1;
             const dp   = dParts[di] || {};
             const items= dp.items || [];
-
-            const k=p.kills||0, d=p.deaths||0, a=p.assists||0, cs=p.creepScore||0, lv=p.level||1;
+            const k=p.kills||0, d2=p.deaths||0, a=p.assists||0, cs=p.creepScore||0, lv=p.level||1;
             const curHp  = p.currentHealth||0, maxHp = p.maxHealth||1;
             const hp     = maxHp>0 ? Math.round((curHp/maxHp)*100) : 100;
             const hpClr  = hp>60?'#4caf50':hp>30?'#ff9800':'#ef5350';
             const gold   = p.totalGold||0;
-
-            const gd     = gold - (opp?.totalGold||0);
-            const gdStr  = gd>0 ? `+${fmtGold(gd)}` : gd<0 ? fmtGold(gd) : '-';
-            const gdCls  = gd>0 ? 'gpos' : gd<0 ? 'gneg' : '';
-
-            const color  = side==='b' ? 'var(--pri)' : 'var(--acc)';
-
-            // items: sort trinkets to end (IDs 3340, 3363, 3364)
             const trinkets = [3340, 3363, 3364, 3513, 2055];
             const mainItems = items.filter(id => id && !trinkets.includes(id));
             const trinket   = items.find(id => id && trinkets.includes(id));
-            const slots = [...mainItems.slice(0,6)];
-            while (slots.length < 6) slots.push(0);
-            slots.push(trinket || 0);
-
-            const itemsHtml = slots.map(id =>
-                id ? `<img src="${itemImg(id)}" alt="" loading="lazy" onerror="this.style.display='none'">`
-                   : `<span class="li-empty"></span>`
-            ).join('');
-
-            return `<tr>
-                <td class="lt-champ-cell">
-                    <div class="lchamp">
-                        <img src="${champImg(champId)}" alt="${champId}" onerror="this.style.opacity='0.3'" class="lchamp-img" style="border-color:${color};">
-                        <div>
-                            <div class="lchamp-cn">${champId} <span class="lchamp-lv" style="color:${color};">Lv.${lv}</span></div>
-                            <div class="lchamp-sn">${sName}</div>
-                        </div>
-                    </div>
-                </td>
-                <td class="lt-hp-cell">
-                    <div class="lhp"><div class="lhp-fill" style="width:${hp}%;background:${hpClr};"></div></div>
-                    <div class="lhp-text">${hp}%</div>
-                </td>
-                <td><div class="litems">${itemsHtml}</div></td>
-                <td class="lt-num">${cs}</td>
-                <td class="lt-k">${k}</td>
-                <td class="lt-d">${d}</td>
-                <td class="lt-a">${a}</td>
-                <td class="lt-num">${fmtGold(gold)}</td>
-                <td class="${gdCls} lt-num">${gdStr}</td>
-            </tr>`;
+            const slots = [...mainItems.slice(0,6)]; while (slots.length < 6) slots.push(0); slots.push(trinket || 0);
+            return { champId, sName, role, k, d2, a, cs, lv, hp, hpClr, gold, slots, items };
         }
 
-        // ---- full team table ----
-        function teamTable(participants, side, teamLabel, teamImg, oppParticipants) {
-            const color = side==='b' ? 'var(--pri)' : 'var(--acc)';
-            const rows  = participants.map((p,i) => playerRow(p, side, oppParticipants[i]||{})).join('');
-            return `<div class="lt-wrap">
-                <table class="lt">
-                    <thead>
-                        <tr class="lt-head-row" style="--team-color:${color};">
-                            <th class="lt-th-main"><span class="lt-team-dot" style="background:${color};"></span>${teamLabel}</th>
-                            <th>VIDA</th>
-                            <th>ITENS</th>
-                            <th>CS</th>
-                            <th style="color:#4caf50;">K</th>
-                            <th style="color:#ef5350;">D</th>
-                            <th style="color:var(--pri);">A</th>
-                            <th>OURO</th>
-                            <th>+/-</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>
+        // ---- matchup row (blue vs red side by side) ----
+        function matchupRow(bp, rp, roleLabel) {
+            const b = getPlayerData(bp, 'b');
+            const r = getPlayerData(rp, 'r');
+            const gd = b.gold - r.gold;
+            const gdStr = gd > 0 ? `<span class="gpos">+${fmtGold(gd)}</span>` : gd < 0 ? `<span class="gneg">${fmtGold(gd)}</span>` : '-';
+            const roleIcons = {top:'🗡️',jungle:'🌿',mid:'⚡',bottom:'🏹',support:'🛡️'};
+            const roleIcon = roleIcons[roleLabel?.toLowerCase()] || '⚔️';
+            const roleShort = {top:'TOP',jungle:'JNG',mid:'MID',bottom:'ADC',support:'SUP'}[roleLabel?.toLowerCase()] || roleLabel || '';
+
+            function itemsHtml(slots) {
+                return slots.map(id => id ? `<img src="${itemImg(id)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span class="li-empty"></span>`).join('');
+            }
+
+            return `<div class="lmr-row">
+                <div class="lmr-side lmr-blue">
+                    <div class="lmr-champ">
+                        <img src="${champImg(b.champId)}" class="lmr-champ-img lmr-img-blue" onerror="this.style.opacity='0.3'">
+                        <div class="lmr-player-info">
+                            <div class="lmr-name">${b.sName}</div>
+                            <div class="lmr-champ-name">${b.champId} <span class="lmr-lv">Lv.${b.lv}</span></div>
+                        </div>
+                    </div>
+                    <div class="lmr-stats">
+                        <span class="lmr-kda"><span class="lmr-k">${b.k}</span>/<span class="lmr-d">${b.d2}</span>/<span class="lmr-a">${b.a}</span></span>
+                        <span class="lmr-cs">${b.cs} CS</span>
+                        <span class="lmr-gold">${fmtGold(b.gold)}</span>
+                    </div>
+                    <div class="lmr-hp"><div class="lmr-hp-fill" style="width:${b.hp}%;background:${b.hpClr};"></div></div>
+                    <div class="lmr-items">${itemsHtml(b.slots)}</div>
+                </div>
+                <div class="lmr-role">
+                    <span class="lmr-role-icon">${roleIcon}</span>
+                    <span class="lmr-role-label">${roleShort}</span>
+                    <span class="lmr-gold-diff">${gdStr}</span>
+                </div>
+                <div class="lmr-side lmr-red">
+                    <div class="lmr-champ lmr-champ-right">
+                        <div class="lmr-player-info lmr-info-right">
+                            <div class="lmr-name">${r.sName}</div>
+                            <div class="lmr-champ-name">${r.champId} <span class="lmr-lv">Lv.${r.lv}</span></div>
+                        </div>
+                        <img src="${champImg(r.champId)}" class="lmr-champ-img lmr-img-red" onerror="this.style.opacity='0.3'">
+                    </div>
+                    <div class="lmr-stats lmr-stats-right">
+                        <span class="lmr-kda"><span class="lmr-k">${r.k}</span>/<span class="lmr-d">${r.d2}</span>/<span class="lmr-a">${r.a}</span></span>
+                        <span class="lmr-cs">${r.cs} CS</span>
+                        <span class="lmr-gold">${fmtGold(r.gold)}</span>
+                    </div>
+                    <div class="lmr-hp"><div class="lmr-hp-fill lmr-hp-red" style="width:${r.hp}%;background:${r.hpClr};"></div></div>
+                    <div class="lmr-items lmr-items-right">${itemsHtml(r.slots)}</div>
+                </div>
             </div>`;
         }
 
-        const bLabel = t1?.code||'Azul', rLabel = t2?.code||'Vermelha';
-        const bTable = teamTable(bt.participants||[], 'b', bLabel, t1?.image, rt.participants||[]);
-        const rTable = teamTable(rt.participants||[], 'r', rLabel, t2?.image, bt.participants||[]);
+        const bParts = bt.participants || [];
+        const rParts = rt.participants || [];
+        // Build matchup rows (paired by position index = role)
+        const roleLabels = ['top','jungle','mid','bottom','support'];
+        let matchupHtml = '';
+        for (let i = 0; i < 5; i++) {
+            const bp = bParts[i] || {};
+            const rp = rParts[i] || {};
+            const bMi = (bp.participantId||1) - 1;
+            const rMi = (rp.participantId||6) - 6;
+            const role = bMeta?.participantMetadata?.[bMi]?.role || rMeta?.participantMetadata?.[rMi]?.role || roleLabels[i] || '';
+            matchupHtml += matchupRow(bp, rp, role);
+        }
+
+        const bLabel = t1?.code||'Azul', rLabel = t2?.code||'Vermelho';
 
         return `
             <div class="live-status ${gs}">
@@ -2568,8 +2572,14 @@
                 <div class="drg-r">${rDrg||'<span class="drg-none">-</span>'}</div>
             </div>` : ''}
 
-            ${bTable}
-            ${rTable}
+            <div class="lmr-header">
+                <div class="lmr-team-label lmr-label-blue">${t1?.image ? `<img src="${t1.image}" class="lmr-team-logo">` : ''}${bLabel}</div>
+                <div class="lmr-vs-label">MATCHUPS</div>
+                <div class="lmr-team-label lmr-label-red">${rLabel}${t2?.image ? `<img src="${t2.image}" class="lmr-team-logo">` : ''}</div>
+            </div>
+            <div class="lmr-matchups">
+                ${matchupHtml}
+            </div>
         `;
     }
 

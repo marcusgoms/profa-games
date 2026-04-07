@@ -454,6 +454,64 @@ a { text-decoration: none; color: inherit; }
 .gpos { color: #4caf50; font-weight: 700; }
 .gneg { color: #ef5350; font-weight: 700; }
 
+/* LIVE MATCHUP ROWS (side by side) */
+.lmr-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; margin-top: 14px;
+    background: linear-gradient(90deg, rgba(59,130,246,0.1), rgba(30,30,50,0.6), rgba(239,68,68,0.1));
+    border-radius: 10px 10px 0 0; border: 1px solid rgba(255,255,255,0.06); border-bottom: none;
+}
+.lmr-team-label { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 0.8em; letter-spacing: 1px; text-transform: uppercase; }
+.lmr-label-blue { color: #3b82f6; }
+.lmr-label-red { color: #ef4444; }
+.lmr-team-logo { width: 22px; height: 22px; border-radius: 4px; }
+.lmr-vs-label { font-size: 0.65em; color: var(--dim); font-weight: 700; letter-spacing: 2px; }
+.lmr-matchups {
+    border: 1px solid rgba(255,255,255,0.06); border-top: none;
+    border-radius: 0 0 10px 10px; overflow: hidden; background: var(--card);
+}
+.lmr-row {
+    display: flex; align-items: stretch; border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+}
+.lmr-row:last-child { border-bottom: none; }
+.lmr-row:hover { background: rgba(255,255,255,0.015); }
+.lmr-side { flex: 1; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lmr-blue { border-right: 1px solid rgba(255,255,255,0.03); }
+.lmr-red { border-left: 1px solid rgba(255,255,255,0.03); }
+.lmr-champ { display: flex; align-items: center; gap: 8px; }
+.lmr-champ-right { justify-content: flex-end; }
+.lmr-champ-img { width: 36px; height: 36px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+.lmr-img-blue { border-color: rgba(59,130,246,0.35); }
+.lmr-img-red { border-color: rgba(239,68,68,0.35); }
+.lmr-player-info { min-width: 0; }
+.lmr-info-right { text-align: right; }
+.lmr-name { font-size: 0.72em; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.lmr-champ-name { font-size: 0.65em; color: var(--dim); }
+.lmr-lv { color: var(--pri); font-weight: 700; font-size: 0.85em; }
+.lmr-stats { display: flex; gap: 8px; align-items: center; font-size: 0.72em; }
+.lmr-stats-right { justify-content: flex-end; }
+.lmr-kda { font-weight: 700; }
+.lmr-k { color: #4caf50; }
+.lmr-d { color: #ef5350; }
+.lmr-a { color: var(--pri); }
+.lmr-cs { color: var(--dim); font-size: 0.9em; }
+.lmr-gold { color: #ffd740; font-size: 0.9em; font-weight: 600; }
+.lmr-hp { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+.lmr-hp-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+.lmr-hp-red { float: right; }
+.lmr-items { display: flex; gap: 2px; }
+.lmr-items-right { justify-content: flex-end; }
+.lmr-items img { width: 18px; height: 18px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.06); }
+.lmr-items .li-empty { display: inline-block; width: 18px; height: 18px; border-radius: 3px; background: rgba(255,255,255,0.03); }
+.lmr-role {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    width: 52px; flex-shrink: 0; background: rgba(0,0,0,0.15); padding: 4px 0;
+}
+.lmr-role-icon { font-size: 1.1em; }
+.lmr-role-label { font-size: 0.55em; color: var(--dim); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.lmr-gold-diff { font-size: 0.6em; font-weight: 700; margin-top: 2px; }
+
 /* BACK, LOADER, ERROR */
 .bb { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 0.9em; padding: 8px 16px; border-radius: 8px; margin-bottom: 20px; transition: color 0.2s, background 0.2s; border: 1px solid rgba(255,255,255,0.06); background: var(--card); cursor: pointer; }
 .bb:hover { color: var(--pri); background: rgba(0,212,255,0.05); }
@@ -1896,6 +1954,15 @@ body::after {
     .gold-header { font-size: 0.78em; }
     .gold-diff { font-size: 0.68em; }
     .drg-bar { padding: 4px 8px; margin: 6px 0 10px; }
+    .lmr-side { padding: 6px 6px; }
+    .lmr-champ-img { width: 28px; height: 28px; }
+    .lmr-name { font-size: 0.62em; max-width: 70px; }
+    .lmr-champ-name { font-size: 0.55em; }
+    .lmr-stats { font-size: 0.6em; gap: 4px; }
+    .lmr-items img, .lmr-items .li-empty { width: 14px; height: 14px; }
+    .lmr-role { width: 36px; }
+    .lmr-role-icon { font-size: 0.85em; }
+    .lmr-gold-diff { font-size: 0.5em; }
     .drg-icon { font-size: 1em; }
     .drg-label { font-size: 0.58em; padding: 0 6px; }
 
