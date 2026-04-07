@@ -5553,8 +5553,14 @@
                 const raw = await rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${id}`, null);
                 if (raw) { const c = compressMatch(raw, puuid); if (c) newMatches.push(c); }
             }
+            // Also refresh ranked data
+            if (btn) btn.innerHTML = '&#8987; Atualizando rank...';
+            const freshLeague = await rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`, []);
+            const prev = cache[playerIdx];
+            const oldLeague = prev.league;
+            if (freshLeague && freshLeague.length) prev.league = freshLeague;
+
             if (newMatches.length) {
-                const prev = cache[playerIdx];
                 const existingIds2 = new Set((prev.matches||[]).map(m => m.metadata?.matchId).filter(Boolean));
                 const brandNew = newMatches.filter(m => !existingIds2.has(m.metadata?.matchId));
                 if (brandNew.length) {
@@ -5563,13 +5569,19 @@
                     cache[playerIdx] = prev;
                     lsSet(`profa_player_${playerIdx}`, prev);
                     fbSavePlayer(playerIdx, prev);
+                    if (oldLeague) detectRankChanges(playerIdx, { league: oldLeague }, { league: prev.league, account: prev.account, matches: prev.matches });
                     showToast('🆕', `<b>${brandNew.length}</b> partida${brandNew.length>1?'s':''}  nova${brandNew.length>1?'s':''} de <b>${d.account.gameName||p.name}</b>!`);
-                    // Re-render profile
                     renderProfile(playerIdx);
                     return;
                 }
             }
-            showToast('✅', `<b>${d.account.gameName||p.name}</b> — Nenhuma partida nova.`);
+            // No new matches but rank may have changed
+            prev._ts = Date.now();
+            cache[playerIdx] = prev;
+            lsSet(`profa_player_${playerIdx}`, prev);
+            fbSavePlayer(playerIdx, prev);
+            if (oldLeague) detectRankChanges(playerIdx, { league: oldLeague }, { league: prev.league, account: prev.account, matches: prev.matches });
+            showToast('✅', `<b>${d.account.gameName||p.name}</b> — Nenhuma partida nova. Rank atualizado.`);
         } catch(e) {
             console.warn('[CheckNew]', e);
             showToast('⚠️', 'Erro ao verificar: ' + (e.message||'tente novamente'));
