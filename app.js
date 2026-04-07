@@ -1018,9 +1018,8 @@
         if (ln) ln.classList.add('on');
         // Page transition
         app.classList.remove('page-enter'); void app.offsetWidth; app.classList.add('page-enter');
-        // Sidebars só no Squad FF
-        const _sL = document.getElementById('sidebar-left'), _sR = document.getElementById('sidebar-right');
-        if (_sL) _sL.classList.toggle('profafm--visible', !h || h === 'team');
+        // Squad sidebar só no Squad FF
+        const _sR = document.getElementById('sidebar-right');
         if (_sR) _sR.classList.toggle('squad-sidebar--visible', !h || h === 'team');
         if (!h || h === 'team')               { clearLive(); renderTeam(); }
         else if (h.startsWith('live'))        { clearLive(); renderLivePage(h); }
@@ -6038,120 +6037,226 @@
         }).catch(() => {});
     }
 
-    // ======================== PROFA FM RADIO ========================
-    (function initProfaFM() {
-        const STATIONS = [
-            { name: 'LoFi Gaming', url: 'https://stream.zeno.fm/f3wvbbqmdg8uv', icon: '🎧' },
-            { name: 'Synthwave', url: 'https://stream.zeno.fm/yan0d1f6ck5tv', icon: '🌆' },
-            { name: 'Chillhop', url: 'https://stream.zeno.fm/0r0xa792kwzuv', icon: '☕' },
-            { name: 'Rock Gaming', url: 'https://stream.zeno.fm/4d6bhkaqmg8uv', icon: '🎸' },
-            { name: 'Trap/Bass', url: 'https://stream.zeno.fm/dnp0ep9f6qhvv', icon: '🔊' },
-        ];
-        let _fmIdx = 0, _fmPlaying = false, _fmAudio = null, _fmAnimId = null;
+    // ======================== PROFA FM — RÁDIO GAMER (Firebase Storage) ========================
+    const RADIO_STATION_META = [
+        { name: 'RPG Chill', icon: '🏰', key: 'rpg_chill' },
+        { name: 'Aventura', icon: '⚔️', key: 'aventura' },
+        { name: 'Batalha', icon: '🔥', key: 'batalha' },
+        { name: 'LoL / Arcane', icon: '🎮', key: 'lol_arcane' },
+        { name: 'Lo-Fi Gaming', icon: '🎧', key: 'lofi_gaming' },
+    ];
 
-        function renderStations() {
-            const el = document.getElementById('profafm-stations');
-            if (!el) return;
-            el.innerHTML = STATIONS.map((s, i) => `
-                <div class="profafm__station ${i === _fmIdx ? 'profafm__station--active' : ''}" onclick="profaFMSelect(${i})">
-                    <span class="profafm__station-icon">${s.icon}</span>
-                    <span class="profafm__station-name">${s.name}</span>
-                    ${i === _fmIdx && _fmPlaying ? '<span class="profafm__station-live">ON AIR</span>' : ''}
-                </div>
-            `).join('');
-        }
+    let _radioStations = RADIO_STATION_META.map(s => ({ ...s, tracks: [] }));
+    let _radioStation = parseInt(localStorage.getItem('profa_radio_station')||'0');
+    let _radioTrack = parseInt(localStorage.getItem('profa_radio_track')||'0');
+    let _radioShuffle = localStorage.getItem('profa_radio_shuffle') === '1';
+    let musicPlaying = false;
+    let _radioLoaded = false;
+    let _radioUploading = false;
+    const MUSIC_VOL = parseInt(localStorage.getItem('profa_radio_vol')||'50');
 
-        function updateNow() {
-            const el = document.getElementById('profafm-now');
-            if (!el) return;
-            const s = STATIONS[_fmIdx];
-            el.innerHTML = _fmPlaying
-                ? `<span class="profafm__now-icon">${s.icon}</span><span class="profafm__now-label">${s.name}</span><span class="profafm__now-live">AO VIVO</span>`
-                : `<span class="profafm__now-label">Parado</span>`;
-        }
+    function currentStation() { return _radioStations[_radioStation] || _radioStations[0]; }
+    function currentTrack() { return currentStation().tracks[_radioTrack] || currentStation().tracks[0]; }
+    function allTracks() { return currentStation().tracks; }
 
-        function updatePlayBtn() {
-            const btn = document.getElementById('profafm-play');
-            if (btn) btn.innerHTML = _fmPlaying ? '&#10074;&#10074;' : '&#9654;';
-        }
+    const audioPlayer = new Audio();
+    audioPlayer.volume = MUSIC_VOL / 100;
+    audioPlayer.addEventListener('ended', () => { musicNext(); });
+    audioPlayer.addEventListener('play', () => { musicPlaying = true; updateMusicUI(); });
+    audioPlayer.addEventListener('pause', () => { musicPlaying = false; updateMusicUI(); });
+    audioPlayer.addEventListener('error', () => {
+        console.warn('[Radio] Erro ao tocar track, pulando...');
+        musicPlaying = false;
+        const tracks = allTracks();
+        if (tracks.length > 1) setTimeout(musicNext, 1000);
+        else updateMusicUI();
+    });
 
-        function animViz() {
-            const canvas = document.getElementById('profafm-canvas');
-            if (!canvas) { _fmAnimId = null; return; }
-            const ctx = canvas.getContext('2d');
-            const w = canvas.width, h = canvas.height;
-            const bars = 18;
-            const bw = (w / bars) - 2;
-            ctx.clearRect(0, 0, w, h);
-            for (let i = 0; i < bars; i++) {
-                const bh = _fmPlaying ? (Math.random() * 0.7 + 0.15) * h : 3;
-                const x = i * (bw + 2);
-                const grad = ctx.createLinearGradient(x, h - bh, x, h);
-                grad.addColorStop(0, '#00d4ff');
-                grad.addColorStop(1, '#e94560');
-                ctx.fillStyle = grad;
-                ctx.fillRect(x, h - bh, bw, bh);
-            }
-            _fmAnimId = requestAnimationFrame(animViz);
-        }
+    function loadRadioTracks() {
+        if (!db) return;
+        const radioRef = db.ref('radio');
+        radioRef.on('value', snap => {
+            const data = snap.val() || {};
+            _radioStations = RADIO_STATION_META.map(s => {
+                const stationData = data[s.key] || {};
+                const tracks = [];
+                Object.keys(stationData).forEach(k => {
+                    const t = stationData[k];
+                    if (t && t.title && t.url) tracks.push({ id: k, title: t.title, url: t.url, fileName: t.fileName || '' });
+                });
+                tracks.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                return { ...s, tracks };
+            });
+            _radioLoaded = true;
+            if (_radioTrack >= allTracks().length) _radioTrack = 0;
+            updateMusicUI();
+        });
+    }
+    loadRadioTracks();
 
-        function stopViz() {
-            if (_fmAnimId) { cancelAnimationFrame(_fmAnimId); _fmAnimId = null; }
-            const canvas = document.getElementById('profafm-canvas');
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                const w = canvas.width, h = canvas.height;
-                ctx.clearRect(0, 0, w, h);
-                const bars = 18, bw = (w / bars) - 2;
-                for (let i = 0; i < bars; i++) {
-                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-                    ctx.fillRect(i * (bw + 2), h - 3, bw, 3);
+    // Create floating radio button (bottom-left)
+    const musicBtn = document.createElement('div');
+    musicBtn.id = 'music-btn';
+    musicBtn.className = 'radio-btn';
+    musicBtn.innerHTML = `<div class="radio-btn-eq"><span></span><span></span><span></span></div><span class="radio-btn-text" id="music-title">PROFA FM</span>`;
+    document.body.appendChild(musicBtn);
+
+    // Radio panel
+    const musicPanel = document.createElement('div');
+    musicPanel.id = 'music-panel';
+    musicPanel.className = 'radio-panel';
+    musicPanel.style.display = 'none';
+    function buildRadioPanel() {
+        const st = currentStation();
+        const tr = currentTrack();
+        const hasTracks = st.tracks.length > 0;
+        musicPanel.innerHTML = `
+        <div class="radio-header">
+            <div class="radio-brand"><span class="radio-logo">📻</span> PROFA FM</div>
+            <button class="radio-close" onclick="toggleMusicPanel()">×</button>
+        </div>
+        <div class="radio-dial">
+            ${_radioStations.map((s, i) => `<button class="radio-station-btn ${i===_radioStation?'active':''}" onclick="switchStation(${i})" title="${s.name}"><span class="radio-st-icon">${s.icon}</span><span class="radio-st-name">${s.name}</span><span class="radio-st-count">${s.tracks.length}</span></button>`).join('')}
+        </div>
+        <div class="radio-now">
+            <div class="radio-now-station">${st.icon} ${st.name}</div>
+            <div class="radio-now-track" id="mp-now">${!hasTracks ? 'Sem músicas' : musicPlaying ? tr.title : 'Pausado'}</div>
+            <div class="radio-now-eq ${musicPlaying?'playing':''}"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="radio-controls">
+            <button class="radio-ctrl" onclick="musicPrev()" title="Anterior" ${!hasTracks?'disabled':''}>⏮</button>
+            <button class="radio-ctrl radio-play" id="mp-play" onclick="musicToggle()" ${!hasTracks?'disabled':''}>${musicPlaying ? '⏸' : '▶'}</button>
+            <button class="radio-ctrl" onclick="musicNext()" title="Próxima" ${!hasTracks?'disabled':''}>⏭</button>
+            <button class="radio-ctrl radio-shuffle ${_radioShuffle?'active':''}" onclick="toggleShuffle()" title="Shuffle">🔀</button>
+        </div>
+        <div class="radio-vol">
+            <span class="radio-vol-icon">🔊</span>
+            <input type="range" id="mp-vol-slider" min="0" max="100" value="${Math.round(audioPlayer.volume*100)}" oninput="musicVol(this.value)">
+            <span class="radio-vol-val" id="radio-vol-val">${Math.round(audioPlayer.volume*100)}</span>
+        </div>
+        <div class="radio-upload-section">
+            <label class="radio-upload-btn" title="Enviar música (.mp3, .ogg, .wav)">
+                <input type="file" accept="audio/*" multiple style="display:none" onchange="radioUpload(this.files)" ${_radioUploading?'disabled':''}>
+                ${_radioUploading ? '⏳ Enviando...' : '📤 Enviar música'}
+            </label>
+            <span class="radio-upload-hint">Upload para "${st.name}"</span>
+        </div>
+        <div class="radio-tracklist" id="mp-list">
+            ${!hasTracks ? '<div class="radio-empty">Nenhuma música nesta estação.<br>Use o botão acima para enviar.</div>' :
+            st.tracks.map((t,i) => `<div class="radio-track ${i===_radioTrack?'on':''}" onclick="musicPlay(${i})"><span class="radio-track-num">${i+1}</span><span class="radio-track-title">${t.title}</span>${i===_radioTrack && musicPlaying?'<span class="radio-track-eq"><span></span><span></span><span></span></span>':''}
+            <button class="radio-track-del" onclick="event.stopPropagation();radioDelete('${st.key}','${t.id}','${t.fileName}')" title="Remover">🗑</button></div>`).join('')}
+        </div>`;
+    }
+    buildRadioPanel();
+    document.body.appendChild(musicPanel);
+
+    window.radioUpload = async function(files) {
+        if (!files || files.length === 0) return;
+        _radioUploading = true;
+        updateMusicUI();
+        const stKey = currentStation().key;
+        let uploaded = 0;
+        for (const file of files) {
+            try {
+                const safeName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                const storageRef = storage.ref('radio/' + stKey + '/' + safeName);
+                const snapshot = await storageRef.put(file, { contentType: file.type });
+                const url = await snapshot.ref.getDownloadURL();
+                const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+                await db.ref('radio/' + stKey).push({ title, url, fileName: safeName });
+                uploaded++;
+            } catch (e) {
+                console.error('[Radio] Upload error:', e);
+                if (e.code === 'storage/unauthorized' || e.code === 'storage/unauthenticated') {
+                    showToast('❌', 'Erro de permissão no Firebase Storage');
+                    break;
+                } else {
+                    showToast('❌', 'Erro ao enviar: ' + e.message);
                 }
             }
         }
+        _radioUploading = false;
+        if (uploaded > 0) showToast('🎵', uploaded + ' música(s) enviada(s)!');
+        updateMusicUI();
+    };
 
-        window.profaFMToggle = function() {
-            if (_fmPlaying) {
-                if (_fmAudio) { _fmAudio.pause(); _fmAudio.src = ''; }
-                _fmPlaying = false;
-                stopViz();
-            } else {
-                if (!_fmAudio) _fmAudio = new Audio();
-                _fmAudio.src = STATIONS[_fmIdx].url;
-                _fmAudio.volume = (document.getElementById('profafm-vol')?.value || 50) / 100;
-                _fmAudio.play().catch(() => {});
-                _fmPlaying = true;
-                animViz();
+    window.radioDelete = async function(stKey, trackId, fileName) {
+        if (!confirm('Remover esta música?')) return;
+        try {
+            await db.ref('radio/' + stKey + '/' + trackId).remove();
+            if (fileName) { try { await storage.ref('radio/' + stKey + '/' + fileName).delete(); } catch(e) {} }
+        } catch(e) { console.error('[Radio] Delete error:', e); }
+    };
+
+    function updateMusicUI() {
+        const tr = currentTrack();
+        const titleEl = document.getElementById('music-title');
+        const btn = document.getElementById('music-btn');
+        if (titleEl) titleEl.textContent = musicPlaying ? (tr?.title || 'PROFA FM') : 'PROFA FM';
+        if (btn) btn.classList.toggle('playing', musicPlaying);
+        buildRadioPanel();
+    }
+
+    window.toggleMusicPanel = function() {
+        const p = document.getElementById('music-panel');
+        p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+    };
+    musicBtn.addEventListener('click', toggleMusicPanel);
+
+    window.switchStation = function(idx) {
+        _radioStation = idx;
+        _radioTrack = 0;
+        localStorage.setItem('profa_radio_station', String(idx));
+        localStorage.setItem('profa_radio_track', '0');
+        audioPlayer.pause();
+        musicPlaying = false;
+        updateMusicUI();
+    };
+
+    window.musicToggle = function() {
+        const tracks = allTracks();
+        if (!tracks.length) return;
+        if (musicPlaying) { audioPlayer.pause(); }
+        else {
+            const tr = currentTrack();
+            if (tr && tr.url) {
+                if (audioPlayer.src !== tr.url) audioPlayer.src = tr.url;
+                audioPlayer.play().catch(e => console.warn('[Radio] Play blocked:', e));
             }
-            updatePlayBtn(); updateNow(); renderStations();
-        };
-
-        window.profaFMSelect = function(idx) {
-            _fmIdx = idx;
-            if (_fmPlaying) {
-                if (_fmAudio) { _fmAudio.src = STATIONS[_fmIdx].url; _fmAudio.play().catch(() => {}); }
-            }
-            updateNow(); renderStations();
-        };
-
-        window.profaFMNext = function() {
-            _fmIdx = (_fmIdx + 1) % STATIONS.length;
-            if (_fmPlaying && _fmAudio) { _fmAudio.src = STATIONS[_fmIdx].url; _fmAudio.play().catch(() => {}); }
-            updateNow(); renderStations();
-        };
-
-        window.profaFMPrev = function() {
-            _fmIdx = (_fmIdx - 1 + STATIONS.length) % STATIONS.length;
-            if (_fmPlaying && _fmAudio) { _fmAudio.src = STATIONS[_fmIdx].url; _fmAudio.play().catch(() => {}); }
-            updateNow(); renderStations();
-        };
-
-        window.profaFMVol = function(v) {
-            if (_fmAudio) _fmAudio.volume = v / 100;
-        };
-
-        renderStations(); updateNow(); stopViz();
-    })();
+        }
+    };
+    window.musicPlay = function(i) {
+        const tracks = allTracks();
+        if (!tracks.length) return;
+        _radioTrack = i % tracks.length;
+        localStorage.setItem('profa_radio_track', String(_radioTrack));
+        const tr = currentTrack();
+        if (tr && tr.url) { audioPlayer.src = tr.url; audioPlayer.play().catch(() => {}); }
+        updateMusicUI();
+    };
+    window.musicNext = function() {
+        const tracks = allTracks();
+        if (!tracks.length) return;
+        if (_radioShuffle) musicPlay(Math.floor(Math.random() * tracks.length));
+        else musicPlay((_radioTrack + 1) % tracks.length);
+    };
+    window.musicPrev = function() {
+        const tracks = allTracks();
+        if (!tracks.length) return;
+        musicPlay((_radioTrack - 1 + tracks.length) % tracks.length);
+    };
+    window.musicVol = function(v) {
+        const vol = parseInt(v);
+        audioPlayer.volume = vol / 100;
+        localStorage.setItem('profa_radio_vol', String(vol));
+        const valEl = document.getElementById('radio-vol-val');
+        if (valEl) valEl.textContent = vol;
+    };
+    window.toggleShuffle = function() {
+        _radioShuffle = !_radioShuffle;
+        localStorage.setItem('profa_radio_shuffle', _radioShuffle ? '1' : '0');
+        updateMusicUI();
+    };
 
     // ======================== SQUAD SIDEBAR (right) ========================
     let _squadSidebarData = [];
