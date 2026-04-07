@@ -1151,7 +1151,7 @@
         const color = tierColors3d[tier] || '#00d4ff';
         return `<div class="rank-badge-3d" style="--rank-color:${color}">
             <div class="rank-badge-inner">
-                <div class="rank-badge-face rank-badge-front"><span class="rank-badge-tier">${tier}</span><span class="rank-badge-rank">${rank}</span><span class="rank-badge-lp">${lp} LP</span></div>
+                <div class="rank-badge-face rank-badge-front"><span class="rank-badge-tier">${tier}</span><span class="rank-badge-rank">${rank}</span><span class="rank-badge-lp">${lp} PDL</span></div>
                 <div class="rank-badge-face rank-badge-back"><span class="rank-badge-emblem">${tier.charAt(0)}</span></div>
             </div>
         </div>`;
@@ -1184,7 +1184,7 @@
             <div class="soloq-ranking" id="soloq-ranking">
                 <div class="soloq-header">
                     <h2>Ranking Solo Q</h2>
-                    <p>Evolu&ccedil;&atilde;o di&aacute;ria de LP do squad (s&eacute;ries temporais)</p>
+                    <p>Evolu&ccedil;&atilde;o di&aacute;ria de PDL do squad (s&eacute;ries temporais)</p>
                 </div>
                 <div class="soloq-chart" id="soloq-chart"><div class="ld"><div class="sp"></div></div></div>
             </div>
@@ -1276,7 +1276,7 @@
                 </div>
             </div>
             ${solo
-                ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}${isFlexData?' <small style="opacity:.6">(Flex)</small>':''}</span><span class="pl">${solo.leaguePoints} LP</span><span class="pw">${wr}% WR</span></div>`
+                ? `<div class="pr"><span class="pt ${rankCls(solo.tier)}">${solo.tier} ${solo.rank}${isFlexData?' <small style="opacity:.6">(Flex)</small>':''}</span><span class="pl">${solo.leaguePoints} PDL</span><span class="pw">${wr}% WR</span></div>`
                 : `<div class="pn">Sem ranked</div>`}
             ${rChId ? `<div class="lr">
                 <img src="${champImg(rChId)}" style="width:22px;height:22px;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'">
@@ -1455,7 +1455,7 @@
                     </div>
                 </div>
                 <div class="soloq-lc-stats">
-                    <span style="color:${color};font-weight:900;">${d.lp} LP</span>
+                    <span style="color:${color};font-weight:900;">${d.lp} PDL</span>
                     <span style="color:var(--dim);font-size:.8em;">${wr}% WR</span>
                     <span style="color:var(--dim);font-size:.75em;">${d.wins}V ${d.losses}D</span>
                 </div>
@@ -1472,7 +1472,7 @@
         // Build chart
         let html = legendHtml + loadingHtml;
         html += `<div class="soloq-evo">
-            <h3>Evolução de LP (dia a dia)</h3>
+            <h3>Evolução de PDL (dia a dia)</h3>
             <div class="soloq-evo-chart" id="soloq-evo-chart"></div>
         </div>`;
 
@@ -1496,7 +1496,7 @@
             return;
         }
 
-        const W = 800, H = 380, PADL = 65, PADR = 90, PADT = 25, PADB = 50;
+        const W = 860, H = 380, PADL = 105, PADR = 110, PADT = 25, PADB = 50;
         const cw = W - PADL - PADR, ch = H - PADT - PADB;
 
         // Collect all LP values for y-axis range
@@ -1530,7 +1530,7 @@
             const y = PADT + (ch / gridCount) * i;
             const val = Math.round(maxY - (rangeY / gridCount) * i);
             svg += `<line x1="${PADL}" y1="${y}" x2="${W-PADR}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
-            svg += `<text x="${PADL-10}" y="${y+4}" fill="#8892b0" font-size="10" text-anchor="end" font-family="system-ui">${val}</text>`;
+            svg += `<text x="${PADL-10}" y="${y+4}" fill="#8892b0" font-size="9" text-anchor="end" font-family="system-ui">${totalLPtoElo(val)}</text>`;
         }
 
         // Vertical grid + date labels
@@ -1577,7 +1577,7 @@
                 const isNoob = PLAYERS[d.idx]?.special === 'noob';
                 const suffix = isNoob ? ' 🤡' : '';
                 svg += `<text x="${last.x + 8}" y="${last.y - 6}" fill="${color}" font-size="11" font-weight="800" font-family="system-ui">${d.name}${suffix}</text>`;
-                svg += `<text x="${last.x + 8}" y="${last.y + 8}" fill="#8892b0" font-size="9" font-family="system-ui">${last.val} LP</text>`;
+                svg += `<text x="${last.x + 8}" y="${last.y + 8}" fill="#8892b0" font-size="9" font-family="system-ui">${totalLPtoElo(last.val)}</text>`;
             }
         });
 
@@ -1757,7 +1757,7 @@
                         <div class="ranked-queue">${qn[e.queueType]||e.queueType}</div>
                         <div class="ranked-main">
                             <div class="ranked-tier ${rankCls(e.tier)}">${e.tier} ${e.rank}</div>
-                            <div class="ranked-lp">${e.leaguePoints} LP</div>
+                            <div class="ranked-lp">${e.leaguePoints} PDL</div>
                         </div>
                         <div class="ranked-bar-wrap">
                             <div class="ranked-bar" style="width:${Math.min(e.leaguePoints,100)}%"></div>
@@ -1960,7 +1960,7 @@
 
             const mainRank = solo || flex;
             const rb = mainRank
-                ? `<span class="prg ${rankCls(mainRank.tier)}">${mainRank.tier} ${mainRank.rank} &mdash; ${mainRank.leaguePoints} LP${!solo&&flex?' (Flex)':''}</span>`
+                ? `<span class="prg ${rankCls(mainRank.tier)}">${mainRank.tier} ${mainRank.rank} &mdash; ${mainRank.leaguePoints} PDL${!solo&&flex?' (Flex)':''}</span>`
                 : `<span class="prg">Não posicionado</span>`;
             const flexBadge = (solo && flex)
                 ? `<span class="prg prg-flex">${flex.tier} ${flex.rank} Flex</span>`
@@ -3169,13 +3169,13 @@
 
             res.innerHTML = `
             <div class="cmp-header">
-                <div class="cmp-player"><img src="${profImg(icA)}" class="cmp-avatar" ${F}><div class="cmp-name">${da.account?.gameName||pa.name}</div><div class="cmp-rank ${rankCls(sa?.tier)}">${sa?sa.tier+' '+sa.rank+' — '+sa.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(da)}</div></div>
+                <div class="cmp-player"><img src="${profImg(icA)}" class="cmp-avatar" ${F}><div class="cmp-name">${da.account?.gameName||pa.name}</div><div class="cmp-rank ${rankCls(sa?.tier)}">${sa?sa.tier+' '+sa.rank+' — '+sa.leaguePoints+' PDL':'Unranked'}</div><div class="cmp-champs">${topChamps(da)}</div></div>
                 <div class="cmp-vs-big">VS</div>
-                <div class="cmp-player"><img src="${profImg(icB)}" class="cmp-avatar" ${F}><div class="cmp-name">${ddb.account?.gameName||pb.name}</div><div class="cmp-rank ${rankCls(sb?.tier)}">${sb?sb.tier+' '+sb.rank+' — '+sb.leaguePoints+' LP':'Unranked'}</div><div class="cmp-champs">${topChamps(ddb)}</div></div>
+                <div class="cmp-player"><img src="${profImg(icB)}" class="cmp-avatar" ${F}><div class="cmp-name">${ddb.account?.gameName||pb.name}</div><div class="cmp-rank ${rankCls(sb?.tier)}">${sb?sb.tier+' '+sb.rank+' — '+sb.leaguePoints+' PDL':'Unranked'}</div><div class="cmp-champs">${topChamps(ddb)}</div></div>
             </div>
             ${h2hHtml}
             <div class="cmp-stats">
-                ${bar('Elo (LP Total)', lpA, lpB)}
+                ${bar('Elo (PDL Total)', lpA, lpB)}
                 ${bar('Win Rate', stA.wr, stB.wr, '%')}
                 ${bar('KDA', stA.kda, stB.kda)}
                 ${bar('Kills/jogo', stA.avgK, stB.avgK)}
@@ -3403,11 +3403,11 @@
         <div class="dash-section">
             <h3>Ranking Semanal</h3>
             <div class="dash-week-tabs">
-                <span class="dash-week-tab on" onclick="showWeekTab('lp',this)">LP Ganho</span>
+                <span class="dash-week-tab on" onclick="showWeekTab('lp',this)">PDL Ganho</span>
                 <span class="dash-week-tab" onclick="showWeekTab('games',this)">Mais Jogou</span>
                 <span class="dash-week-tab" onclick="showWeekTab('kda',this)">Melhor KDA</span>
             </div>
-            <div id="dash-week-lp" class="dash-rank-list">${weekSortedLP.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${['🥇','🥈','🥉'][i]||i+1+'º'}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val" style="color:${s.lpChange>0?'#4caf50':s.lpChange<0?'#ef5350':'var(--dim)'}">${s.lpChange>0?'+':''}${s.lpChange} LP</span><span class="dash-rank-wr">${s.games} jogos</span></div>`).join('')||'<p style="color:var(--dim);text-align:center;font-size:.85em;">Sem dados</p>'}</div>
+            <div id="dash-week-lp" class="dash-rank-list">${weekSortedLP.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${['🥇','🥈','🥉'][i]||i+1+'º'}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val" style="color:${s.lpChange>0?'#4caf50':s.lpChange<0?'#ef5350':'var(--dim)'}">${s.lpChange>0?'+':''}${s.lpChange} PDL</span><span class="dash-rank-wr">${s.games} jogos</span></div>`).join('')||'<p style="color:var(--dim);text-align:center;font-size:.85em;">Sem dados</p>'}</div>
             <div id="dash-week-games" class="dash-rank-list" style="display:none">${weekSortedGames.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${['🥇','🥈','🥉'][i]||i+1+'º'}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val">${s.games} jogos</span><span class="dash-rank-wr">${s.wr}% WR</span></div>`).join('')||'<p style="color:var(--dim);text-align:center;font-size:.85em;">Sem dados</p>'}</div>
             <div id="dash-week-kda" class="dash-rank-list" style="display:none">${weekSortedKDA.map((s,i) => `<div class="dash-rank-item" onclick="location.hash='profile/${s.idx}'"><span class="dash-rank-pos">${['🥇','🥈','🥉'][i]||i+1+'º'}</span><span class="dash-rank-name">${s.name}</span><span class="dash-rank-val">${s.kda.toFixed(2)} KDA</span><span class="dash-rank-wr">${s.kills}/${s.deaths}/${s.assists}</span></div>`).join('')||'<p style="color:var(--dim);text-align:center;font-size:.85em;">Sem dados</p>'}</div>
         </div>
@@ -3447,7 +3447,7 @@
         </div>` : ''}
 
         <div class="dash-section">
-            <h3>Histórico de LP</h3>
+            <h3>Histórico de PDL</h3>
             <div id="dash-lp-chart"><p style="color:var(--dim);text-align:center;font-size:.85em;">Carregando...</p></div>
         </div>
 
@@ -3480,13 +3480,13 @@
                     const solo2 = ps2 ? getBestRanked(allData[ps2.idx]?.league) : null;
                     const color = tierColors2[solo2?.tier] || 'var(--pri)';
                     tableHtml += `<tr><td style="color:${color};font-weight:700;">${name}</td>`;
-                    vals.forEach(v => { tableHtml += `<td>${v!==undefined?v:'—'}</td>`; });
-                    tableHtml += `<td style="color:${diff>0?'#4caf50':diff<0?'#ef5350':'var(--dim)'};font-weight:700;">${diff>0?'+':''}${diff}</td></tr>`;
+                    vals.forEach(v => { tableHtml += `<td style="font-size:.8em;">${v!==undefined?totalLPtoElo(v):'—'}</td>`; });
+                    tableHtml += `<td style="color:${diff>0?'#4caf50':diff<0?'#ef5350':'var(--dim)'};font-weight:700;">${diff>0?'+':''}${diff} PDL</td></tr>`;
                 });
                 tableHtml += '</tbody></table></div>';
                 lpEl.innerHTML = tableHtml;
             } else if (lpEl) {
-                lpEl.innerHTML = '<p style="color:var(--dim);text-align:center;font-size:.85em;">Dados de LP registrados. Volte amanhã para ver a evolução.</p>';
+                lpEl.innerHTML = '<p style="color:var(--dim);text-align:center;font-size:.85em;">Dados de PDL registrados. Volte amanhã para ver a evolução.</p>';
             }
         } catch(_) {}
 
@@ -3782,6 +3782,20 @@
         const tiers = {IRON:0,BRONZE:400,SILVER:800,GOLD:1200,PLATINUM:1600,EMERALD:2000,DIAMOND:2400,MASTER:2800,GRANDMASTER:3200,CHALLENGER:3600};
         const ranks = {IV:0,III:100,II:200,I:300};
         return (tiers[tier]||0) + (ranks[rank]||0) + (lp||0);
+    }
+    // Reverse: totalLP → "Gold 1 45 PDL"
+    function totalLPtoElo(val) {
+        const tierList = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+        const tierNames = {IRON:'Iron',BRONZE:'Bronze',SILVER:'Silver',GOLD:'Gold',PLATINUM:'Plat',EMERALD:'Emerald',DIAMOND:'Diamond',MASTER:'Master',GRANDMASTER:'GM',CHALLENGER:'Chall'};
+        const rankList = ['IV','III','II','I'];
+        let tierIdx = Math.min(Math.floor(val / 400), tierList.length - 1);
+        if (tierIdx < 0) tierIdx = 0;
+        const tierName = tierList[tierIdx];
+        const remaining = val - tierIdx * 400;
+        let rankIdx = Math.min(Math.floor(remaining / 100), 3);
+        if (rankIdx < 0) rankIdx = 0;
+        const pdl = Math.max(0, remaining - rankIdx * 100);
+        return `${tierNames[tierName]||tierName} ${rankList[rankIdx]} ${pdl} PDL`;
     }
 
     // ======================== RPG ARENA ========================
@@ -4396,7 +4410,7 @@
         const user = getLoggedUser();
         // Default predictions
         const defaultQs = [
-            { id: 'weekly_lp', question: 'Quem vai ganhar mais LP essa semana?', options: PLAYERS.map(p=>p.name) },
+            { id: 'weekly_lp', question: 'Quem vai ganhar mais PDL essa semana?', options: PLAYERS.map(p=>p.name) },
             { id: 'weekly_penta', question: 'Quem vai fazer o próximo pentakill?', options: PLAYERS.map(p=>p.name) },
             { id: 'weekly_feed', question: 'Quem vai ter mais mortes essa semana?', options: PLAYERS.map(p=>p.name) },
         ];
@@ -4550,7 +4564,7 @@
                 <div class="tb-summary-stats">
                     <div><span class="tb-stat-label">Jogadores</span><span class="tb-stat-val">${filled}/5</span></div>
                     <div><span class="tb-stat-label">Elo Médio</span><span class="tb-stat-val ${rankCls(avgTier)}">${avgTier}</span></div>
-                    <div><span class="tb-stat-label">LP Médio</span><span class="tb-stat-val">${avgLP}</span></div>
+                    <div><span class="tb-stat-label">PDL Médio</span><span class="tb-stat-val">${avgLP}</span></div>
                 </div>
             </div>`;
         };
@@ -5140,7 +5154,7 @@
         panel.className = 'notif-settings-panel';
         const items = [
             { key: 'live', icon: '🎮', label: 'Partidas ao vivo do squad' },
-            { key: 'rank', icon: '📊', label: 'Mudanças de rank / LP' },
+            { key: 'rank', icon: '📊', label: 'Mudanças de rank / PDL' },
             { key: 'chat', icon: '💬', label: 'Mensagens no chat' },
             { key: 'cblol', icon: '🏆', label: 'CBLOL e campeonatos' },
             { key: 'pentakill', icon: '💀', label: 'Pentakills' },
@@ -5188,8 +5202,8 @@
         const newLP = newSolo.leaguePoints || 0;
         const oldLP = oldSolo.leaguePoints || 0;
         if (newLP >= 100 && oldLP < 100) {
-            sendNotification('LP Milestone!', `${name} chegou a ${newLP} LP em ${newSolo.tier} ${newSolo.rank}!`, null, 'rank');
-            postFeedEvent({ type: 'lp_milestone', player: name, idx: playerIdx, msg: `${name} atingiu ${newLP} LP!` });
+            sendNotification('PDL Milestone!', `${name} chegou a ${newLP} PDL em ${newSolo.tier} ${newSolo.rank}!`, null, 'rank');
+            postFeedEvent({ type: 'lp_milestone', player: name, idx: playerIdx, msg: `${name} atingiu ${newLP} PDL!` });
         }
         // Detect pentakill from new matches
         const oldMatches = new Set((Array.isArray(oldData.matches)?oldData.matches:[]).map(m=>m.metadata?.matchId).filter(Boolean));
@@ -5411,7 +5425,7 @@
             const w = solo.wins || 0, l = solo.losses || 0;
             const wr = (w+l) > 0 ? ((w/(w+l))*100).toFixed(0) : 0;
             const icon = TIER_ICONS[tier] || '';
-            return `<span class="lm-rank-badge ${rankCls(tier)}" title="${w}W ${l}L (${wr}% WR)">${icon} ${tier.charAt(0)+tier.slice(1).toLowerCase()} ${rank} · ${lp} LP</span>`;
+            return `<span class="lm-rank-badge ${rankCls(tier)}" title="${w}W ${l}L (${wr}% WR)">${icon} ${tier.charAt(0)+tier.slice(1).toLowerCase()} ${rank} · ${lp} PDL</span>`;
         }
 
         // Helper: get rune info for a participant
