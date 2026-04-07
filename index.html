@@ -40,24 +40,36 @@
         </div>
     </nav>
     <!-- Tier List Sidebars -->
-    <aside id="sidebar-left" class="tier-sidebar tier-sidebar--left">
-        <div class="tier-sidebar__header">
-            <span class="tier-sidebar__icon">&#9650;</span>
-            <span class="tier-sidebar__title">TOP WIN RATE</span>
-        </div>
-        <div class="tier-sidebar__list" id="tier-left-list"></div>
-        <div class="tier-sidebar__footer">
-            <span class="tier-sidebar__src">Platinum+ &bull; Patch Atual</span>
+    <aside id="sidebar-left" class="tier-sidebar tier-sidebar--left tier-sidebar--collapsed">
+        <button class="tier-sidebar__toggle" onclick="this.parentElement.classList.toggle('tier-sidebar--collapsed')" title="Expandir/Minimizar">
+            <span class="tier-sidebar__toggle-icon">&#9654;</span>
+            <span class="tier-sidebar__toggle-label">TOP WR</span>
+        </button>
+        <div class="tier-sidebar__body">
+            <div class="tier-sidebar__header">
+                <span class="tier-sidebar__icon">&#9650;</span>
+                <span class="tier-sidebar__title">TOP WIN RATE</span>
+            </div>
+            <div class="tier-sidebar__list" id="tier-left-list"></div>
+            <div class="tier-sidebar__footer">
+                <span class="tier-sidebar__src">Platinum+ &bull; Patch Atual</span>
+            </div>
         </div>
     </aside>
-    <aside id="sidebar-right" class="tier-sidebar tier-sidebar--right">
-        <div class="tier-sidebar__header">
-            <span class="tier-sidebar__icon">&#9660;</span>
-            <span class="tier-sidebar__title">LOW WIN RATE</span>
-        </div>
-        <div class="tier-sidebar__list" id="tier-right-list"></div>
-        <div class="tier-sidebar__footer">
-            <span class="tier-sidebar__src">Platinum+ &bull; Patch Atual</span>
+    <aside id="sidebar-right" class="tier-sidebar tier-sidebar--right tier-sidebar--collapsed">
+        <button class="tier-sidebar__toggle" onclick="this.parentElement.classList.toggle('tier-sidebar--collapsed')" title="Expandir/Minimizar">
+            <span class="tier-sidebar__toggle-label">LOW WR</span>
+            <span class="tier-sidebar__toggle-icon">&#9664;</span>
+        </button>
+        <div class="tier-sidebar__body">
+            <div class="tier-sidebar__header">
+                <span class="tier-sidebar__icon">&#9660;</span>
+                <span class="tier-sidebar__title">LOW WIN RATE</span>
+            </div>
+            <div class="tier-sidebar__list" id="tier-right-list"></div>
+            <div class="tier-sidebar__footer">
+                <span class="tier-sidebar__src">Platinum+ &bull; Patch Atual</span>
+            </div>
         </div>
     </aside>
 

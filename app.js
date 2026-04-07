@@ -1018,6 +1018,10 @@
         if (ln) ln.classList.add('on');
         // Page transition
         app.classList.remove('page-enter'); void app.offsetWidth; app.classList.add('page-enter');
+        // Sidebars só no Squad FF
+        const _sL = document.getElementById('sidebar-left'), _sR = document.getElementById('sidebar-right');
+        if (_sL) _sL.classList.toggle('tier-sidebar--visible', !h || h === 'team');
+        if (_sR) _sR.classList.toggle('tier-sidebar--visible', !h || h === 'team');
         if (!h || h === 'team')               { clearLive(); renderTeam(); }
         else if (h.startsWith('live'))        { clearLive(); renderLivePage(h); }
         else if (h.startsWith('profile/'))    renderProfile(parseInt(h.split('/')[1]));

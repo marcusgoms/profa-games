@@ -3356,19 +3356,86 @@ body::after {
     display: none;
     position: fixed;
     top: 72px;
-    width: 195px;
-    max-height: calc(100vh - 90px);
     z-index: 50;
+    transition: width 0.3s ease, opacity 0.3s ease;
+}
+.tier-sidebar--left { left: 12px; }
+.tier-sidebar--right { right: 12px; }
+
+/* Toggle button (visible when collapsed) */
+.tier-sidebar__toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, rgba(13,13,26,0.92) 0%, rgba(22,33,62,0.88) 100%);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    color: var(--dim);
+    cursor: pointer;
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.tier-sidebar__toggle:hover {
+    background: linear-gradient(180deg, rgba(13,13,26,0.96) 0%, rgba(22,33,62,0.94) 100%);
+    border-color: rgba(0,212,255,0.15);
+    color: var(--txt);
+}
+.tier-sidebar--right .tier-sidebar__toggle:hover { border-color: rgba(233,69,96,0.15); }
+.tier-sidebar__toggle-icon {
+    font-size: 0.8em;
+    color: var(--pri);
+    transition: transform 0.3s ease;
+}
+.tier-sidebar--right .tier-sidebar__toggle-icon { color: var(--acc); }
+.tier-sidebar__toggle-label {
+    font-size: 0.85em;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+/* Body (the expandable content) */
+.tier-sidebar__body {
+    width: 195px;
+    max-height: calc(100vh - 130px);
     background: linear-gradient(180deg, rgba(13,13,26,0.92) 0%, rgba(22,33,62,0.88) 100%);
     backdrop-filter: blur(14px);
     border: 1px solid rgba(255,255,255,0.05);
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    display: flex;
     flex-direction: column;
+    margin-top: 6px;
+    transition: max-height 0.35s ease, opacity 0.25s ease, transform 0.3s ease;
+    transform-origin: top center;
 }
-.tier-sidebar--left { left: 12px; }
-.tier-sidebar--right { right: 12px; }
+
+/* Collapsed state */
+.tier-sidebar--collapsed .tier-sidebar__body {
+    max-height: 0;
+    opacity: 0;
+    transform: scaleY(0);
+    pointer-events: none;
+    margin-top: 0;
+    border: none;
+    box-shadow: none;
+}
+.tier-sidebar--collapsed .tier-sidebar__toggle-icon {
+    transform: rotate(0deg);
+}
+/* Expanded: rotate arrow */
+.tier-sidebar--left:not(.tier-sidebar--collapsed) .tier-sidebar__toggle-icon {
+    transform: rotate(90deg);
+}
+.tier-sidebar--right:not(.tier-sidebar--collapsed) .tier-sidebar__toggle-icon {
+    transform: rotate(-90deg);
+}
 
 .tier-sidebar__header {
     display: flex;
@@ -3477,7 +3544,7 @@ body::after {
     letter-spacing: 0.5px;
 }
 
-/* Show sidebars only on wide screens */
+/* Only show on wide screens AND only when on Squad FF page */
 @media (min-width: 1500px) {
-    .tier-sidebar { display: flex; }
+    .tier-sidebar.tier-sidebar--visible { display: block; }
 }
