@@ -926,8 +926,8 @@
             <div class="squad-hero-splash"></div>
             <div class="squad-hero-inner">
                 <img src="https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/4644.png" alt="" class="hero-emblem">
-                <h1>O <span>Squad</span></h1>
-                <p>Clique em um jogador para ver perfil, ranked e partidas recentes</p>
+                <h1>O <span>Squad FF</span></h1>
+                <p>FF = FAMILY FRIENDS (Discord) ou BTC TO THE FUCKIN MOON (WhatsApp)</p>
             </div>
         </div>
         <div class="section-wrap">
@@ -952,7 +952,7 @@
         </div>
         <div class="section-wrap">
             <div class="tl-section" id="squad-timeline-wrap">
-                <div class="tl-header"><h2>Timeline do Squad</h2><p>Últimas partidas de todos os jogadores</p></div>
+                <div class="tl-header"><h2>Timeline do Squad FF</h2><p>Últimas partidas de todos os jogadores</p></div>
                 <div id="squad-timeline"><p style="color:var(--dim);text-align:center;padding:1rem;">Carregando...</p></div>
             </div>
         </div>`;
