@@ -852,7 +852,7 @@
         else if (h === 'cblol')               { clearLive(); renderCBLOL('upcoming'); }
         else if (h === 'dashboard')           { clearLive(); renderDashboard(); }
         else if (h === 'arena')               { clearLive(); renderArenaRPG(); }
-        else if (h === 'chat')                { clearLive(); renderChat(); }
+        else if (h === 'chat')                { clearLive(); clearChatBadge(); renderChat(); }
         else if (h === 'teambuilder')         { clearLive(); renderTeamBuilder(); }
         else                                  { clearLive(); renderTeam(); }
     }
@@ -4466,6 +4466,42 @@
         });
     };
 
+    // ======================== CHAT BACKGROUND NOTIFICATIONS ========================
+    let _chatBgRef = null;
+    let _chatLastTs = Date.now();
+    function startChatBgListener() {
+        if (_chatBgRef || !db) return;
+        _chatBgRef = db.ref('chat').orderByChild('ts').startAt(Date.now());
+        _chatBgRef.on('child_added', snap => {
+            const msg = snap.val();
+            if (!msg || !msg.text || !msg.ts) return;
+            // Don't notify for own messages
+            const user = getLoggedUser();
+            if (user && msg.idx === user.idx) return;
+            // Don't notify if on chat page
+            const currentPage = (location.hash || '#').replace(/^#/, '');
+            if (currentPage === 'chat') return;
+            // Respect prefs
+            if (!getNotifPrefs().chat) return;
+            const name = msg.name || '???';
+            const text = msg.text.length > 50 ? msg.text.substring(0, 50) + '...' : msg.text;
+            showToast('💬', `<b>${name}:</b> ${escapeHtml(text)}`, () => location.hash = 'chat', 4000);
+            sendNotification('Chat — ' + name, msg.text, null, 'chat');
+            // Update chat nav badge
+            const chatLink = document.querySelector('.nl a[data-p="chat"]');
+            if (chatLink && !chatLink.querySelector('.chat-notif-dot')) {
+                chatLink.insertAdjacentHTML('beforeend', ' <span class="chat-notif-dot"></span>');
+            }
+        });
+    }
+    startChatBgListener();
+
+    // Clear chat badge when navigating to chat
+    function clearChatBadge() {
+        const dot = document.querySelector('.chat-notif-dot');
+        if (dot) dot.remove();
+    }
+
     // ======================== PRESENCE (quem está online) ========================
     let _onlineUsers = {};
     function updatePresence(user) {
@@ -4548,9 +4584,69 @@
         return icons[type] || '📌';
     }
 
-    // Detect rank changes and post to feed
-    // Browser notifications
-    function sendNotification(title, body, icon) {
+    // ======================== NOTIFICATION SYSTEM ========================
+    // Notification preferences (stored in localStorage)
+    const NOTIF_DEFAULTS = { live: true, rank: true, chat: true, cblol: true, pentakill: true };
+    function getNotifPrefs() {
+        try { return { ...NOTIF_DEFAULTS, ...JSON.parse(localStorage.getItem('profa_notif_prefs') || '{}') }; } catch(_) { return { ...NOTIF_DEFAULTS }; }
+    }
+    function setNotifPref(key, val) {
+        const prefs = getNotifPrefs();
+        prefs[key] = val;
+        localStorage.setItem('profa_notif_prefs', JSON.stringify(prefs));
+    }
+
+    // Toast notification bar — single bar at bottom, replaces stacked alerts
+    const _toastQueue = [];
+    let _toastActive = false;
+    let _toastBar = null;
+
+    function initToastBar() {
+        if (_toastBar) return;
+        _toastBar = document.createElement('div');
+        _toastBar.id = 'notif-bar';
+        _toastBar.className = 'notif-bar';
+        _toastBar.style.display = 'none';
+        _toastBar.innerHTML = `<div class="notif-bar-content"><span class="notif-bar-icon"></span><span class="notif-bar-text"></span></div><button class="notif-bar-close">&times;</button>`;
+        _toastBar.querySelector('.notif-bar-close').onclick = () => dismissToast();
+        document.body.appendChild(_toastBar);
+    }
+    initToastBar();
+
+    function showToast(icon, text, onClick, duration) {
+        _toastQueue.push({ icon, text, onClick, duration: duration || 5000 });
+        if (!_toastActive) processToastQueue();
+    }
+
+    function processToastQueue() {
+        if (!_toastQueue.length) { _toastActive = false; return; }
+        _toastActive = true;
+        const t = _toastQueue.shift();
+        const bar = _toastBar;
+        bar.querySelector('.notif-bar-icon').textContent = t.icon || '';
+        bar.querySelector('.notif-bar-text').innerHTML = t.text;
+        bar.onclick = (e) => { if (!e.target.classList.contains('notif-bar-close')) { if (t.onClick) t.onClick(); dismissToast(); } };
+        bar.style.display = 'flex';
+        bar.classList.remove('notif-bar-hide');
+        bar.classList.add('notif-bar-show');
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => dismissToast(), t.duration);
+    }
+
+    function dismissToast() {
+        if (!_toastBar) return;
+        _toastBar.classList.remove('notif-bar-show');
+        _toastBar.classList.add('notif-bar-hide');
+        setTimeout(() => {
+            if (_toastBar) _toastBar.style.display = 'none';
+            processToastQueue();
+        }, 300);
+    }
+
+    // Browser notifications (respects prefs)
+    function sendNotification(title, body, icon, category) {
+        const prefs = getNotifPrefs();
+        if (category && !prefs[category]) return;
         if (!('Notification' in window)) return;
         if (Notification.permission === 'granted') {
             new Notification(title, { body, icon: icon || 'https://ddragon.leagueoflegends.com/cdn/14.24.1/img/profileicon/4644.png' });
@@ -4558,6 +4654,39 @@
             Notification.requestPermission();
         }
     }
+
+    // Notification settings panel (toggled from nav)
+    window.toggleNotifSettings = function() {
+        let panel = document.getElementById('notif-settings-panel');
+        if (panel) { panel.remove(); return; }
+        const prefs = getNotifPrefs();
+        panel = document.createElement('div');
+        panel.id = 'notif-settings-panel';
+        panel.className = 'notif-settings-panel';
+        const items = [
+            { key: 'live', icon: '🎮', label: 'Partidas ao vivo do squad' },
+            { key: 'rank', icon: '📊', label: 'Mudanças de rank / LP' },
+            { key: 'chat', icon: '💬', label: 'Mensagens no chat' },
+            { key: 'cblol', icon: '🏆', label: 'CBLOL e campeonatos' },
+            { key: 'pentakill', icon: '💀', label: 'Pentakills' },
+        ];
+        panel.innerHTML = `
+            <div class="notif-settings-header">
+                <span>Notificações</span>
+                <button class="notif-settings-close" onclick="toggleNotifSettings()">&times;</button>
+            </div>
+            ${items.map(i => `<label class="notif-setting-item">
+                <span class="notif-setting-label">${i.icon} ${i.label}</span>
+                <input type="checkbox" ${prefs[i.key] ? 'checked' : ''} onchange="setNotifPref('${i.key}', this.checked)">
+                <span class="notif-toggle"></span>
+            </label>`).join('')}
+            <div class="notif-settings-footer">
+                <button class="notif-perm-btn" onclick="Notification.requestPermission().then(()=>toggleNotifSettings())">
+                    ${Notification?.permission === 'granted' ? '✅ Notificações do navegador ativas' : '🔔 Ativar notificações do navegador'}
+                </button>
+            </div>`;
+        document.body.appendChild(panel);
+    };
 
     function detectRankChanges(playerIdx, oldData, newData) {
         if (!oldData?.league || !newData?.league) return;
@@ -4571,18 +4700,20 @@
         if (newVal > oldVal) {
             const msg = `${name} subiu para ${newSolo.tier} ${newSolo.rank}!`;
             postFeedEvent({ type: 'rank_up', player: name, idx: playerIdx, msg });
-            sendNotification('Rank Up!', msg);
+            sendNotification('Rank Up!', msg, null, 'rank');
+            if (getNotifPrefs().rank) showToast('📈', msg, () => location.hash = `profile/${playerIdx}`);
             playSFX('victory');
         } else if (newVal < oldVal) {
             const msg = `${name} caiu para ${newSolo.tier} ${newSolo.rank}`;
             postFeedEvent({ type: 'rank_down', player: name, idx: playerIdx, msg });
-            sendNotification('Rank Down', msg);
+            sendNotification('Rank Down', msg, null, 'rank');
+            if (getNotifPrefs().rank) showToast('📉', msg, () => location.hash = `profile/${playerIdx}`);
         }
         // LP milestone notifications
         const newLP = newSolo.leaguePoints || 0;
         const oldLP = oldSolo.leaguePoints || 0;
         if (newLP >= 100 && oldLP < 100) {
-            sendNotification('LP Milestone!', `${name} chegou a ${newLP} LP em ${newSolo.tier} ${newSolo.rank}!`);
+            sendNotification('LP Milestone!', `${name} chegou a ${newLP} LP em ${newSolo.tier} ${newSolo.rank}!`, null, 'rank');
             postFeedEvent({ type: 'lp_milestone', player: name, idx: playerIdx, msg: `${name} atingiu ${newLP} LP!` });
         }
         // Detect pentakill from new matches
@@ -4592,7 +4723,8 @@
             const mp = m.info?.participants?.find(x => x.puuid === newData.account?.puuid);
             if (mp?.pentaKills > 0) {
                 const champName = CMAP[mp.championId] || '?';
-                sendNotification('PENTAKILL!', `${name} fez PENTAKILL de ${champName}!`);
+                sendNotification('PENTAKILL!', `${name} fez PENTAKILL de ${champName}!`, null, 'pentakill');
+                if (getNotifPrefs().pentakill) showToast('💀', `<b>${name}</b> fez PENTAKILL de <b>${champName}</b>!`, () => location.hash = `profile/${playerIdx}`);
                 postFeedEvent({ type:'pentakill', player:name, idx:playerIdx, msg:`${name} fez PENTAKILL de ${champName}!` });
                 playSFX('unlock');
             }
@@ -4636,9 +4768,10 @@
                     if (!wasAlerted) {
                         const pName = d.account.gameName || p.name;
                         const champName = CMAP[liveChampId] || '';
-                        showInGameAlert(i, pName, champName);
+                        const idx = i;
+                        if (getNotifPrefs().live) showToast('🎮', `<b>${pName}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora!`, () => showLiveMatch(idx));
                         postFeedEvent({ type: 'in_game', player: p.name, idx: i, msg: `${pName} está em partida agora!${champName ? ` (${champName})` : ''}` });
-                        sendNotification('Em Jogo!', `${pName} está jogando de ${champName || 'campeão'}!`);
+                        sendNotification('Em Jogo!', `${pName} está jogando de ${champName || 'campeão'}!`, null, 'live');
                     }
                     updateCardLive(i);
                 } else {
@@ -4655,16 +4788,7 @@
         _liveCheckRunning = false;
     }
 
-    function showInGameAlert(idx, name, champName) {
-        if (document.getElementById(`ingame-alert-${idx}`)) return;
-        const alert = document.createElement('div');
-        alert.id = `ingame-alert-${idx}`;
-        alert.className = 'ingame-alert';
-        alert.innerHTML = `<span class="ldot"></span><b>${name}</b> está jogando${champName ? ` de <b>${champName}</b>` : ''} agora! <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.2em;margin-left:8px;">&times;</button>`;
-        alert.onclick = (e) => { if (e.target.tagName !== 'BUTTON') location.hash = `profile/${idx}`; };
-        document.body.appendChild(alert);
-        setTimeout(() => alert.remove(), 30000);
-    }
+    // showInGameAlert removed — now uses unified toast bar
 
     // Update a single card's live state — applies classes + splash directly
     function updateCardLive(i) {
