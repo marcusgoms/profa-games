@@ -20,6 +20,68 @@
     const CBLOL_ID    = '98767991332355509';
     let DVER          = '14.24.1';
 
+    // ======================== WEB WORKER ========================
+    let statsWorker = null;
+    const _workerCallbacks = {};
+    try {
+        statsWorker = new Worker('stats-worker.js');
+        statsWorker.onmessage = function(e) {
+            const { type, result } = e.data;
+            if (_workerCallbacks[type]) {
+                _workerCallbacks[type](result);
+                delete _workerCallbacks[type];
+            }
+        };
+        console.log('✓ Stats Worker iniciado');
+    } catch(_) { console.warn('Web Worker não suportado — fallback para main thread'); }
+
+    function workerRequest(type, data) {
+        return new Promise(resolve => {
+            if (!statsWorker) { resolve(null); return; }
+            _workerCallbacks[type] = resolve;
+            statsWorker.postMessage({ type, data });
+            // Timeout fallback
+            setTimeout(() => { if (_workerCallbacks[type]) { delete _workerCallbacks[type]; resolve(null); } }, 10000);
+        });
+    }
+
+    // ======================== PWA INSTALL ========================
+    let _deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault();
+        _deferredPrompt = e;
+        // Show install prompt after 10s if not dismissed before
+        if (!localStorage.getItem('pwa_dismissed')) {
+            setTimeout(showPWAInstall, 10000);
+        }
+    });
+    function showPWAInstall() {
+        if (!_deferredPrompt || document.getElementById('pwa-install')) return;
+        const el = document.createElement('div');
+        el.id = 'pwa-install';
+        el.className = 'pwa-install';
+        el.innerHTML = `<span class="pwa-install-icon">📱</span>
+            <div class="pwa-install-text">Instalar PROFA GAMES<small>Acesse direto da tela inicial</small></div>
+            <button class="pwa-install-btn" onclick="installPWA()">Instalar</button>
+            <button class="pwa-install-close" onclick="dismissPWA()">&times;</button>`;
+        document.body.appendChild(el);
+    }
+    window.installPWA = function() {
+        if (!_deferredPrompt) return;
+        _deferredPrompt.prompt();
+        _deferredPrompt.userChoice.then(r => {
+            if (r.outcome === 'accepted') console.log('✓ PWA instalado');
+            _deferredPrompt = null;
+            const el = document.getElementById('pwa-install');
+            if (el) el.remove();
+        });
+    };
+    window.dismissPWA = function() {
+        localStorage.setItem('pwa_dismissed', '1');
+        const el = document.getElementById('pwa-install');
+        if (el) el.remove();
+    };
+
     // ======================== FIREBASE ========================
     let db = null;
     try {
@@ -927,6 +989,28 @@
                 </div>
             </div>` : '';
 
+            // Dynamic card backgrounds
+            const isInGame = !!_liveAlerts[i];
+            // Win/loss streak detection
+            let streakCount = 0, streakType = null;
+            const sortedMt = [...mt].filter(m => m?.info?.participants).sort((a,b) => (b.info?.gameCreation||0)-(a.info?.gameCreation||0));
+            for (const m of sortedMt) {
+                const pp = m.info.participants.find(x => x.puuid === d.account?.puuid);
+                if (!pp) break;
+                if (streakType === null) { streakType = pp.win ? 'win' : 'loss'; streakCount = 1; }
+                else if ((streakType === 'win' && pp.win) || (streakType === 'loss' && !pp.win)) streakCount++;
+                else break;
+            }
+            // Apply dynamic classes
+            card.classList.remove('pc-ingame', 'pc-winstreak', 'pc-lossstreak');
+            if (isInGame) card.classList.add('pc-ingame');
+            else if (streakType === 'win' && streakCount >= 3) card.classList.add('pc-winstreak');
+            else if (streakType === 'loss' && streakCount >= 3) card.classList.add('pc-lossstreak');
+
+            const streakBadgeHtml = (streakType === 'win' && streakCount >= 3) ? `<div class="pc-streak-badge">🔥 ${streakCount} vitórias seguidas</div>`
+                : (streakType === 'loss' && streakCount >= 3) ? `<div class="pc-streak-badge">💀 ${streakCount} derrotas seguidas</div>`
+                : '';
+
             card.innerHTML = `
             ${noobBadge}
             <div class="pch">
@@ -946,7 +1030,13 @@
                 <span class="dot ${rWin?'g':'r'}"></span>
                 <span>${CMAP[rChId]||'?'} &bull; ${ago}</span>
             </div>` : ago ? `<div class="lr"><span class="dot g"></span><span>${ago}</span></div>` : ''}
+            ${streakBadgeHtml}
             ${noobFooter}`;
+
+            // Cache profile for offline PWA
+            if (navigator.serviceWorker?.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'CACHE_PROFILE', idx: i, profile: d });
+            }
 
             // Return rank data for chart
             if (solo) {
@@ -1219,7 +1309,19 @@
         if (!p) { location.hash = 'team'; return; }
         app.innerHTML = `<div class="section-wrap-sm">
             <button class="bb" onclick="location.hash='team'">&larr; Voltar</button>
-            <div class="pv"><div class="ld"><div class="sp"></div><p>Carregando ${p.name}…</p></div></div>
+            <div class="pv">
+                <div class="skel-profile-header skel-pulse"></div>
+                <div class="skel-profile-stats">
+                    <div class="skel-stat-box skel-pulse"></div>
+                    <div class="skel-stat-box skel-pulse"></div>
+                    <div class="skel-stat-box skel-pulse"></div>
+                    <div class="skel-stat-box skel-pulse"></div>
+                </div>
+                <div class="skel-section-title skel-pulse"></div>
+                <div class="skel-match skel-pulse"></div>
+                <div class="skel-match skel-pulse"></div>
+                <div class="skel-match skel-pulse"></div>
+            </div>
         </div>`;
 
         loadPlayer(idx).then(d => {
@@ -1612,7 +1714,11 @@
                     </div>
                 </div>
                 <div class="cblol-tabs">${cblolTabs.map(t => `<button class="cblol-tab ${t.k===tab?'on':''}" data-t="${t.k}"><span class="cblol-tab-ic">${t.ic}</span>${t.l}</button>`).join('')}</div>
-                <div id="cc"><div class="ld"><div class="sp"></div></div></div>
+                <div id="cc">
+                    <div class="skel-cblol-match skel-pulse"></div>
+                    <div class="skel-cblol-match skel-pulse"></div>
+                    <div class="skel-cblol-match skel-pulse"></div>
+                </div>
             </div>
         </div>`;
 
@@ -2709,7 +2815,16 @@
                 <button class="dash-btn" onclick="location.hash='compare'">Comparar Jogadores</button>
                 <button class="dash-btn" onclick="location.hash='teambuilder'">Montar Time</button>
             </div>
-            <div id="dash-content"><div class="ld"><div class="sp"></div></div></div>
+            <div id="dash-content">
+                <div class="skel-dash-grid">
+                    <div class="skel-dash-card skel-pulse"></div>
+                    <div class="skel-dash-card skel-pulse"></div>
+                    <div class="skel-dash-card skel-pulse"></div>
+                    <div class="skel-dash-card skel-pulse"></div>
+                </div>
+                <div class="skel-dash-section skel-pulse"></div>
+                <div class="skel-dash-section skel-pulse"></div>
+            </div>
         </div>`;
 
         // Load all players
@@ -3435,6 +3550,18 @@
         }).catch(() => {});
     }
     // PWA Service Worker
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            // Check for updates
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                });
+            });
+        }).catch(() => {});
+    }
 
     })();
