@@ -1485,8 +1485,10 @@
         if (!chartEl) return;
 
         const tierColors = {CHALLENGER:'#f0c040',GRANDMASTER:'#ef5350',MASTER:'#b344e0',DIAMOND:'#4fc3f7',EMERALD:'#4caf50',PLATINUM:'#26c6da',GOLD:'#ffd740',SILVER:'#b0bec5',BRONZE:'#cd7f32',IRON:'#795548'};
+        const tierList = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+        const tierNames = {IRON:'Iron',BRONZE:'Bronze',SILVER:'Silver',GOLD:'Gold',PLATINUM:'Plat',EMERALD:'Emerald',DIAMOND:'Diamond',MASTER:'Master',GRANDMASTER:'GM',CHALLENGER:'Chall'};
+        const tierBase = {IRON:0,BRONZE:400,SILVER:800,GOLD:1200,PLATINUM:1600,EMERALD:2000,DIAMOND:2400,MASTER:2800,GRANDMASTER:3200,CHALLENGER:3600};
 
-        // If only 1 date, show a message
         if (dates.length < 2) {
             chartEl.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--dim);">
                 <p style="font-size:1.2em;margin-bottom:8px;">📊 Dados do dia registrados!</p>
@@ -1496,16 +1498,31 @@
             return;
         }
 
-        const W = 860, H = 380, PADL = 105, PADR = 110, PADT = 25, PADB = 50;
+        // Fill missing days: if a player has no entry for a date, use their current totalLP
+        data.forEach(d => {
+            dates.forEach(dt => {
+                if (history[dt] && history[dt][d.name] === undefined) {
+                    history[dt][d.name] = d.totalLP;
+                }
+            });
+        });
+
+        const W = 800, H = 380, PADL = 70, PADR = 90, PADT = 25, PADB = 50;
         const cw = W - PADL - PADR, ch = H - PADT - PADB;
 
-        // Collect all LP values for y-axis range
+        // Collect all values for y-axis range
         let allVals = [];
         data.forEach(d => {
             dates.forEach(dt => { if (history[dt]?.[d.name] !== undefined) allVals.push(history[dt][d.name]); });
         });
-        const minY = Math.min(...allVals) - 20, maxY = Math.max(...allVals) + 20;
-        const rangeY = maxY - minY || 100;
+        // Snap range to elo boundaries
+        const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+        // Find the tier below min and tier above max
+        let minTierIdx = Math.max(0, Math.floor(rawMin / 400));
+        let maxTierIdx = Math.min(tierList.length - 1, Math.floor(rawMax / 400) + 1);
+        const minY = minTierIdx * 400;
+        const maxY = (maxTierIdx + 1) * 400;
+        const rangeY = maxY - minY || 400;
 
         const xStep = dates.length > 1 ? cw / (dates.length - 1) : cw;
         const scaleY = v => PADT + ch - ((v - minY) / rangeY) * ch;
@@ -1524,13 +1541,26 @@
         });
         svg += `</defs>`;
 
-        // Background grid
-        const gridCount = 5;
-        for (let i = 0; i <= gridCount; i++) {
-            const y = PADT + (ch / gridCount) * i;
-            const val = Math.round(maxY - (rangeY / gridCount) * i);
-            svg += `<line x1="${PADL}" y1="${y}" x2="${W-PADR}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
-            svg += `<text x="${PADL-10}" y="${y+4}" fill="#8892b0" font-size="9" text-anchor="end" font-family="system-ui">${totalLPtoElo(val)}</text>`;
+        // Elo tier boundary lines (horizontal lines at each elo boundary)
+        for (let ti = minTierIdx; ti <= maxTierIdx + 1; ti++) {
+            const boundary = ti * 400;
+            if (boundary < minY || boundary > maxY) continue;
+            const y = scaleY(boundary);
+            const tierName = tierNames[tierList[ti]] || '';
+            const tierColor = tierColors[tierList[ti]] || 'rgba(255,255,255,0.1)';
+            // Elo boundary line
+            svg += `<line x1="${PADL}" y1="${y}" x2="${W-PADR}" y2="${y}" stroke="${tierColor}" stroke-width="1" opacity="0.3" stroke-dasharray="4,4"/>`;
+            // Elo label on Y axis
+            if (tierName) {
+                svg += `<text x="${PADL-8}" y="${y+4}" fill="${tierColor}" font-size="10" text-anchor="end" font-weight="700" font-family="system-ui">${tierName}</text>`;
+            }
+        }
+
+        // Lighter sub-division lines within visible elos (every 100 = one rank)
+        for (let val = Math.ceil(minY/100)*100; val <= maxY; val += 100) {
+            if (val % 400 === 0) continue; // skip elo boundaries (already drawn)
+            const y = scaleY(val);
+            svg += `<line x1="${PADL}" y1="${y}" x2="${W-PADR}" y2="${y}" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>`;
         }
 
         // Vertical grid + date labels
@@ -1567,39 +1597,30 @@
                 svg += `<path d="${linePath}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
             }
 
-            // Dots with tooltips
+            // Dots
             points.forEach(p => {
-                svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${color}" stroke="var(--bg)" stroke-width="2.5" opacity="0.95"/>`;
+                svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${color}" stroke="var(--bg)" stroke-width="2" opacity="0.95"/>`;
             });
 
-            // Collect label for anti-overlap pass
+            // End label
             if (points.length) {
                 const last = points[points.length - 1];
                 const isNoob = PLAYERS[d.idx]?.special === 'noob';
                 const suffix = isNoob ? ' 🤡' : '';
-                endLabels.push({ x: last.x, y: last.y, name: d.name + suffix, elo: totalLPtoElo(last.val), color });
+                endLabels.push({ x: last.x, y: last.y, name: d.name + suffix, color });
             }
         });
 
-        // Anti-overlap: sort labels by Y, push apart if too close
+        // Anti-overlap labels
         endLabels.sort((a, b) => a.y - b.y);
-        const MIN_GAP = 22; // min pixels between label groups
         for (let i = 1; i < endLabels.length; i++) {
-            const prev = endLabels[i - 1], cur = endLabels[i];
-            if (cur.y - prev.y < MIN_GAP) {
-                const overlap = MIN_GAP - (cur.y - prev.y);
-                prev.y -= overlap / 2;
-                cur.y += overlap / 2;
+            if (endLabels[i].y - endLabels[i-1].y < 14) {
+                endLabels[i].y = endLabels[i-1].y + 14;
             }
         }
-        // Clamp to chart bounds
-        endLabels.forEach(l => { l.y = Math.max(PADT + 10, Math.min(H - PADB - 5, l.y)); });
-
-        // Render labels with connector lines
         endLabels.forEach(l => {
-            svg += `<line x1="${l.x + 5}" y1="${l.y}" x2="${l.x + 8}" y2="${l.y - 6}" stroke="${l.color}" stroke-width="0.8" opacity="0.4"/>`;
-            svg += `<text x="${l.x + 10}" y="${l.y - 6}" fill="${l.color}" font-size="10" font-weight="800" font-family="system-ui">${l.name}</text>`;
-            svg += `<text x="${l.x + 10}" y="${l.y + 7}" fill="#8892b0" font-size="8" font-family="system-ui">${l.elo}</text>`;
+            l.y = Math.max(PADT + 8, Math.min(H - PADB - 4, l.y));
+            svg += `<text x="${l.x + 8}" y="${l.y + 4}" fill="${l.color}" font-size="10" font-weight="700" font-family="system-ui">${l.name}</text>`;
         });
 
         // Axis lines
