@@ -558,7 +558,8 @@
     // Only new matches are fetched from Riot API — existing ones are reused from Firebase.
     const cache = {};
     const CACHE_TTL = 5 * 60 * 1000; // 5 min — data fresher than this skips API entirely
-    const MAX_MATCHES = 50; // Store up to 50 matches per player
+    const MAX_MATCHES = 200; // Store up to 200 matches per player
+    const FETCH_PAGE_SIZE = 100; // Riot API max per request
 
     function lsGet(key) { try { const d=JSON.parse(localStorage.getItem(key)); return d||null; } catch(_) { return null; } }
     function lsSet(key, data) { try { localStorage.setItem(key, JSON.stringify({...data, _ts:Date.now()})); } catch(_) {} }
@@ -576,6 +577,48 @@
         return d;
     }
 
+    // Compress match data — keep only fields we actually use (saves ~90% Firebase space)
+    function compressMatch(m, puuid) {
+        if (!m?.info || !m?.metadata) return null;
+        const me = m.info.participants?.find(p => p.puuid === puuid);
+        // Keep all participants but only essential fields
+        const participants = (m.info.participants || []).map(p => ({
+            puuid: p.puuid, championId: p.championId, teamId: p.teamId,
+            kills: p.kills, deaths: p.deaths, assists: p.assists, win: p.win,
+            totalMinionsKilled: p.totalMinionsKilled, neutralMinionsKilled: p.neutralMinionsKilled,
+            totalDamageDealtToChampions: p.totalDamageDealtToChampions,
+            visionScore: p.visionScore, goldEarned: p.goldEarned,
+            pentaKills: p.pentaKills, quadraKills: p.quadraKills, tripleKills: p.tripleKills,
+            doubleKills: p.doubleKills, firstBloodKill: p.firstBloodKill || false,
+            turretKills: p.turretKills, dragonKills: p.dragonKills, baronKills: p.baronKills,
+        }));
+        return {
+            metadata: { matchId: m.metadata.matchId, participants: m.metadata.participants },
+            info: {
+                gameCreation: m.info.gameCreation, gameDuration: m.info.gameDuration,
+                gameMode: m.info.gameMode, queueId: m.info.queueId,
+                teams: (m.info.teams || []).map(t => ({ teamId: t.teamId, win: t.win })),
+                participants,
+            }
+        };
+    }
+
+    // Fetch ALL match IDs with pagination (Riot API returns max 100 per request)
+    async function fetchAllMatchIds(cl, puuid) {
+        const allIds = [];
+        for (let start = 0; start < MAX_MATCHES; start += FETCH_PAGE_SIZE) {
+            const count = Math.min(FETCH_PAGE_SIZE, MAX_MATCHES - start);
+            const ids = await rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=${start}&count=${count}`, []);
+            if (!ids || ids.length === 0) break;
+            allIds.push(...ids);
+            if (ids.length < count) break; // No more pages
+            if (start + FETCH_PAGE_SIZE < MAX_MATCHES) {
+                await new Promise(r => setTimeout(r, 1200));
+            }
+        }
+        return allIds;
+    }
+
     async function fbGetPlayer(i) {
         if (!db) return null;
         try {
@@ -584,18 +627,34 @@
         } catch(_) { return null; }
     }
 
-    function fbSavePlayer(i, data) {
+    async function fbSavePlayer(i, data) {
         if (!db) return;
         // Strip internal fields before saving to Firebase
         const toSave = { ...data };
         delete toSave._ts;
         delete toSave._full;
         delete toSave._matchIds;
-        // Limit matches to MAX_MATCHES
-        if (toSave.matches?.length > MAX_MATCHES) {
-            toSave.matches = toSave.matches.slice(0, MAX_MATCHES);
+        // Compress matches before saving (only keep essential fields)
+        if (toSave.matches?.length) {
+            const puuid = toSave.account?.puuid;
+            toSave.matches = toSave.matches.map(m => {
+                // Already compressed? Check if it has minimal fields
+                if (m.info?.participants?.[0] && !m.info.participants[0].summonerName) return m;
+                return compressMatch(m, puuid) || m;
+            }).filter(Boolean);
         }
+        // Merge with existing Firebase data — NEVER lose old matches
+        try {
+            const existing = await fbGetPlayer(i);
+            if (existing?.matches?.length) {
+                const existingIds = new Set(toSave.matches.map(m => m.metadata?.matchId).filter(Boolean));
+                const oldMatches = existing.matches.filter(m => m.metadata?.matchId && !existingIds.has(m.metadata.matchId));
+                toSave.matches = [...toSave.matches, ...oldMatches]
+                    .sort((a, b) => (b.info?.gameCreation||0) - (a.info?.gameCreation||0));
+            }
+        } catch(_) {}
         toSave._updatedAt = Date.now();
+        toSave._matchCount = toSave.matches?.length || 0;
         db.ref(`players/${i}`).set(toSave).catch(e => console.warn('Firebase save error:', e.message));
     }
 
@@ -610,12 +669,13 @@
         const [summoner, league, matchIds] = await Promise.all([
             riot(`https://${pl}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${account.puuid}`),
             rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`, []),
-            rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/by-puuid/${account.puuid}/ids?start=0&count=${MAX_MATCHES}`, []),
+            fetchAllMatchIds(cl, account.puuid),
         ]);
         const ids = matchIds || [];
         let recentMatch = null;
         if (ids.length) {
-            recentMatch = await rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${ids[0]}`, null);
+            const raw = await rots(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${ids[0]}`, null);
+            recentMatch = raw ? compressMatch(raw, account.puuid) : null;
         }
         return { account, summoner, league: league||[], mastery:[], matches: recentMatch?[recentMatch]:[], _matchIds: ids };
     }
@@ -674,7 +734,8 @@
                 if (prev?.matches?.length) {
                     const existingIds = new Set(prev.matches.map(m => m.metadata?.matchId).filter(Boolean));
                     const brandNew = fresh.matches.filter(m => !existingIds.has(m.metadata?.matchId));
-                    fresh.matches = [...brandNew, ...prev.matches].slice(0, MAX_MATCHES);
+                    fresh.matches = [...brandNew, ...prev.matches]
+                        .sort((a, b) => (b.info?.gameCreation||0) - (a.info?.gameCreation||0));
                     if (prev.mastery?.length) fresh.mastery = prev.mastery;
                     fresh._full = prev._full || false;
                 }
@@ -692,7 +753,7 @@
         return bgRefresh[i];
     }
 
-    // BACKGROUND: loads remaining matches (up to 50) + mastery. Only fetches matches not already in cache.
+    // BACKGROUND: loads ALL available matches + mastery. Only fetches matches not already in cache.
     // All API calls go through _refreshQueue to avoid rate limit collisions.
     function loadPlayerBackground(i) {
         if (bgLoading[i]) return bgLoading[i];
@@ -716,15 +777,18 @@
 
             // Only fetch matches we don't already have
             const alreadyLoaded = new Set(base.matches.map(m => m.metadata?.matchId).filter(Boolean));
-            const toLoad = ids.slice(0, MAX_MATCHES).filter(mid => !alreadyLoaded.has(mid));
+            const toLoad = ids.filter(mid => !alreadyLoaded.has(mid));
             const newMatches = [];
-            // Fetch in batches of 3, each batch queued through the global queue
-            for (let b = 0; b < toLoad.length; b += 3) {
-                const batch = toLoad.slice(b, b+3);
+            console.log(`[${p.name}] Buscando ${toLoad.length} partidas novas de ${ids.length} total...`);
+            // Fetch in batches of 5, each batch queued through the global queue
+            for (let b = 0; b < toLoad.length; b += 5) {
+                const batch = toLoad.slice(b, b+5);
                 const batchWork = _refreshQueue.then(async () => {
-                    await new Promise(r => setTimeout(r, 2000));
+                    await new Promise(r => setTimeout(r, 1500));
                     await Promise.all(batch.map(mid =>
-                        riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`).then(d => newMatches.push(d)).catch(() => {})
+                        riot(`https://${cl}.api.riotgames.com/lol/match/v5/matches/${mid}`)
+                            .then(d => { const c = compressMatch(d, puuid); if (c) newMatches.push(c); })
+                            .catch(() => {})
                     ));
                 });
                 _refreshQueue = batchWork.catch(() => {});
@@ -733,9 +797,9 @@
 
             const allMatches = [...base.matches, ...newMatches]
                 .filter((m, idx2, arr) => arr.findIndex(x => x.metadata?.matchId === m.metadata?.matchId) === idx2)
-                .sort((a2, b2) => (b2.info?.gameCreation||0) - (a2.info?.gameCreation||0))
-                .slice(0, MAX_MATCHES);
+                .sort((a2, b2) => (b2.info?.gameCreation||0) - (a2.info?.gameCreation||0));
 
+            console.log(`[${p.name}] Total: ${allMatches.length} partidas salvas`);
             cache[i] = { ...base, mastery: mastery||[], matches: allMatches, _full: true, _ts: Date.now() };
             lsSet(`profa_player_${i}`, cache[i]);
             fbSavePlayer(i, cache[i]);
