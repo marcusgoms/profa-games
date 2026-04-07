@@ -6009,4 +6009,66 @@
         }).catch(() => {});
     }
 
+    // ======================== TIER LIST SIDEBARS ========================
+    (function initTierSidebars() {
+        const TOP_WR = [
+            { name:'KogMaw', display:"Kog'Maw", wr:54.3, tier:'S', role:'ADC' },
+            { name:'Veigar', display:'Veigar', wr:53.8, tier:'S', role:'Mid' },
+            { name:'Swain', display:'Swain', wr:53.6, tier:'A', role:'APC' },
+            { name:'Rammus', display:'Rammus', wr:53.5, tier:'A', role:'Jungle' },
+            { name:'Nasus', display:'Nasus', wr:53.1, tier:'B', role:'Top' },
+            { name:'Kayle', display:'Kayle', wr:52.9, tier:'A', role:'Top' },
+            { name:'Singed', display:'Singed', wr:52.7, tier:'B', role:'Top' },
+            { name:'Ornn', display:'Ornn', wr:52.5, tier:'A', role:'Top' },
+            { name:'Nilah', display:'Nilah', wr:52.5, tier:'B', role:'ADC' },
+            { name:'Nami', display:'Nami', wr:52.4, tier:'S', role:'Sup' },
+            { name:'Sona', display:'Sona', wr:52.2, tier:'A', role:'Sup' },
+            { name:'Briar', display:'Briar', wr:52.1, tier:'A', role:'Jungle' },
+            { name:'Milio', display:'Milio', wr:52.1, tier:'A', role:'Sup' },
+            { name:'DrMundo', display:'Dr. Mundo', wr:52.0, tier:'B', role:'Jungle' },
+            { name:'Soraka', display:'Soraka', wr:52.0, tier:'A', role:'Sup' },
+        ];
+        const LOW_WR = [
+            { name:'Zeri', display:'Zeri', wr:45.1, tier:'E', role:'ADC' },
+            { name:'Ryze', display:'Ryze', wr:45.4, tier:'E', role:'Mid' },
+            { name:'Azir', display:'Azir', wr:45.8, tier:'E', role:'Mid' },
+            { name:'Nidalee', display:'Nidalee', wr:46.0, tier:'D', role:'Jungle' },
+            { name:'Kalista', display:'Kalista', wr:46.2, tier:'D', role:'ADC' },
+            { name:'Akali', display:'Akali', wr:46.5, tier:'D', role:'Mid' },
+            { name:'Corki', display:'Corki', wr:46.7, tier:'D', role:'Mid' },
+            { name:'Rengar', display:'Rengar', wr:46.8, tier:'D', role:'Jungle' },
+            { name:'Jayce', display:'Jayce', wr:46.9, tier:'D', role:'Top' },
+            { name:'Gangplank', display:'Gangplank', wr:47.0, tier:'D', role:'Top' },
+            { name:'Thresh', display:'Thresh', wr:47.1, tier:'D', role:'Sup' },
+            { name:'LeBlanc', display:'LeBlanc', wr:47.2, tier:'D', role:'Mid' },
+            { name:'Gwen', display:'Gwen', wr:47.3, tier:'D', role:'Top' },
+            { name:'Riven', display:'Riven', wr:47.4, tier:'D', role:'Top' },
+            { name:'Qiyana', display:'Qiyana', wr:47.5, tier:'D', role:'Mid' },
+        ];
+        function wrClass(wr) {
+            if (wr >= 52) return 'tier-row__wr--high';
+            if (wr >= 50) return 'tier-row__wr--mid';
+            return 'tier-row__wr--low';
+        }
+        function renderList(containerId, list) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            el.innerHTML = list.map((c, i) => `
+                <div class="tier-row" title="${c.display} — ${c.role}">
+                    <span class="tier-row__pos">${i + 1}</span>
+                    <img class="tier-row__img" src="https://ddragon.leagueoflegends.com/cdn/${DVER}/img/champion/${c.name}.png" alt="${c.display}" onerror="this.style.opacity='0.3'">
+                    <div class="tier-row__info">
+                        <div class="tier-row__name">${c.display}</div>
+                        <div class="tier-row__wr ${wrClass(c.wr)}">${c.wr.toFixed(1)}% WR</div>
+                    </div>
+                    <span class="tier-row__tier tier-row__tier--${c.tier}">${c.tier}</span>
+                </div>
+            `).join('');
+        }
+        setTimeout(() => {
+            renderList('tier-left-list', TOP_WR);
+            renderList('tier-right-list', LOW_WR);
+        }, 2500);
+    })();
+
     })();
