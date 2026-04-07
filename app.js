@@ -3899,28 +3899,32 @@
         const winRate = (wins/n)*100;
 
         // Normalize stats to 0-100 scale (approximate benchmarks)
-        let atk = Math.min(100, (avgDPM / 800) * 100);       // DPM: 800+ = max
-        let def = Math.min(100, Math.max(0, (1 - (deaths/n)/8) * 100)); // Low deaths = high def
-        let agi = Math.min(100, (avgKDA / 6) * 100);         // KDA: 6+ = max
-        let int_stat = Math.min(100, (avgVision / 40) * 100);     // Vision: 40+ = max
-        let fr = Math.min(100, (avgGPM / 500) * 100);        // GPM: 500+ = max
-        let sab = Math.min(100, winRate);                     // Win rate direct
+        const rawAtk = Math.min(100, (avgDPM / 800) * 100);       // DPM: 800+ = max
+        const rawDef = Math.min(100, Math.max(0, (1 - (deaths/n)/8) * 100)); // Low deaths = high def
+        const rawAgi = Math.min(100, (avgKDA / 6) * 100);         // KDA: 6+ = max
+        const rawInt = Math.min(100, (avgVision / 40) * 100);     // Vision: 40+ = max
+        const rawFr = Math.min(100, (avgGPM / 500) * 100);        // GPM: 500+ = max
+        const rawSab = Math.min(100, winRate);                     // Win rate direct
 
-        // Elo bonus: ranked tier boosts all stats proportionally
+        // Elo is 40% of the power formula — a higher elo player ALWAYS scores above a lower one
+        // Performance stats are 60% — differentiate within the same elo bracket
         const ranked = getBestRanked(Array.isArray(league) ? league : []);
-        let eloBonus = 0;
+        let eloPercent = 0; // 0-100 scale representing ranked position
         if (ranked) {
             const tierVal = {IRON:0,BRONZE:1,SILVER:2,GOLD:3,PLATINUM:4,EMERALD:5,DIAMOND:6,MASTER:7,GRANDMASTER:8,CHALLENGER:9};
             const rankVal = {IV:0,III:1,II:2,I:3};
-            const eloScore = (tierVal[ranked.tier]||0)*4 + (rankVal[ranked.rank]||0); // 0-39
-            eloBonus = (eloScore / 39) * 15; // Up to +15 bonus across stats
+            const eloScore = (tierVal[ranked.tier]||0)*4 + (rankVal[ranked.rank]||0) + (ranked.leaguePoints||0)/100; // 0~40
+            eloPercent = Math.min(100, (eloScore / 40) * 100);
         }
-        atk = Math.min(100, atk + eloBonus);
-        def = Math.min(100, def + eloBonus);
-        agi = Math.min(100, agi + eloBonus);
-        int_stat = Math.min(100, int_stat + eloBonus);
-        fr = Math.min(100, fr + eloBonus);
-        sab = Math.min(100, sab + eloBonus);
+        const ELO_WEIGHT = 0.40;
+        const PERF_WEIGHT = 0.60;
+        const perfAvg = (rawAtk + rawDef + rawAgi + rawInt + rawFr + rawSab) / 6;
+        const atk = Math.min(100, rawAtk * PERF_WEIGHT + eloPercent * ELO_WEIGHT);
+        const def = Math.min(100, rawDef * PERF_WEIGHT + eloPercent * ELO_WEIGHT);
+        const agi = Math.min(100, rawAgi * PERF_WEIGHT + eloPercent * ELO_WEIGHT);
+        const int_stat = Math.min(100, rawInt * PERF_WEIGHT + eloPercent * ELO_WEIGHT);
+        const fr = Math.min(100, rawFr * PERF_WEIGHT + eloPercent * ELO_WEIGHT);
+        const sab = Math.min(100, rawSab * PERF_WEIGHT + eloPercent * ELO_WEIGHT);
 
         const power = ((atk + def + agi + int_stat + fr + sab) / 6);
 
@@ -4176,6 +4180,21 @@
             }
         });
         await Promise.all(promises);
+
+        // Sort cards by power (highest first)
+        const grid = document.getElementById('rpg-grid');
+        if (grid) {
+            const cards = [...grid.children];
+            cards.sort((a, b) => {
+                const ai = parseInt(a.dataset.rpg), bi = parseInt(b.dataset.rpg);
+                const pa = allRPGStats[ai]?.power || -1, pb = allRPGStats[bi]?.power || -1;
+                return pb - pa;
+            });
+            cards.forEach((c, idx) => {
+                c.style.setProperty('--enter-i', idx);
+                grid.appendChild(c);
+            });
+        }
 
         // Save weekly RPG snapshot
         saveRPGSnapshot(allRPGStats.filter(Boolean));
