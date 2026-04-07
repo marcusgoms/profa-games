@@ -3446,10 +3446,33 @@
         const rpgClass = RPG_CLASSES.find(c => c.stat === dominant) || RPG_CLASSES[0];
         const rank = getRPGRank(power);
 
+        // Virtudes e Defeitos baseados nos stats
+        const virtues = [], flaws = [];
+        const ra = Math.round(atk), rd = Math.round(def), rag = Math.round(agi), ri = Math.round(int), rf = Math.round(fr), rs = Math.round(sab);
+        if (ra >= 70) virtues.push({ icon:'⚔️', text:'Dano devastador' });
+        else if (ra < 30) flaws.push({ icon:'⚔️', text:'Dano fraco' });
+        if (rd >= 70) virtues.push({ icon:'🛡️', text:'Sobrevivente nato' });
+        else if (rd < 30) flaws.push({ icon:'💀', text:'Morre demais' });
+        if (rag >= 70) virtues.push({ icon:'🗡️', text:'Precisão letal' });
+        else if (rag < 30) flaws.push({ icon:'🗡️', text:'KDA problemático' });
+        if (ri >= 70) virtues.push({ icon:'👁️', text:'Visão impecável' });
+        else if (ri < 30) flaws.push({ icon:'👁️', text:'Cego no mapa' });
+        if (rf >= 70) virtues.push({ icon:'👑', text:'Rei do ouro' });
+        else if (rf < 30) flaws.push({ icon:'👑', text:'Sempre sem gold' });
+        if (rs >= 70) virtues.push({ icon:'✨', text:'Vencedor consistente' });
+        else if (rs < 30) flaws.push({ icon:'✨', text:'Perde demais' });
+        // Bonus traits
+        if (ra >= 80 && rd < 40) virtues.push({ icon:'💥', text:'Canhão de vidro' });
+        if (rd >= 80 && ra < 40) virtues.push({ icon:'🏰', text:'Muralha inabalável' });
+        if (rag >= 80 && rs >= 60) virtues.push({ icon:'🎯', text:'Assassino cirúrgico' });
+        if (ri >= 60 && rs >= 60) virtues.push({ icon:'🧠', text:'Mente estratégica' });
+        if (rd < 25 && ra < 25) flaws.push({ icon:'🤡', text:'Perdido no jogo' });
+        if (rs < 25 && rag < 30) flaws.push({ icon:'📉', text:'Fase terrível' });
+
         return {
-            atk: Math.round(atk), def: Math.round(def), agi: Math.round(agi),
-            int: Math.round(int), for: Math.round(fr), sab: Math.round(sab),
+            atk: ra, def: rd, agi: rag, int: ri, for: rf, sab: rs,
             power: Math.round(power), rpgClass, rank, topChampId,
+            virtues: virtues.slice(0, 3), flaws: flaws.slice(0, 3),
             raw: { avgKDA: avgKDA.toFixed(2), avgDPM: avgDPM.toFixed(0), avgGPM: avgGPM.toFixed(0),
                    avgVision: avgVision.toFixed(1), avgCS: avgCS.toFixed(0), winRate: winRate.toFixed(0),
                    games: n, wins, deaths: (deaths/n).toFixed(1) }
@@ -3608,6 +3631,31 @@
         <div class="rpg-legend">
             ${RPG_CLASSES.map(c => `<div class="rpg-legend-item"><span class="rpg-legend-icon" style="color:${c.color}">${c.icon}</span><span class="rpg-legend-name" style="color:${c.color}">${c.name}</span></div>`).join('')}
         </div>
+        <div class="rpg-guide">
+            <button class="rpg-guide-toggle" onclick="this.parentElement.classList.toggle('open')">Guia de Atributos <span class="rpg-guide-arrow">&#9660;</span></button>
+            <div class="rpg-guide-content">
+                <div class="rpg-guide-grid">
+                    <div class="rpg-guide-item"><span class="rpg-guide-icon" style="color:#e53935">⚔️</span><div><b>ATK (Ataque)</b><p>Dano por minuto (DPM). Mede quanto dano o jogador causa aos campeões inimigos a cada minuto de jogo. Quanto mais alto, mais agressivo e impactante nas teamfights.</p></div></div>
+                    <div class="rpg-guide-item"><span class="rpg-guide-icon" style="color:#1e88e5">🛡️</span><div><b>DEF (Defesa)</b><p>Sobrevivência baseada em mortes por jogo. Quanto menos morre, maior o DEF. Um jogador com DEF alto sabe se posicionar e evitar ser abatido.</p></div></div>
+                    <div class="rpg-guide-item"><span class="rpg-guide-icon" style="color:#ab47bc">🗡️</span><div><b>AGI (Agilidade)</b><p>KDA (Kills+Assists/Deaths). Representa a eficiência geral em combate. Um jogador ágil participa de muitos abates e morre pouco.</p></div></div>
+                    <div class="rpg-guide-item"><span class="rpg-guide-icon" style="color:#00acc1">👁️</span><div><b>INT (Inteligência)</b><p>Placar de visão médio. Mede o controle de visão do mapa — wards colocadas, wards destruídas, controle de objetivos. Visão ganha jogos.</p></div></div>
+                    <div class="rpg-guide-item"><span class="rpg-guide-icon" style="color:#fdd835">👑</span><div><b>FOR (Fortuna)</b><p>Ouro por minuto (GPM). Mede a capacidade de gerar recursos — farm, abates, objetivos. Mais ouro = mais itens = mais poder.</p></div></div>
+                    <div class="rpg-guide-item"><span class="rpg-guide-icon" style="color:#66bb6a">✨</span><div><b>SAB (Sabedoria)</b><p>Taxa de vitória (Win Rate). O stat mais importante — no final, o que importa é vencer. Um jogador sábio toma as decisões certas para fechar o jogo.</p></div></div>
+                </div>
+                <div class="rpg-guide-section">
+                    <h4>Como funciona a Classe</h4>
+                    <p>Cada jogador recebe a classe do seu atributo mais alto. Se seu ATK é o maior, você é <b style="color:#e53935">Guerreiro</b>. Se é o DEF, <b style="color:#1e88e5">Guardião</b>. E assim por diante.</p>
+                </div>
+                <div class="rpg-guide-section">
+                    <h4>Virtudes e Defeitos</h4>
+                    <p><span style="color:#4caf50">Virtudes</span> aparecem quando um stat está acima de 70 — o jogador é excepcional naquela área. <span style="color:#ef5350">Defeitos</span> aparecem quando está abaixo de 30 — um ponto fraco evidente. Combos especiais são detectados, como "Canhão de vidro" (ATK alto + DEF baixo).</p>
+                </div>
+                <div class="rpg-guide-section">
+                    <h4>Ranks</h4>
+                    <p>O Poder é a média dos 6 atributos. Ele define o rank: <span style="color:#78909c">Aprendiz</span> → <span style="color:#66bb6a">Soldado</span> → <span style="color:#42a5f5">Veterano</span> → <span style="color:#ab47bc">Elite</span> → <span style="color:#ffa726">Campeão</span> → <span style="color:#ef5350">Lendário</span> → <span style="color:#e040fb">Mítico</span> → <span style="color:#ffd740">Divino</span>.</p>
+                </div>
+            </div>
+        </div>
         <div class="rpg-evo-section">
             <h3>Evolução de Poder</h3>
             <div id="rpg-evo-chart"><div class="ld"><div class="sp"></div></div></div>
@@ -3631,9 +3679,7 @@
                 if (!stats) { allRPGStats[i]=null; return renderRPGCardEmpty(i, p, d); }
                 stats.idx = i;
                 allRPGStats[i] = stats;
-                // Compute inventory
-                const inventory = computePlayerInventory(mt, puuid);
-                renderRPGCard(i, p, d, stats, inventory);
+                renderRPGCard(i, p, d, stats);
             } catch(_) {
                 allRPGStats[i]=null;
                 renderRPGCardEmpty(i, p, null);
@@ -3663,7 +3709,7 @@
             <div class="rpg-card-empty">Sem dados suficientes para forjar guerreiro</div>`;
     }
 
-    function renderRPGCard(i, p, d, stats, inventory) {
+    function renderRPGCard(i, p, d, stats) {
         const card = document.querySelector(`[data-rpg="${i}"]`);
         if (!card) return;
         card.classList.remove('rpg-card-loading');
@@ -3715,6 +3761,11 @@
                 </div>
             </div>
 
+            <div class="rpg-card-traits">
+                ${stats.virtues.length ? `<div class="rpg-traits-col rpg-virtues"><div class="rpg-traits-title virtues-title">Virtudes</div>${stats.virtues.map(v => `<div class="rpg-trait rpg-virtue"><span>${v.icon}</span> ${v.text}</div>`).join('')}</div>` : ''}
+                ${stats.flaws.length ? `<div class="rpg-traits-col rpg-flaws"><div class="rpg-traits-title flaws-title">Defeitos</div>${stats.flaws.map(f => `<div class="rpg-trait rpg-flaw"><span>${f.icon}</span> ${f.text}</div>`).join('')}</div>` : ''}
+            </div>
+
             <div class="rpg-card-raw">
                 <div class="rpg-raw-item"><span>KDA</span><b>${stats.raw.avgKDA}</b></div>
                 <div class="rpg-raw-item"><span>DPM</span><b>${stats.raw.avgDPM}</b></div>
@@ -3723,7 +3774,6 @@
                 <div class="rpg-raw-item"><span>CS</span><b>${stats.raw.avgCS}</b></div>
                 <div class="rpg-raw-item"><span>WR</span><b>${stats.raw.winRate}%</b></div>
             </div>
-            ${inventory?.length ? `<div class="rpg-inventory"><span class="rpg-inv-label">Equipamento</span><div class="rpg-inv-items">${inventory.map(item => `<img src="${itemImg(item.id)}" class="rpg-inv-item" title="${item.cnt}x comprado">`).join('')}</div></div>` : ''}
             <div class="rpg-card-footer">
                 <span>${stats.raw.games} batalhas &bull; ${stats.raw.wins}V ${stats.raw.games - stats.raw.wins}D</span>
                 ${champName ? `<span>Main: ${champName}</span>` : ''}
@@ -4160,7 +4210,6 @@
         box.innerHTML = _chatMessages.map(m => {
             const isMe = user?.idx === m.idx;
             const icon = playerIcon(m.idx, null);
-            const key = m._key || '';
             return `<div class="chat-msg ${isMe ? 'chat-me' : ''}">
                 <img src="${profImg(icon)}" class="chat-avatar" onerror="this.style.display='none'">
                 <div class="chat-bubble">
@@ -4169,43 +4218,11 @@
                         <span class="chat-msg-time">${fmtAgo(m.ts)}</span>
                     </div>
                     <div class="chat-msg-text">${escapeHtml(m.text || '')}</div>
-                    <div class="chat-reactions" id="chat-react-${key}">
-                        <div class="chat-react-btns">${['👍','🔥','😂','💀','❤️'].map(e=>`<button class="chat-react-btn" onclick="reactChat('${key}','${e}')">${e}</button>`).join('')}</div>
-                        <div class="chat-react-counts" id="chat-counts-${key}"></div>
-                    </div>
                 </div>
             </div>`;
         }).join('');
         if (wasAtBottom) box.scrollTop = box.scrollHeight;
-        // Load chat reactions
-        if (db) {
-            _chatMessages.forEach(m => {
-                if (!m._key) return;
-                db.ref(`chatReactions/${m._key}`).once('value').then(snap => {
-                    const data = snap.val() || {};
-                    const counts = {};
-                    Object.values(data).forEach(r => { counts[r] = (counts[r]||0)+1; });
-                    const el = document.getElementById(`chat-counts-${m._key}`);
-                    if (el) el.innerHTML = Object.entries(counts).map(([e,c])=>`<span class="chat-count-badge">${e}${c}</span>`).join('');
-                }).catch(()=>{});
-            });
-        }
     }
-
-    window.reactChat = function(msgKey, emoji) {
-        const user = getLoggedUser();
-        if (!user || !db || !msgKey) return;
-        db.ref(`chatReactions/${msgKey}/${user.idx}`).set(emoji).then(() => {
-            // Reload reaction counts
-            db.ref(`chatReactions/${msgKey}`).once('value').then(snap => {
-                const data = snap.val() || {};
-                const counts = {};
-                Object.values(data).forEach(r => { counts[r] = (counts[r]||0)+1; });
-                const el = document.getElementById(`chat-counts-${msgKey}`);
-                if (el) el.innerHTML = Object.entries(counts).map(([e,c])=>`<span class="chat-count-badge">${e}${c}</span>`).join('');
-            });
-        }).catch(()=>{});
-    };
 
     window.sendChat = function() {
         const user = getLoggedUser();

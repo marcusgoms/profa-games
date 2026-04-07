@@ -2293,24 +2293,73 @@ body::after {
 }
 .evo-chart { width: 100%; max-width: 500px; margin: 0 auto; display: block; }
 
-/* ======================== INVENTORY ======================== */
-.rpg-inventory {
+/* ======================== RPG STAT GUIDE ======================== */
+.rpg-guide {
+    max-width: 1400px; margin: 0 auto;
+    background: rgba(0,0,0,0.15); border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.rpg-guide-toggle {
+    width: 100%; padding: 14px 20px; background: none; border: none;
+    color: rgba(255,255,255,0.6); font-weight: 600; font-size: 0.9em;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    gap: 8px; transition: color 0.2s;
+}
+.rpg-guide-toggle:hover { color: rgba(255,255,255,0.9); }
+.rpg-guide-arrow { font-size: 0.7em; transition: transform 0.3s; }
+.rpg-guide.open .rpg-guide-arrow { transform: rotate(180deg); }
+.rpg-guide-content {
+    max-height: 0; overflow: hidden; transition: max-height 0.4s ease;
+    padding: 0 20px;
+}
+.rpg-guide.open .rpg-guide-content {
+    max-height: 800px; padding: 0 20px 20px;
+}
+.rpg-guide-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+}
+.rpg-guide-item {
+    display: flex; gap: 12px; padding: 12px;
+    background: rgba(255,255,255,0.03); border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.04);
+}
+.rpg-guide-icon { font-size: 1.5em; flex-shrink: 0; margin-top: 2px; }
+.rpg-guide-item b { color: rgba(255,255,255,0.9); font-size: 0.9em; }
+.rpg-guide-item p {
+    color: rgba(255,255,255,0.5); font-size: 0.78em; line-height: 1.5;
+    margin-top: 4px;
+}
+.rpg-guide-section { margin-top: 12px; }
+.rpg-guide-section h4 {
+    color: rgba(255,255,255,0.7); font-size: 0.9em; margin-bottom: 6px;
+}
+.rpg-guide-section p {
+    color: rgba(255,255,255,0.45); font-size: 0.8em; line-height: 1.6;
+}
+
+/* ======================== VIRTUES & FLAWS ======================== */
+.rpg-card-traits {
     position: relative; z-index: 2;
-    padding: 6px 16px; display: flex; align-items: center; gap: 8px;
+    display: flex; gap: 8px; padding: 6px 16px;
 }
-.rpg-inv-label {
-    font-size: 0.6em; font-weight: 700; color: rgba(255,255,255,0.3);
-    text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
+.rpg-traits-col { flex: 1; min-width: 0; }
+.rpg-traits-title {
+    font-size: 0.6em; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 4px; padding-left: 2px;
 }
-.rpg-inv-items { display: flex; gap: 4px; flex-wrap: wrap; }
-.rpg-inv-item {
-    width: 24px; height: 24px; border-radius: 4px;
-    border: 1px solid rgba(255,255,255,0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
+.virtues-title { color: #4caf50; }
+.flaws-title { color: #ef5350; }
+.rpg-trait {
+    font-size: 0.72em; padding: 3px 6px; margin-bottom: 3px;
+    border-radius: 6px; display: flex; align-items: center; gap: 4px;
 }
-.rpg-inv-item:hover {
-    transform: scale(1.3); z-index: 5;
-    box-shadow: 0 0 8px rgba(255,255,255,0.2);
+.rpg-virtue {
+    background: rgba(76,175,80,0.08); color: rgba(76,175,80,0.85);
+    border: 1px solid rgba(76,175,80,0.12);
+}
+.rpg-flaw {
+    background: rgba(239,83,80,0.08); color: rgba(239,83,80,0.85);
+    border: 1px solid rgba(239,83,80,0.12);
 }
 
 /* ======================== BATTLE 1v1 ======================== */
@@ -2506,27 +2555,6 @@ body::after {
 .squad-pred-pct {
     position: relative; z-index: 2; font-size: 0.8em; color: var(--dim);
     font-weight: 600;
-}
-
-/* ======================== CHAT REACTIONS ======================== */
-.chat-reactions {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-    margin-top: 4px; padding-top: 4px;
-    border-top: 1px solid rgba(255,255,255,0.04);
-}
-.chat-react-btns {
-    display: flex; gap: 2px; opacity: 0; transition: opacity 0.2s;
-}
-.chat-bubble:hover .chat-react-btns { opacity: 1; }
-.chat-react-btn {
-    background: none; border: none; cursor: pointer; font-size: 0.75em;
-    padding: 1px 3px; border-radius: 6px; transition: all 0.15s;
-}
-.chat-react-btn:hover { background: rgba(255,255,255,0.1); transform: scale(1.3); }
-.chat-react-counts { display: flex; gap: 4px; flex-wrap: wrap; }
-.chat-count-badge {
-    font-size: 0.72em; padding: 1px 6px; background: rgba(255,255,255,0.06);
-    border-radius: 10px; color: rgba(255,255,255,0.7);
 }
 
 /* ======================== RPG THEME ON PROFILE ======================== */
