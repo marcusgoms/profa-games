@@ -630,120 +630,120 @@
         const solo = getBestRanked(league);
         const tier = solo?.tier || '';
 
-        // Build pool of applicable analytical comments (corporate-analyst tone, nonsense)
+        // Build pool of applicable LoL-themed comments
         const pool = [];
         const n = playerName;
 
         // KDA-based
         if (kda >= 5) {
-            pool.push({ icon:'📊', txt:`Auditoria trimestral: ${n} opera com KDA de ${kda.toFixed(1)} — índice de eficiência letal que coloca 97% do servidor em situação de compliance negativa. Relatório arquivado.` });
-            pool.push({ icon:'📈', txt:`O board executivo precisa saber: ${n} entrega um KDA de ${kda.toFixed(1)}. Em termos de ROI por teamfight, isso é retorno garantido. Recomendação: manter o ativo.` });
+            pool.push({ icon:'⚔️', txt:`${n} com KDA de ${kda.toFixed(1)}. Isso é nível Faker em dia de final. O Rift inteiro treme quando esse jogador entra na partida.` });
+            pool.push({ icon:'🔥', txt:`KDA de ${kda.toFixed(1)}. ${n} tá jogando como se tivesse 3 itens a mais que todo mundo. Os inimigos devem achar que é smurf.` });
         } else if (kda >= 3) {
-            pool.push({ icon:'📋', txt:`${n} apresenta KDA de ${kda.toFixed(1)}. Pelos padrões de consultoria em Summoner's Rift, está no quartil superior de "faz o básico sem destruir a operação". Aceitável.` });
-            pool.push({ icon:'📈', txt:`Análise proprietária indica: KDA de ${kda.toFixed(1)} posiciona ${n} na categoria "Funcionário do Mês". Certificado pendente de aprovação do comitê.` });
+            pool.push({ icon:'🎯', txt:`${n} com KDA de ${kda.toFixed(1)}. Sólido como torre tier 2 — não é o highlight do jogo, mas tá sempre de pé quando importa.` });
+            pool.push({ icon:'⚔️', txt:`KDA de ${kda.toFixed(1)} coloca ${n} no patamar de "jogador que o jungler não precisa gankar". Auto-suficiente no Rift.` });
         } else if (kda < 1.5) {
-            pool.push({ icon:'📊', txt:`KDA de ${kda.toFixed(1)}. Caso submetido ao departamento de gestão de riscos. Conclusão: ${n} É o risco. O relatório de 47 páginas está disponível mediante requisição formal.` });
-            pool.push({ icon:'📈', txt:`Reunião de emergência convocada sobre o KDA de ${n}. ${kda.toFixed(1)}. O slide deck tem 3 gráficos e todos apontam pra baixo. Literalmente todos.` });
-            pool.push({ icon:'⚖️', txt:`De acordo com o manual de conduta interna, o KDA de ${n} está tecnicamente dentro dos limites legais de operação. Tecnicamente.` });
+            pool.push({ icon:'💀', txt:`KDA de ${kda.toFixed(1)}. ${n} tá dando mais gold pro inimigo que o Baron Nashor. Pelo menos o Baron luta de volta.` });
+            pool.push({ icon:'🪦', txt:`${n} com KDA de ${kda.toFixed(1)}. Até o Karthus passivo causa mais impacto. E ele tá literalmente morto.` });
+            pool.push({ icon:'😭', txt:`KDA de ${kda.toFixed(1)}. Os minions do ${n} têm mais KDA que ele. E eles nem aparecem no scoreboard.` });
         }
 
         // Death-based
         if (avgD >= 8) {
-            pool.push({ icon:'📊', txt:`${n} registra ${avgD.toFixed(1)} óbitos operacionais por partida. Em termos corporativos, isso é uma taxa de turnover de 100%. Do próprio corpo.` });
-            pool.push({ icon:'📈', txt:`Avaliação de RH: a média de ${avgD.toFixed(0)} mortes por jogo configura o que especialistas chamam de "demissão involuntária repetida". A cada 4 minutos.` });
-            pool.push({ icon:'📋', txt:`Análise de frequência de mortes de ${n} — ${avgD.toFixed(1)}/partida — sugere que a fonte cinza do respawn deveria cobrar taxa de utilização.` });
+            pool.push({ icon:'💀', txt:`${n} morre ${avgD.toFixed(1)} vezes por jogo. A fonte cinza já mandou mensagem pedindo pra dar uma pausa. Cansou de ver essa cara.` });
+            pool.push({ icon:'🪦', txt:`${avgD.toFixed(0)} mortes por partida. ${n} não tá jogando LoL, tá jogando simulador de tela cinza. E tá no master desse jogo.` });
+            pool.push({ icon:'👻', txt:`${n} com ${avgD.toFixed(1)} mortes/jogo. A essa altura o respawn timer dele é praticamente o cooldown de uma ultimate.` });
         } else if (avgD >= 6) {
-            pool.push({ icon:'📈', txt:`No dashboard de performance, ${n} aparece com ${avgD.toFixed(1)} mortes/jogo. O gráfico foi colorido de vermelho. Não por ser negativo — é que combina com o tema.` });
+            pool.push({ icon:'💀', txt:`${n} com ${avgD.toFixed(1)} mortes/jogo. Não é inter, é "agressividade calculada". O cálculo só tá sempre errado.` });
         } else if (avgD <= 2 && zeroDeathGames >= 2) {
-            pool.push({ icon:'📊', txt:`${n} registrou ${zeroDeathGames} partidas com zero baixas. Caso submetido ao departamento de fenômenos inexplicáveis. Status: sob investigação.` });
+            pool.push({ icon:'🛡️', txt:`${n} tem ${zeroDeathGames} partidas com ZERO mortes. Esse jogador é feito de Zhonya — simplesmente não morre.` });
         }
 
         // Kills-based
         if (avgK >= 10) {
-            pool.push({ icon:'📈', txt:`${n} elimina em média ${avgK.toFixed(1)} oponentes por operação. Pela planilha interna — que tem fórmulas e tudo — isso classifica como "Top Performer". O título oficial é "Destruidor de Metas".` });
-            pool.push({ icon:'📊', txt:`${avgK.toFixed(1)} abates por missão. Isso coloca ${n} no percentil 95 de eliminações. Recomendação da auditoria: promoção imediata para carry designado.` });
+            pool.push({ icon:'🔥', txt:`${n} abate ${avgK.toFixed(1)} inimigos por jogo. Isso não é carry, é massacre. O time inimigo vê ${n} e já pensa em /ff.` });
+            pool.push({ icon:'⚔️', txt:`${avgK.toFixed(1)} kills por partida. ${n} é o tipo de jogador que faz o ADC inimigo trocar de lane. E depois trocar de jogo.` });
         } else if (avgK <= 2) {
-            pool.push({ icon:'📋', txt:`${n} com ${avgK.toFixed(1)} kills por jogo. Na consultoria, chamamos isso de "presença passiva" — está na reunião, câmera ligada, mas no mute. Permanentemente.` });
-            pool.push({ icon:'⚖️', txt:`Devolutiva agendada com ${n} sobre os indicadores de eliminação. Pauta: "Por que o gráfico de kills parece um eletrocardiograma em linha reta?"` });
+            pool.push({ icon:'😴', txt:`${n} com ${avgK.toFixed(1)} kills por jogo. Tá jogando LoL ou assistindo? Porque o dano é de espectador.` });
+            pool.push({ icon:'🌿', txt:`${avgK.toFixed(1)} kills por partida. ${n} joga como se tivesse feito um pacto de não-agressão com o time inimigo. E tá cumprindo.` });
         }
 
         // Win rate
         if (wr >= 70) {
-            pool.push({ icon:'📈', txt:`Comunicado ao conselho: ${wr.toFixed(0)}% de winrate. ${n} opera ${((wr-50)/50*100).toFixed(0)}% acima do benchmark do setor. Proposta de bônus trimestral em RP.` });
-            pool.push({ icon:'📊', txt:`${wr.toFixed(0)}% de taxa de sucesso. O benchmark é 50%. ${n} opera 1.${(wr-50).toFixed(0)}x acima do mercado. Análise SWOT confirma: zero fraquezas detectadas. Por enquanto.` });
+            pool.push({ icon:'👑', txt:`${wr.toFixed(0)}% de winrate. ${n} nasceu pra escalar elo. Esse é o tipo de jogador que carrega até no ARAM.` });
+            pool.push({ icon:'🏆', txt:`${wr.toFixed(0)}% de WR. ${n} tá tão acima que até o matchmaking tá confuso tentando equilibrar as partidas.` });
         } else if (wr <= 30) {
-            pool.push({ icon:'📈', txt:`Caso ${n}: ${wr.toFixed(0)}% de winrate. O gráfico de pizza foi gerado e... a fatia de derrota comeu a pizza inteira. Literalmente. Não sobrou pizza.` });
-            pool.push({ icon:'📋', txt:`O forecast de ${n} projeta ${wr.toFixed(0)}% de conversão. No mundo corporativo, isso geraria uma reunião de crise. Aqui, gera mais uma fila de derrota.` });
-            pool.push({ icon:'📊', txt:`${wr.toFixed(0)}% de WR. Pela metodologia Six Sigma, isso é um desvio de 4σ negativos. Recomendação formal: reestruturação completa do processo decisório.` });
+            pool.push({ icon:'📉', txt:`${n} com ${wr.toFixed(0)}% de winrate. A fila de derrotas tá tão longa que dá pra usar de lane. Do nexus até o nexus inimigo.` });
+            pool.push({ icon:'😭', txt:`${wr.toFixed(0)}% de WR. ${n} perde mais que minion no early game. E o minion pelo menos tenta.` });
+            pool.push({ icon:'🪦', txt:`${wr.toFixed(0)}% de winrate. O botão de /ff já vem pré-selecionado quando ${n} entra na partida.` });
         } else if (wr >= 50 && wr < 55) {
-            pool.push({ icon:'📋', txt:`${n} mantém ${wr.toFixed(0)}% de WR. Na consultoria chamamos de "estabilidade operacional neutra". Em português: nem fede nem cheira. E tá tudo bem com isso.` });
+            pool.push({ icon:'⚖️', txt:`${n} com ${wr.toFixed(0)}% de WR. Perfeitamente equilibrado, como toda coisa deveria ser. Thanos jogaria ranked assim.` });
         }
 
         // Vision
         if (avgVis <= 5) {
-            pool.push({ icon:'📊', txt:`Setor de inteligência reporta: ${n} com score de visão ${avgVis.toFixed(0)}. Falha crítica de reconhecimento territorial. O mapa é escuro porque ${n} não acende.` });
-            pool.push({ icon:'📈', txt:`Relatório de infraestrutura: cobertura de wards de ${n} classificada como "inexistente". O heatmap gerado ficou... preto. Todo preto. Sem dados pra renderizar.` });
+            pool.push({ icon:'🔦', txt:`${n} com score de visão ${avgVis.toFixed(0)}. O mapa tá mais escuro que a Sombra das Ilhas. Compra uma ward, pelo amor do Rift.` });
+            pool.push({ icon:'👁️', txt:`Visão de ${n}: ${avgVis.toFixed(0)}. Nocturne ia ficar com inveja desse blackout. O fog of war é o melhor amigo de ${n}. Ou pior inimigo.` });
         } else if (avgVis >= 30) {
-            pool.push({ icon:'📊', txt:`Score de visão: ${avgVis.toFixed(0)}. ${n} opera o sistema de vigilância mais eficiente do squad. O departamento de segurança reconhece a excelência operacional.` });
+            pool.push({ icon:'👁️', txt:`Score de visão: ${avgVis.toFixed(0)}. ${n} warda mais que o mapa inteiro consegue mostrar. Se visão ganhasse jogo, esse era Challenger.` });
         }
 
         // CS
         if (avgCS <= 80) {
-            pool.push({ icon:'📋', txt:`${n} com média de ${avgCS.toFixed(0)} CS/jogo. Análise de produtividade indica operação a 40% da capacidade de farm. O restante é gasto... existindo.` });
-            pool.push({ icon:'📈', txt:`Report de farm de ${n}: ${avgCS.toFixed(0)} CS. O estagiário que plotou o gráfico perguntou se faltavam dados. Não faltavam. É isso mesmo.` });
+            pool.push({ icon:'🌾', txt:`${n} com ${avgCS.toFixed(0)} CS/jogo. Até o Bard ADC farma mais que isso. Os minions passam e ${n} só olha.` });
+            pool.push({ icon:'💰', txt:`${avgCS.toFixed(0)} CS de média. ${n} tá mais pobre que support sem item de suporte. O ouro não vem sozinho, amigo.` });
         } else if (avgCS >= 200) {
-            pool.push({ icon:'📊', txt:`${avgCS.toFixed(0)} CS por operação. Eficiência de extração de recursos no percentil 90. ${n} é o CFO que esse time precisa. Nomeação pendente de aprovação.` });
+            pool.push({ icon:'💰', txt:`${avgCS.toFixed(0)} CS por jogo. ${n} farma como se cada minion devesse dinheiro pra ele. Nasus ficaria orgulhoso dessa dedicação.` });
         }
 
         // Champion pool
         if (topCount >= 6 && games >= 8) {
-            pool.push({ icon:'📋', txt:`${n} selecionou ${topChamp} em ${topCount} de ${games} operações recentes. Os dados sugerem dependência operacional de ativo único. Índice de diversificação: 0.` });
-            pool.push({ icon:'📊', txt:`${topCount} deployments de ${topChamp}. Concentração de portfólio excede todos os limites prudenciais. Nota do analista: admiro a convicção. É arriscado, mas admiro.` });
+            pool.push({ icon:'🎭', txt:`${n} jogou ${topChamp} em ${topCount} de ${games} partidas. Isso não é main, é relacionamento sério. Já podem casar no Rift.` });
+            pool.push({ icon:'💍', txt:`${topCount} jogos de ${topChamp}. ${n} tem um one-trick tão forte que o campeão já devia pedir ordem de restrição. Ou um anel.` });
         } else if (uniqueChamps >= 8) {
-            pool.push({ icon:'📈', txt:`${n} rotacionou ${uniqueChamps} campeões diferentes. No PowerPoint interno isso se chama "Estratégia de Diversificação Agressiva". Ou como o time chama: "não sabe o que quer".` });
+            pool.push({ icon:'🎭', txt:`${n} rodou ${uniqueChamps} campeões diferentes. Champion pool mais largo que o rio do Rift. Respeito pela versatilidade. Ou indecisão.` });
         }
 
         // Pentas
         if (pentas > 0) {
-            pool.push({ icon:'📈', txt:`COMUNICADO OFICIAL: ${n} registrou um Pentakill. O departamento de marketing foi notificado. Press release, banner e troféu em produção.` });
-            pool.push({ icon:'📊', txt:`Pentakill confirmado e auditado. Eliminação quintupla sequencial em ambiente competitivo. Probabilidade estatística: 0.03%. Mérito operacional: absoluto.` });
+            pool.push({ icon:'🏆', txt:`PENTAKILL! ${n} eliminou o time inteiro sozinho. Darius ia aplaudir de pé. Esse é o tipo de jogada que vira highlight pra sempre.` });
+            pool.push({ icon:'💥', txt:`Pentakill confirmado. ${n} passou por cima de 5 jogadores como se fosse um Sion ultando. Lendário. Literalmente.` });
         }
 
         // Max deaths in a single game
         if (maxDeaths >= 12) {
-            pool.push({ icon:'📋', txt:`Pico de ${maxDeaths} mortes em uma sessão. Na consultoria, isso é o que chamamos de "evento catastrófico isolado". Exceto que não é isolado. Acontece com frequência.` });
-            pool.push({ icon:'📈', txt:`${maxDeaths} mortes num jogo. Isso foi apresentado no all-hands. A sala ficou em silêncio. Não era respeito. Era choque.` });
+            pool.push({ icon:'💀', txt:`${maxDeaths} mortes num jogo. ${n} alimentou tanto que o time inimigo podia ir full tank e ainda oneshot. Buffet completo no Rift.` });
+            pool.push({ icon:'🪦', txt:`Recorde de ${maxDeaths} mortes. ${n} morreu mais vezes que um minion wave inteira. E o minion pelo menos tankou uma torre.` });
         }
 
         // First bloods
         if (firstBloods >= 3) {
-            pool.push({ icon:'📊', txt:`${n} registrou first blood em ${firstBloods} de ${games} operações. Taxa de abertura letal de ${((firstBloods/games)*100).toFixed(0)}%. O departamento de aquisições agressivas aprova.` });
+            pool.push({ icon:'🗡️', txt:`${n} pegou first blood em ${firstBloods} de ${games} jogos. Taxa de ${((firstBloods/games)*100).toFixed(0)}%. Esse jogador entra na lane já com instinto assassino. Zed aprovaria.` });
         }
 
         // Damage
         if (avgDmg >= 25000) {
-            pool.push({ icon:'📊', txt:`Output de dano: ${(avgDmg/1000).toFixed(0)}K por partida. ${n} opera como departamento de artilharia pesada. Custo por eliminação: altamente eficiente. Promoção no organograma recomendada.` });
+            pool.push({ icon:'💥', txt:`${(avgDmg/1000).toFixed(0)}K de dano por jogo. ${n} causa mais estrago que um Baron Nashor em teamfight. O time inimigo sente de longe.` });
         } else if (avgDmg <= 8000) {
-            pool.push({ icon:'📋', txt:`${(avgDmg/1000).toFixed(0)}K de dano médio. Segundo auditoria de impacto, ${n} causa menos dano que uma ward expirada. E a ward nem ataca.` });
-            pool.push({ icon:'📈', txt:`O dano de ${n} não apareceu no gráfico. Parecia bug. Não era. São ${(avgDmg/1000).toFixed(0)}K. O Excel arredondou pra "irrelevante". Decisão autônoma do software.` });
+            pool.push({ icon:'🌿', txt:`${(avgDmg/1000).toFixed(0)}K de dano médio. ${n} causa menos dano que uma ward expirada. E a ward nem ataca.` });
+            pool.push({ icon:'😴', txt:`O dano de ${n} é ${(avgDmg/1000).toFixed(0)}K. Soraka com Warmog faz mais dano. E ela é healer.` });
         }
 
         // Rank
         if (tier === 'IRON') {
-            pool.push({ icon:'📈', txt:`${n} está classificado como Iron. Na escala corporativa, isso equivale a estagiário de outro departamento que entrou pela porta errada.` });
-            pool.push({ icon:'📊', txt:`Rank: Iron. Classificação mínima do sistema. Análise de 200 páginas conclui que o potencial de crescimento é... estatisticamente o único caminho possível.` });
+            pool.push({ icon:'⛏️', txt:`${n} tá no Iron. O elo mais profundo do Rift. Daqui só sobe... teoricamente. Na prática, o Iron é a casa de ${n}.` });
+            pool.push({ icon:'🪨', txt:`Rank: Iron. ${n} tá no subsolo do ranked. Mas ó, todo Challenger já foi Iron um dia. Talvez. Provavelmente não.` });
         } else if (tier === 'CHALLENGER') {
-            pool.push({ icon:'📈', txt:`${n} atingiu Challenger. O equivalente a CEO do servidor. E-mail corporativo em distribuição para toda a base. Com cópia oculta pro arquivo.` });
+            pool.push({ icon:'👑', txt:`${n} atingiu Challenger. Tá no topo do servidor junto com os pros. Esse é o tipo de jogador que faz stream e a galera assiste de verdade.` });
         } else if (tier === 'BRONZE') {
-            pool.push({ icon:'📋', txt:`${n} opera no tier Bronze. Na metodologia OKR, o resultado-chave atingido foi... existir no ranking. O objetivo mínimo viável está tecnicamente cumprido.` });
+            pool.push({ icon:'🥉', txt:`${n} tá no Bronze. O elo onde todo mundo sabe jogar — segundo eles mesmos. Na prática, é fiesta 24/7 e ${n} é VIP.` });
         }
 
         // Generic fallbacks
-        pool.push({ icon:'📈', txt:`Análise 360° de ${n} concluída. Resultado do comitê: desempenho classificado como "dentro das expectativas". Que expectativas? Não foram definidas. Mas está dentro.` });
-        pool.push({ icon:'📊', txt:`Due diligence das métricas de ${n} finalizada. Os indicadores estão todos... presentes. No sentido de que existem números. A qualidade é um debate em aberto.` });
-        pool.push({ icon:'📋', txt:`Relatório final sobre ${n}: "Está jogando." Fim do relatório. Três páginas de capa, índice e bibliografia pra essa conclusão.` });
-        pool.push({ icon:'⚖️', txt:`Parecer de compliance sobre os KPIs de ${n} com base nas diretrizes do capítulo 7, seção 3.2.1. Resultado: inconclusivo. Como sempre.` });
-        pool.push({ icon:'📈', txt:`Se esse squad fosse uma empresa, ${n} seria o departamento que ninguém sabe o que faz, mas todo trimestre entrega um relatório. Que ninguém lê.` });
+        pool.push({ icon:'🎮', txt:`${n} tá grindando no Rift como se o LP pagasse conta. Não paga, mas a dedicação é real.` });
+        pool.push({ icon:'⚔️', txt:`${n} segue firme no Summoner's Rift. Ganhando ou perdendo, o importante é que tá na fila. De novo. Sempre de novo.` });
+        pool.push({ icon:'🏟️', txt:`As partidas de ${n} são como solo queue: imprevisíveis, emocionantes, e alguém sempre sai reclamando no chat.` });
+        pool.push({ icon:'🗺️', txt:`${n} no Rift é como Teemo no mato — você nunca sabe o que esperar. Pode ser uma jogada genial ou um int épico.` });
+        pool.push({ icon:'🎯', txt:`Se o Rift fosse um anime, ${n} seria aquele personagem que aparece todo episódio mas ninguém sabe se é protagonista ou figurante.` });
 
         // Pick 1 random based on a daily seed (changes once per day per player)
         const daySeed = Math.floor(Date.now() / 86400000) + (playerName.charCodeAt(0)||0);
