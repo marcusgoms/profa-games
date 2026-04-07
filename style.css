@@ -1426,11 +1426,26 @@ body::after {
 .lm-spells { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
 .lm-spell { width: 18px; height: 18px; border-radius: 3px; }
 
-.lm-info { min-width: 0; }
-.lm-info-right { text-align: right; }
-.lm-name { font-size: 0.8em; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.lm-info { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lm-info-right { text-align: right; align-items: flex-end; }
+.lm-name { font-size: 0.8em; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 .lm-me .lm-name { color: var(--pri); }
 .lm-champ { font-size: 0.7em; color: var(--dim); }
+.lm-rank-badge { font-size: 0.65em; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,0.06); display: inline-block; margin-top: 1px; white-space: nowrap; }
+.lm-rank-badge.lm-unranked { color: var(--dim); font-weight: 400; }
+.lm-rank-badge.rank-iron { color: #8b8b8b; }
+.lm-rank-badge.rank-bronze { color: #b08d57; }
+.lm-rank-badge.rank-silver { color: #c0c0c0; }
+.lm-rank-badge.rank-gold { color: #c8aa6e; }
+.lm-rank-badge.rank-platinum { color: #4ca1a1; }
+.lm-rank-badge.rank-emerald { color: #50c878; }
+.lm-rank-badge.rank-diamond { color: #576cce; }
+.lm-rank-badge.rank-master { color: #9d4dbb; }
+.lm-rank-badge.rank-grandmaster { color: #ef5350; }
+.lm-rank-badge.rank-challenger { color: #f0c75e; }
+.lm-runes { font-size: 0.62em; color: var(--dim); white-space: nowrap; margin-top: 1px; }
+.lm-wr { font-size: 0.6em; font-weight: 600; white-space: nowrap; }
+.lm-wr small { font-weight: 400; opacity: 0.7; }
 
 .lm-role {
     display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -2214,6 +2229,9 @@ body::after {
     .lm-champ-img { width: 32px; height: 32px; }
     .lm-spell { width: 14px; height: 14px; }
     .lm-name { font-size: 0.7em; max-width: 90px; }
+    .lm-rank-badge { font-size: 0.55em; padding: 1px 4px; }
+    .lm-runes { font-size: 0.55em; }
+    .lm-wr { font-size: 0.52em; }
     .lm-champ { font-size: 0.6em; }
     .lm-role { width: 36px; }
     .lm-role-icon { font-size: 1em; }

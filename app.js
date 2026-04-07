@@ -393,6 +393,11 @@
     // Spell ID → name map (DDragon uses names not IDs)
     const SPELL_MAP = {1:'SummonerBoost',3:'SummonerExhaust',4:'SummonerFlash',6:'SummonerHaste',7:'SummonerHeal',11:'SummonerSmite',12:'SummonerTeleport',13:'SummonerMana',14:'SummonerDot',21:'SummonerBarrier',30:'SummonerPoroRecall',31:'SummonerPoroThrow',32:'SummonerSnowball',39:'SummonerSnowURFSnowball_Mark',54:'Summoner_UltBookPlaceholder',55:'Summoner_UltBookSmitePlaceholder',2201:'SummonerCherryHold',2202:'SummonerCherryFlash'};
     const spellImg= id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/spell/${SPELL_MAP[id]||id||'SummonerFlash'}.png`;
+    // Rune keystone map
+    const KEYSTONE_MAP = {8005:'Press the Attack',8008:'Lethal Tempo',8021:'Fleet Footwork',8010:'Conqueror',8112:'Electrocute',8124:'Predator',8128:'Dark Harvest',9923:'Hail of Blades',8214:'Summon Aery',8229:'Arcane Comet',8230:'Phase Rush',8437:'Grasp',8439:'Aftershock',8465:'Guardian',8351:'Glacial Augment',8360:'Unsealed Spellbook',8369:'First Strike'};
+    const RUNE_TREE_MAP = {8000:{name:'Precision',icon:'⚔️',color:'#c8aa6e'},8100:{name:'Domination',icon:'🔴',color:'#d44242'},8200:{name:'Sorcery',icon:'🔮',color:'#9b59b6'},8300:{name:'Inspiration',icon:'💡',color:'#49b4be'},8400:{name:'Resolve',icon:'🛡️',color:'#a1d811'}};
+    const TIER_ORDER = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+    const TIER_ICONS = {IRON:'⬜',BRONZE:'🟫',SILVER:'⬜',GOLD:'🟡',PLATINUM:'🔵',EMERALD:'🟢',DIAMOND:'💎',MASTER:'🟣',GRANDMASTER:'🔴',CHALLENGER:'👑'};
     const profImg = id => `https://ddragon.leagueoflegends.com/cdn/${DVER}/img/profileicon/${id}.png`;
     function getCustomIcon(idx) { return localStorage.getItem('profa_custom_icon_'+idx); }
     function setCustomIcon(idx, iconId) { localStorage.setItem('profa_custom_icon_'+idx, iconId); }
@@ -4351,83 +4356,277 @@
     // ======================== CHAT (Firebase real-time) ========================
     let _chatRef = null;
     let _chatMessages = [];
+    let _chatReplyTo = null;
+    let _chatRecording = false;
+    let _chatMediaRec = null;
+    let _chatTypingTimer = null;
+    let _chatEmojiOpen = false;
+
+    const CHAT_EMOJIS = ['😂','😍','🔥','👍','👎','😢','😡','🎮','💀','🏆','❤️','😎','🤣','👏','💪','🙄','😱','🤔','✅','❌','🎯','⚡','🗡️','🛡️','🌿','🏹'];
+    const CHAT_REACTIONS = ['❤️','😂','👍','🔥','😢','😡'];
 
     function renderChat() {
         const user = getLoggedUser();
         const online = Object.values(_onlineUsers).filter(u => u.online);
-        app.innerHTML = `<div class="section-wrap-sm">
-            <div class="chat-hero">
-                <h1>Chat <span>do Squad</span></h1>
-                <p style="font-size:.8em;color:${db?'#4caf50':'#ffd740'};">${db?'Online — tempo real':'Offline — sem Firebase'}</p>
-                ${online.length ? `<div class="chat-online"><span class="online-dot"></span> ${online.map(u=>u.name).join(', ')}</div>` : ''}
+        app.innerHTML = `<div class="chat-fullpage">
+            <div class="chat-topbar">
+                <div class="chat-topbar-info">
+                    <h2>Chat do Squad</h2>
+                    <div class="chat-topbar-status">
+                        <span class="online-dot"></span>
+                        ${online.length ? online.map(u=>u.name).join(', ') : 'Ninguém online'}
+                    </div>
+                </div>
+                <div class="chat-topbar-actions">
+                    <button class="chat-action-btn" onclick="chatSearch()" title="Buscar">🔍</button>
+                </div>
             </div>
+            <div class="chat-search-bar" id="chat-search-bar" style="display:none;">
+                <input type="text" id="chat-search-input" placeholder="Buscar mensagens..." oninput="filterChatMessages(this.value)">
+                <button onclick="closeChatSearch()">✕</button>
+            </div>
+            <div id="chat-typing" class="chat-typing" style="display:none;"></div>
             <div class="chat-box" id="chat-box"><div class="ld"><div class="sp"></div></div></div>
-            ${user ? `<div class="chat-input-wrap">
-                <input type="text" id="chat-input" placeholder="Digite sua mensagem..." maxlength="300" autocomplete="off">
-                <button class="chat-send" onclick="sendChat()">Enviar</button>
-            </div>` : '<div class="chat-login-prompt"><p>Faça login para enviar mensagens</p><button class="cfg-btn" onclick="showLoginModal()">Entrar</button></div>'}
+            ${user ? `
+            <div class="chat-reply-bar" id="chat-reply-bar" style="display:none;">
+                <div class="chat-reply-preview" id="chat-reply-preview"></div>
+                <button class="chat-reply-close" onclick="cancelReply()">✕</button>
+            </div>
+            <div class="chat-input-area">
+                <div class="chat-input-row">
+                    <button class="chat-btn-emoji" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
+                    <input type="text" id="chat-input" placeholder="Mensagem..." maxlength="500" autocomplete="off">
+                    <label class="chat-btn-attach" title="Enviar imagem">
+                        <input type="file" accept="image/*" style="display:none" onchange="chatSendImage(this.files)">📎</label>
+                    <button class="chat-btn-mic" id="chat-mic-btn" onmousedown="chatStartRecord()" onmouseup="chatStopRecord()" ontouchstart="chatStartRecord()" ontouchend="chatStopRecord()" title="Áudio">🎙️</button>
+                    <button class="chat-send" onclick="sendChat()">➤</button>
+                </div>
+                <div class="chat-emoji-picker" id="chat-emoji-picker" style="display:none;">
+                    ${CHAT_EMOJIS.map(e => `<button class="chat-emoji-btn" onclick="insertEmoji('${e}')">${e}</button>`).join('')}
+                </div>
+            </div>
+            ` : '<div class="chat-login-prompt"><p>Faça login para participar</p><button class="cfg-btn" onclick="showLoginModal()">Entrar</button></div>'}
         </div>`;
 
         stopChat();
         _chatMessages = [];
+        _chatReplyTo = null;
 
         if (db) {
-            _chatRef = db.ref('chat').orderByChild('ts').limitToLast(100);
+            _chatRef = db.ref('chat').orderByChild('ts').limitToLast(200);
             _chatRef.on('value', snap => {
                 _chatMessages = [];
                 snap.forEach(child => {
                     const val = child.val();
-                    if (val && val.text) _chatMessages.push({ _key: child.key, ...val, ts: val.ts || Date.now() });
+                    if (val) _chatMessages.push({ _key: child.key, ...val, ts: val.ts || Date.now() });
                 });
                 _chatMessages.sort((a, b) => (a.ts || 0) - (b.ts || 0));
                 renderChatMessages();
             }, err => {
-                console.warn('Chat listen error:', err.message);
                 const box = $('chat-box');
-                if (box) box.innerHTML = `<p class="chat-empty" style="color:#ef5350;">Erro ao carregar chat: ${err.message.includes('PERMISSION_DENIED')?'Regras do Firebase expiraram':'Erro de conexão'}</p>`;
+                if (box) box.innerHTML = `<p class="chat-empty" style="color:#ef5350;">Erro: ${err.message.includes('PERMISSION_DENIED')?'Regras do Firebase expiraram':'Erro de conexão'}</p>`;
+            });
+
+            // Typing indicator
+            const chatInput = $('chat-input');
+            if (chatInput) {
+                chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+                chatInput.addEventListener('input', () => {
+                    const user = getLoggedUser();
+                    if (!user) return;
+                    db.ref('chatTyping/' + user.idx).set({ name: PLAYERS[user.idx]?.name, ts: firebase.database.ServerValue.TIMESTAMP });
+                    clearTimeout(_chatTypingTimer);
+                    _chatTypingTimer = setTimeout(() => db.ref('chatTyping/' + user.idx).remove(), 2000);
+                });
+                chatInput.focus();
+            }
+
+            // Listen for typing
+            db.ref('chatTyping').on('value', snap => {
+                const data = snap.val() || {};
+                const user = getLoggedUser();
+                const typers = Object.entries(data)
+                    .filter(([k, v]) => v.ts && Date.now() - v.ts < 3000 && (!user || parseInt(k) !== user.idx))
+                    .map(([_, v]) => v.name);
+                const el = $('chat-typing');
+                if (el) {
+                    if (typers.length) {
+                        el.style.display = 'flex';
+                        el.innerHTML = `<span class="chat-typing-dots"><span></span><span></span><span></span></span> ${typers.join(', ')} ${typers.length > 1 ? 'estão' : 'está'} digitando...`;
+                    } else {
+                        el.style.display = 'none';
+                    }
+                }
             });
         } else {
             const box = $('chat-box');
-            if (box) box.innerHTML = '<p class="chat-empty">Configure o Firebase para usar o chat online.</p>';
-        }
-
-        const input = $('chat-input');
-        if (input) {
-            input.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
-            input.focus();
+            if (box) box.innerHTML = '<p class="chat-empty">Configure o Firebase para usar o chat.</p>';
         }
     }
 
     function stopChat() {
         if (_chatRef) { _chatRef.off(); _chatRef = null; }
+        if (db) { try { db.ref('chatTyping').off(); } catch(_) {} }
     }
 
-    function renderChatMessages() {
+    function renderChatMessages(filter) {
         const box = $('chat-box');
         if (!box) { stopChat(); return; }
-        if (!_chatMessages.length) {
-            box.innerHTML = '<p class="chat-empty">Nenhuma mensagem ainda. Seja o primeiro!</p>';
+        let msgs = _chatMessages;
+        if (filter) {
+            const f = filter.toLowerCase();
+            msgs = msgs.filter(m => (m.text||'').toLowerCase().includes(f) || (m.name||'').toLowerCase().includes(f));
+        }
+        if (!msgs.length) {
+            box.innerHTML = `<p class="chat-empty">${filter ? 'Nenhum resultado' : 'Nenhuma mensagem ainda. Seja o primeiro!'}</p>`;
             return;
         }
         const user = getLoggedUser();
         const wasAtBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
-        box.innerHTML = _chatMessages.map(m => {
+        let lastDate = '';
+        let html = '';
+
+        msgs.forEach(m => {
+            // Date separator
+            const d = new Date(m.ts);
+            const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined });
+            if (dateStr !== lastDate) {
+                html += `<div class="chat-date-sep"><span>${dateStr}</span></div>`;
+                lastDate = dateStr;
+            }
             const isMe = user?.idx === m.idx;
             const icon = playerIcon(m.idx, null);
-            return `<div class="chat-msg ${isMe ? 'chat-me' : ''}">
-                <img src="${profImg(icon)}" class="chat-avatar" onerror="this.style.display='none'">
-                <div class="chat-bubble">
-                    <div class="chat-msg-head">
-                        <span class="chat-msg-name">${escapeHtml(m.name || '???')}</span>
-                        <span class="chat-msg-time">${fmtAgo(m.ts)}</span>
-                    </div>
-                    <div class="chat-msg-text">${escapeHtml(m.text || '')}</div>
-                </div>
+            const isDeleted = m.deleted;
+            const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+            // Reply quote
+            let replyHtml = '';
+            if (m.replyTo) {
+                const orig = _chatMessages.find(x => x._key === m.replyTo);
+                if (orig) {
+                    replyHtml = `<div class="chat-reply-quote" onclick="scrollToMsg('${m.replyTo}')">
+                        <span class="chat-reply-name">${escapeHtml(orig.name||'')}</span>
+                        <span class="chat-reply-text">${escapeHtml((orig.text||'').substring(0, 60))}${(orig.text||'').length > 60 ? '...' : ''}</span>
+                    </div>`;
+                }
+            }
+
+            // Reactions
+            const reactions = m.reactions || {};
+            const reactionCounts = {};
+            Object.values(reactions).forEach(r => { reactionCounts[r] = (reactionCounts[r]||0) + 1; });
+            const reactionsHtml = Object.keys(reactionCounts).length ? `<div class="chat-reactions">${Object.entries(reactionCounts).map(([emoji, count]) => {
+                const myReaction = user && reactions[user.idx] === emoji;
+                return `<button class="chat-reaction ${myReaction?'my':''}" onclick="chatReact('${m._key}','${emoji}')">${emoji}${count > 1 ? `<span>${count}</span>` : ''}</button>`;
+            }).join('')}</div>` : '';
+
+            // Image
+            let mediaHtml = '';
+            if (m.imageUrl) {
+                mediaHtml = `<div class="chat-media"><img src="${m.imageUrl}" alt="imagem" onclick="window.open(this.src)" loading="lazy"></div>`;
+            }
+            // Audio
+            if (m.audioUrl) {
+                mediaHtml = `<div class="chat-media"><audio controls src="${m.audioUrl}" preload="none" style="width:100%;max-width:250px;height:32px;"></audio></div>`;
+            }
+
+            // Context actions
+            const actions = `<div class="chat-msg-actions">
+                <button onclick="chatSetReply('${m._key}')" title="Responder">↩</button>
+                <button onclick="showReactPicker('${m._key}')" title="Reagir">😊</button>
+                ${isMe && !isDeleted ? `<button onclick="chatDeleteMsg('${m._key}')" title="Apagar">🗑</button>` : ''}
             </div>`;
-        }).join('');
-        if (wasAtBottom) box.scrollTop = box.scrollHeight;
+
+            if (isDeleted) {
+                html += `<div class="chat-msg ${isMe ? 'chat-me' : ''}" id="msg-${m._key}">
+                    <img src="${profImg(icon)}" class="chat-avatar" onerror="this.style.display='none'">
+                    <div class="chat-bubble chat-deleted"><span class="chat-deleted-icon">🚫</span> Mensagem apagada<span class="chat-msg-time">${timeStr}</span></div>
+                </div>`;
+            } else {
+                html += `<div class="chat-msg ${isMe ? 'chat-me' : ''}" id="msg-${m._key}">
+                    <img src="${profImg(icon)}" class="chat-avatar" onerror="this.style.display='none'">
+                    <div class="chat-bubble">
+                        ${replyHtml}
+                        <div class="chat-msg-head">
+                            <span class="chat-msg-name" onclick="location.hash='profile/${m.idx}'">${escapeHtml(m.name || '???')}</span>
+                            <span class="chat-msg-time">${timeStr}</span>
+                        </div>
+                        ${mediaHtml}
+                        ${m.text ? `<div class="chat-msg-text">${formatChatText(m.text)}</div>` : ''}
+                        ${reactionsHtml}
+                        ${actions}
+                    </div>
+                </div>`;
+            }
+        });
+
+        box.innerHTML = html;
+        if (wasAtBottom || !filter) box.scrollTop = box.scrollHeight;
     }
 
+    // Format chat text: links, bold, italic
+    function formatChatText(text) {
+        let s = escapeHtml(text);
+        s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" class="chat-link">$1</a>');
+        s = s.replace(/\*(.+?)\*/g, '<b>$1</b>');
+        s = s.replace(/_(.+?)_/g, '<i>$1</i>');
+        return s;
+    }
+
+    // Reply
+    window.chatSetReply = function(key) {
+        const m = _chatMessages.find(x => x._key === key);
+        if (!m) return;
+        _chatReplyTo = key;
+        const bar = $('chat-reply-bar');
+        const preview = $('chat-reply-preview');
+        if (bar) bar.style.display = 'flex';
+        if (preview) preview.innerHTML = `<b>${escapeHtml(m.name||'')}</b>: ${escapeHtml((m.text||'').substring(0, 80))}`;
+        $('chat-input')?.focus();
+    };
+    window.cancelReply = function() {
+        _chatReplyTo = null;
+        const bar = $('chat-reply-bar');
+        if (bar) bar.style.display = 'none';
+    };
+
+    // Scroll to message
+    window.scrollToMsg = function(key) {
+        const el = document.getElementById('msg-' + key);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('chat-highlight'); setTimeout(() => el.classList.remove('chat-highlight'), 1500); }
+    };
+
+    // Reactions
+    window.showReactPicker = function(key) {
+        // Remove existing picker
+        document.querySelectorAll('.chat-react-picker').forEach(e => e.remove());
+        const msgEl = document.getElementById('msg-' + key);
+        if (!msgEl) return;
+        const picker = document.createElement('div');
+        picker.className = 'chat-react-picker';
+        picker.innerHTML = CHAT_REACTIONS.map(e => `<button onclick="chatReact('${key}','${e}')">${e}</button>`).join('');
+        msgEl.querySelector('.chat-bubble').appendChild(picker);
+        setTimeout(() => { document.addEventListener('click', function rem() { picker.remove(); document.removeEventListener('click', rem); }); }, 10);
+    };
+    window.chatReact = function(key, emoji) {
+        const user = getLoggedUser();
+        if (!user || !db) return;
+        const ref = db.ref('chat/' + key + '/reactions/' + user.idx);
+        ref.once('value').then(snap => {
+            if (snap.val() === emoji) ref.remove(); // toggle off
+            else ref.set(emoji);
+        });
+        document.querySelectorAll('.chat-react-picker').forEach(e => e.remove());
+    };
+
+    // Delete message
+    window.chatDeleteMsg = function(key) {
+        const user = getLoggedUser();
+        if (!user || !db) return;
+        db.ref('chat/' + key).update({ deleted: true, text: null, imageUrl: null, audioUrl: null });
+    };
+
+    // Send message
     window.sendChat = function() {
         const user = getLoggedUser();
         if (!user || !db) return;
@@ -4435,36 +4634,107 @@
         if (!input || !input.value.trim()) return;
         const text = input.value.trim();
         input.value = '';
-        input.disabled = true;
-        const btn = document.querySelector('.chat-send');
-        if (btn) btn.disabled = true;
         const msg = {
             idx: user.idx,
             name: PLAYERS[user.idx]?.name || '???',
             text: text,
             ts: firebase.database.ServerValue.TIMESTAMP
         };
+        if (_chatReplyTo) { msg.replyTo = _chatReplyTo; }
+        cancelReply();
         db.ref('chat').push(msg).then(() => {
-            input.disabled = false;
-            if (btn) btn.disabled = false;
             input.focus();
+            db.ref('chatTyping/' + user.idx).remove();
         }).catch(e => {
-            console.warn('Chat error:', e.message);
-            input.disabled = false;
-            if (btn) btn.disabled = false;
-            input.value = text; // restore text on failure
-            // Show error
-            const box = $('chat-box');
-            if (box) {
-                const err = document.createElement('div');
-                err.className = 'chat-error';
-                err.textContent = 'Erro ao enviar: ' + (e.message.includes('PERMISSION_DENIED') ? 'Regras do Firebase expiraram. Atualize para modo aberto.' : e.message);
-                box.appendChild(err);
-                box.scrollTop = box.scrollHeight;
-                setTimeout(() => err.remove(), 5000);
-            }
+            input.value = text;
+            showToast('❌', 'Erro ao enviar: ' + e.message);
         });
     };
+
+    // Send image
+    window.chatSendImage = async function(files) {
+        if (!files?.length) return;
+        const user = getLoggedUser();
+        if (!user || !db) return;
+        const file = files[0];
+        if (file.size > 5 * 1024 * 1024) { showToast('❌', 'Imagem muito grande (máx 5MB)'); return; }
+        showToast('📤', 'Enviando imagem...');
+        try {
+            const safeName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const ref = storage.ref('chat_images/' + safeName);
+            await ref.put(file, { contentType: file.type });
+            const url = await ref.getDownloadURL();
+            const msg = {
+                idx: user.idx, name: PLAYERS[user.idx]?.name || '???',
+                imageUrl: url, text: '', ts: firebase.database.ServerValue.TIMESTAMP
+            };
+            if (_chatReplyTo) { msg.replyTo = _chatReplyTo; cancelReply(); }
+            await db.ref('chat').push(msg);
+        } catch(e) { showToast('❌', 'Erro: ' + e.message); }
+    };
+
+    // Voice recording
+    window.chatStartRecord = function() {
+        const user = getLoggedUser();
+        if (!user || !db || _chatRecording) return;
+        navigator.mediaDevices?.getUserMedia({ audio: true }).then(stream => {
+            _chatRecording = true;
+            const btn = $('chat-mic-btn');
+            if (btn) btn.classList.add('recording');
+            const chunks = [];
+            _chatMediaRec = new MediaRecorder(stream);
+            _chatMediaRec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+            _chatMediaRec.onstop = async () => {
+                stream.getTracks().forEach(t => t.stop());
+                if (btn) btn.classList.remove('recording');
+                _chatRecording = false;
+                if (!chunks.length) return;
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                if (blob.size < 1000) return; // too short
+                showToast('🎙️', 'Enviando áudio...');
+                try {
+                    const safeName = Date.now() + '_audio.webm';
+                    const ref = storage.ref('chat_audio/' + safeName);
+                    await ref.put(blob, { contentType: 'audio/webm' });
+                    const url = await ref.getDownloadURL();
+                    await db.ref('chat').push({
+                        idx: user.idx, name: PLAYERS[user.idx]?.name || '???',
+                        audioUrl: url, text: '', ts: firebase.database.ServerValue.TIMESTAMP
+                    });
+                } catch(e) { showToast('❌', 'Erro: ' + e.message); }
+            };
+            _chatMediaRec.start();
+        }).catch(() => showToast('❌', 'Sem permissão para microfone'));
+    };
+    window.chatStopRecord = function() {
+        if (_chatMediaRec && _chatRecording) {
+            _chatMediaRec.stop();
+        }
+    };
+
+    // Emoji picker
+    window.toggleEmojiPicker = function() {
+        const picker = $('chat-emoji-picker');
+        if (picker) { _chatEmojiOpen = !_chatEmojiOpen; picker.style.display = _chatEmojiOpen ? 'flex' : 'none'; }
+    };
+    window.insertEmoji = function(emoji) {
+        const input = $('chat-input');
+        if (input) { input.value += emoji; input.focus(); }
+    };
+
+    // Search
+    window.chatSearch = function() {
+        const bar = $('chat-search-bar');
+        if (bar) { bar.style.display = bar.style.display === 'none' ? 'flex' : 'none'; if (bar.style.display === 'flex') $('chat-search-input')?.focus(); }
+    };
+    window.closeChatSearch = function() {
+        const bar = $('chat-search-bar');
+        if (bar) bar.style.display = 'none';
+        const input = $('chat-search-input');
+        if (input) input.value = '';
+        renderChatMessages();
+    };
+    window.filterChatMessages = function(val) { renderChatMessages(val); };
 
     // ======================== CHAT BACKGROUND NOTIFICATIONS ========================
     let _chatBgRef = null;
@@ -4899,15 +5169,15 @@
         } catch(_) { return null; }
     }
 
-    function renderLiveMatchView(container, gameData, playerPuuid) {
+    function renderLiveMatchView(container, gameData, playerPuuid, rankedData) {
         if (!gameData?.participants) { container.innerHTML = '<div class="err">Dados não disponíveis</div>'; return; }
+        rankedData = rankedData || {};
 
         const blue = gameData.participants.filter(p => p.teamId === 100);
         const red = gameData.participants.filter(p => p.teamId === 200);
         const blueRoles = assignRoles(blue);
         const redRoles = assignRoles(red);
 
-        // Sort by role order: TOP, JNG, MID, ADC, SUP
         const roleOrder = { TOP: 0, JNG: 1, MID: 2, ADC: 3, SUP: 4 };
         const blueSort = blue.map((p, i) => ({ ...p, role: blueRoles[i] })).sort((a, b) => (roleOrder[a.role]??5) - (roleOrder[b.role]??5));
         const redSort = red.map((p, i) => ({ ...p, role: redRoles[i] })).sort((a, b) => (roleOrder[a.role]??5) - (roleOrder[b.role]??5));
@@ -4915,17 +5185,49 @@
         const roleIcons = { TOP: '🗡️', JNG: '🌿', MID: '⚡', ADC: '🏹', SUP: '🛡️' };
         const roleNames = { TOP: 'Top', JNG: 'Jungle', MID: 'Mid', ADC: 'ADC', SUP: 'Suporte' };
 
-        // Game time
         const gameStart = gameData.gameStartTime || 0;
         const gameLen = gameData.gameLength || 0;
         let elapsed = gameLen;
-        if (gameStart > 0) {
-            elapsed = Math.max(0, Math.floor((Date.now() - gameStart) / 1000));
-        }
+        if (gameStart > 0) elapsed = Math.max(0, Math.floor((Date.now() - gameStart) / 1000));
         _liveGameStart = gameStart;
 
-        // Check which team our player is on
         const isBlue = blue.some(p => p.puuid === playerPuuid);
+
+        // Helper: get ranked info for a participant
+        function getRankBadge(puuid) {
+            const entries = rankedData[puuid];
+            if (!entries || !entries.length) return '<span class="lm-rank-badge lm-unranked">Unranked</span>';
+            const solo = entries.find(e => e.queueType === 'RANKED_SOLO_5x5') || entries[0];
+            const tier = solo.tier || 'UNRANKED';
+            const rank = solo.rank || '';
+            const lp = solo.leaguePoints ?? 0;
+            const w = solo.wins || 0, l = solo.losses || 0;
+            const wr = (w+l) > 0 ? ((w/(w+l))*100).toFixed(0) : 0;
+            const icon = TIER_ICONS[tier] || '';
+            return `<span class="lm-rank-badge ${rankCls(tier)}" title="${w}W ${l}L (${wr}% WR)">${icon} ${tier.charAt(0)+tier.slice(1).toLowerCase()} ${rank} · ${lp} LP</span>`;
+        }
+
+        // Helper: get rune info for a participant
+        function getRuneInfo(p) {
+            if (!p.perks) return '';
+            const keystoneId = p.perks.perkIds?.[0];
+            const primaryTree = RUNE_TREE_MAP[p.perks.perkStyle];
+            const secondaryTree = RUNE_TREE_MAP[p.perks.perkSubStyle];
+            const keystoneName = KEYSTONE_MAP[keystoneId] || '';
+            if (!keystoneName) return '';
+            return `<span class="lm-runes" title="${primaryTree?.name||''} + ${secondaryTree?.name||''}">${primaryTree?.icon||''} ${keystoneName}</span>`;
+        }
+
+        // Helper: get WR line for a participant
+        function getWrLine(puuid) {
+            const entries = rankedData[puuid];
+            if (!entries || !entries.length) return '';
+            const solo = entries.find(e => e.queueType === 'RANKED_SOLO_5x5') || entries[0];
+            const w = solo.wins || 0, l = solo.losses || 0;
+            const wr = (w+l) > 0 ? ((w/(w+l))*100).toFixed(0) : 0;
+            const wrColor = wr >= 55 ? '#4caf50' : wr >= 50 ? '#c8aa6e' : '#ef5350';
+            return `<span class="lm-wr" style="color:${wrColor}">${wr}% WR <small>(${w}W ${l}L)</small></span>`;
+        }
 
         const matchupRows = [];
         for (let i = 0; i < 5; i++) {
@@ -4950,6 +5252,9 @@
                     <div class="lm-info">
                         <div class="lm-name">${bIsMe ? '⭐ ' : ''}${bName}</div>
                         <div class="lm-champ">${bChamp}</div>
+                        ${getRankBadge(b.puuid)}
+                        ${getRuneInfo(b)}
+                        ${getWrLine(b.puuid)}
                     </div>
                 </div>
                 <div class="lm-role">
@@ -4960,6 +5265,9 @@
                     <div class="lm-info lm-info-right">
                         <div class="lm-name">${rIsMe ? '⭐ ' : ''}${rName}</div>
                         <div class="lm-champ">${rChamp}</div>
+                        ${getRankBadge(r.puuid)}
+                        ${getRuneInfo(r)}
+                        ${getWrLine(r.puuid)}
                     </div>
                     <img src="${champImg(r.championId)}" class="lm-champ-img" onerror="this.style.opacity='0.3'">
                     <div class="lm-spells">
@@ -5017,6 +5325,7 @@
         const d = cache[playerIdx];
         if (!d?.account?.puuid) return;
         const p = PLAYERS[playerIdx];
+        const pl = plat(p.region);
 
         app.innerHTML = `<div class="section-wrap-sm">
             <button class="bb" onclick="location.hash='profile/${playerIdx}'">&larr; Voltar ao perfil</button>
@@ -5026,10 +5335,25 @@
                     <h2>${d.account.gameName || p.name} — Partida ao Vivo</h2>
                 </div>
                 <div id="lm-container"><div class="ld"><div class="sp"></div></div></div>
-                <div class="lm-refresh-info" id="lm-refresh-info">Atualizando a cada 3s...</div>
+                <div class="lm-refresh-info" id="lm-refresh-info">Carregando dados dos jogadores...</div>
             </div>
         </div>`;
 
+        // Fetch ranked data for all 10 participants (once, cached)
+        const _liveRankedCache = {};
+        async function fetchAllRanked(gameData) {
+            if (!gameData?.participants) return;
+            const promises = gameData.participants.map(async part => {
+                if (_liveRankedCache[part.puuid]) return; // already cached
+                try {
+                    const entries = await rots(`https://${pl}.api.riotgames.com/lol/league/v4/entries/by-puuid/${part.puuid}`, []);
+                    _liveRankedCache[part.puuid] = entries || [];
+                } catch(_) { _liveRankedCache[part.puuid] = []; }
+            });
+            await Promise.allSettled(promises);
+        }
+
+        let rankedFetched = false;
         async function refreshLiveMatch() {
             const gameData = await fetchSpectatorData(playerIdx);
             const container = document.getElementById('lm-container');
@@ -5041,7 +5365,14 @@
                 if (info) info.textContent = 'Partida finalizada';
                 return;
             }
-            renderLiveMatchView(container, gameData, d.account.puuid);
+            // Fetch ranked for all participants only once
+            if (!rankedFetched) {
+                await fetchAllRanked(gameData);
+                rankedFetched = true;
+                const info = document.getElementById('lm-refresh-info');
+                if (info) info.textContent = 'Atualizando a cada 3s...';
+            }
+            renderLiveMatchView(container, gameData, d.account.puuid, _liveRankedCache);
         }
 
         await refreshLiveMatch();
