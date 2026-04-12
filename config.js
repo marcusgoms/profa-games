@@ -27,7 +27,7 @@ window.PROFA_FIREBASE = {
 
 window.PROFA_CONFIG = {
     // Riot Games API - obtenha em https://developer.riotgames.com/
-    riotKey: localStorage.getItem('lol_key') || 'RGAPI-f6700e95-c12d-4e21-93ea-ad1f4ecb9928',
+    riotKey: localStorage.getItem('lol_key') || 'RGAPI-ad7ff338-c0d0-4304-ad5e-e0b02ff6fb75',
 
     // LoL Esports API - obtenha em https://lolesports.com (F12 > Network > esports-api > x-api-key)
     esportsKey: localStorage.getItem('esports_key') || '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z',

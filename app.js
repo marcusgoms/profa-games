@@ -13,7 +13,7 @@
         { name:'Nick',        tag:'LSD21', region:'BR1' },
         { name:'Malaric',     tag:'PR1',   region:'BR1', special:'noob' },
     ];
-    const RIOT_KEY    = window.PROFA_CONFIG?.riotKey    || localStorage.getItem('lol_key')     || 'RGAPI-f6700e95-c12d-4e21-93ea-ad1f4ecb9928';
+    const RIOT_KEY    = window.PROFA_CONFIG?.riotKey    || localStorage.getItem('lol_key')     || 'RGAPI-ad7ff338-c0d0-4304-ad5e-e0b02ff6fb75';
     const ESPORTS_KEY = window.PROFA_CONFIG?.esportsKey || localStorage.getItem('esports_key') || '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
     const KEY_SAVED_AT = parseInt(localStorage.getItem('lol_key_ts') || '0');
     const KEY_TTL = 24 * 60 * 60 * 1000; // 24h
